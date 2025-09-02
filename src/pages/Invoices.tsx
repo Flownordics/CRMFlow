@@ -1,0 +1,344 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
+  Receipt,
+  Send,
+  Coins,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Invoice } from "@/services/invoices";
+import { useInvoices } from "@/services/invoices";
+import { generatePDF } from "@/lib/pdf";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { DataTable } from "@/components/tables/DataTable";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/EmptyState";
+import { InvoicesKpiHeader, InvoiceStatusFilters, InvoiceEmptyState, getInvoiceTheme, tokenBg, tokenText } from "@/components/invoices";
+import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import { formatMoneyMinor } from "@/lib/money";
+import { useCompanyLookup } from "@/hooks/useCompanyLookup";
+
+const Invoices: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { toast } = useToast();
+  const { t } = useI18n();
+  const { getCompanyName } = useCompanyLookup();
+
+  // Fetch invoices from API
+  const { data: invoicesData, isLoading, error } = useInvoices({
+    q: searchTerm,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+  });
+
+  const invoices = invoicesData?.data || [];
+  const totalInvoices = invoicesData?.total || 0;
+
+  const filteredInvoices = invoices.filter((invoice) => {
+    const matchesSearch = invoice.number
+      ? invoice.number.toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+    const matchesStatus =
+      statusFilter === "all" || invoice.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Calculate counts for status filters
+  const statusCounts = invoices.reduce((acc, invoice) => {
+    acc[invoice.status] = (acc[invoice.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="h-8 bg-muted/30 animate-pulse rounded" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-24 bg-muted/30 animate-pulse rounded-2xl" />
+          ))}
+        </div>
+        <div className="space-y-2">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-16 bg-muted/30 animate-pulse rounded" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="text-center text-destructive">
+          Error: {error.message}
+        </div>
+      </div>
+    );
+  }
+
+  const handleGeneratePDF = async (invoice: Invoice) => {
+    try {
+      const url = await generatePDF("invoice", invoice.id);
+      if (typeof url === 'string') {
+        window.open(url, "_blank");
+      }
+
+      toast({
+        title: "PDF Generated",
+        description: `Invoice ${invoice.number} has been opened in a new tab.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteInvoice = (invoiceId: string) => {
+    toast({
+      title: "Invoice Deleted",
+      description: "The invoice has been removed.",
+    });
+  };
+
+  const handleStatusChange = (
+    invoiceId: string,
+    newStatus: Invoice["status"],
+  ) => {
+    toast({
+      title: "Status Updated",
+      description: `Invoice status changed to ${newStatus}.`,
+    });
+  };
+
+  const isOverdue = (dueDate: string) => {
+    return new Date(dueDate) < new Date();
+  };
+
+  const getDaysOverdue = (dueDate: string) => {
+    const diffTime = new Date().getTime() - new Date(dueDate).getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const isDueSoon = (dueDate: string) => {
+    if (!dueDate) return false;
+    const due = new Date(dueDate);
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return due <= sevenDaysFromNow && due > now;
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "—";
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header with subtitle and gradient separator */}
+      <PageHeader
+        title="Invoices"
+        subtitle="Track billing, payments and overdue balances."
+        actions={
+          <Button>
+            <Plus aria-hidden="true" className="mr-2 h-4 w-4" />
+            New Invoice
+          </Button>
+        }
+      />
+      <div className="h-0.5 w-full bg-gradient-to-r from-accent/30 via-primary/30 to-transparent rounded-full" aria-hidden="true" />
+
+      {/* KPI Cards */}
+      <InvoicesKpiHeader invoices={invoices} currency="DKK" />
+
+      {/* Search and Filters */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex max-w-md gap-2">
+            <div className="relative flex-1">
+              <Search
+                aria-hidden="true"
+                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+              />
+              <Input
+                placeholder="Search invoices..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button variant="outline">
+              <Filter aria-hidden="true" className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Status Filters */}
+        <InvoiceStatusFilters
+          activeFilter={statusFilter}
+          onFilterChange={setStatusFilter}
+          counts={statusCounts}
+        />
+      </div>
+
+      {/* Invoices View */}
+      {filteredInvoices.length === 0 ? (
+        <InvoiceEmptyState
+          onCreate={() => navigate("/invoices/new")}
+          onConvertFromOrder={() => navigate("/orders")}
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Invoice</TableHead>
+              <TableHead>Company</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Due Date</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredInvoices.map((invoice) => {
+              const theme = getInvoiceTheme(invoice.status);
+              const Icon = theme.icon;
+              const overdue = invoice.due_date ? isOverdue(invoice.due_date) : false;
+              const dueSoon = invoice.due_date ? isDueSoon(invoice.due_date) : false;
+
+              return (
+                <TableRow key={invoice.id} className="hover:bg-muted/30 transition">
+                  <TableCell>
+                    <div className="inline-flex items-center gap-2">
+                      <Icon className={cn("h-4 w-4", tokenText(theme.color))} aria-hidden="true" focusable="false" />
+                      <span className="font-medium">{invoice.number ?? "—"}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="truncate">
+                    {getCompanyName(invoice.company_id)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {formatMoneyMinor(invoice.total_minor || 0, invoice.currency || "DKK")}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge intent={invoice.status === "draft" ? "draft" :
+                      invoice.status === "sent" ? "active" :
+                        invoice.status === "paid" ? "closed" :
+                          invoice.status === "overdue" ? "overdue" : "draft"}>
+                      {invoice.status}
+                    </StatusBadge>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {overdue ? (
+                      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs", tokenBg("danger"), tokenText("danger"))}>
+                        {t("overdue")}
+                      </span>
+                    ) : dueSoon ? (
+                      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs", tokenBg("warning"), tokenText("warning"))}>
+                        {t("due_soon")}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">{formatDate(invoice.due_date)}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("open_pdf")}
+                        onClick={() => handleGeneratePDF(invoice)}
+                      >
+                        <Download className="h-4 w-4" aria-hidden="true" focusable="false" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("send")}
+                        disabled={invoice.status === "paid"}
+                      >
+                        <Send className="h-4 w-4" aria-hidden="true" focusable="false" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("add_payment")}
+                        disabled={invoice.status !== "sent" && invoice.status !== "overdue"}
+                      >
+                        <Coins className="h-4 w-4" aria-hidden="true" focusable="false" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/invoices/${invoice.id}`)}
+                        aria-label={`View ${invoice.number}`}
+                      >
+                        <Eye className="h-4 w-4" aria-hidden="true" focusable="false" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Edit ${invoice.number}`}
+                      >
+                        <Edit className="h-4 w-4" aria-hidden="true" focusable="false" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteInvoice(invoice.id)}
+                        aria-label={`Delete ${invoice.number}`}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" focusable="false" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+};
+
+export default Invoices;

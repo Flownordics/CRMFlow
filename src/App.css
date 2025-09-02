@@ -5,18 +5,7 @@
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
+/* TODO(DS): logo styles moved to design system */
 
 @keyframes logo-spin {
   from {
@@ -33,10 +22,8 @@
   }
 }
 
-.card {
-  padding: 2em;
-}
+/* TODO(DS): justify override - card padding moved to design system */
 
 .read-the-docs {
-  color: #888;
+  color: hsl(var(--muted-foreground));
 }

@@ -1,73 +1,130 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Prism CRM Design System - Professional CRM Platform */
+/* CRMFlow Design System - Professional CRM Platform */
 
 @layer base {
   :root {
     /* Core Brand Colors */
-    --primary: 203 77% 19%;          /* Deep Navy #0b3a54 */
+    --primary: 203 77% 19%;
+    /* Deep Navy */
     --primary-foreground: 0 0% 98%;
-    --primary-light: 203 60% 35%;    /* Lighter navy for hover states */
-    --primary-dark: 203 85% 12%;     /* Darker navy for pressed states */
-    
-    --accent: 160 83% 39%;           /* Emerald Green #10B981 */
+    --primary-light: 203 60% 35%;
+    /* Lighter navy for hover states */
+    --primary-dark: 203 85% 12%;
+    /* Darker navy for pressed states */
+
+    --accent: 160 83% 39%;
+    /* Emerald Green */
     --accent-foreground: 0 0% 98%;
-    --accent-light: 160 70% 50%;     /* Lighter emerald */
-    --accent-dark: 160 90% 30%;      /* Darker emerald */
-    
+    --accent-light: 160 70% 50%;
+    /* Lighter emerald */
+    --accent-dark: 160 90% 30%;
+    /* Darker emerald */
+
     /* Success & Status Colors */
-    --success: 160 83% 39%;          /* Emerald for success */
+    --success: 160 83% 39%;
+    /* Emerald for success */
     --success-foreground: 0 0% 98%;
-    --warning: 43 96% 56%;           /* Amber for warnings */
+    --warning: 43 96% 56%;
+    /* Amber for warnings */
     --warning-foreground: 0 0% 9%;
-    --destructive: 0 72% 51%;        /* Red for errors */
+    --destructive: 0 72% 51%;
+    /* Red for errors */
     --destructive-foreground: 0 0% 98%;
-    
+
     /* Neutral Palette */
     --background: 0 0% 100%;
-    --foreground: 203 20% 12%;       /* Dark navy-gray */
+    --foreground: 203 20% 12%;
+    /* Dark navy-gray */
     --card: 0 0% 100%;
     --card-foreground: 203 20% 12%;
     --popover: 0 0% 100%;
     --popover-foreground: 203 20% 12%;
-    
-    --secondary: 203 12% 96%;        /* Light navy-gray */
+
+    --secondary: 203 12% 96%;
+    /* Light navy-gray */
     --secondary-foreground: 203 20% 12%;
     --muted: 203 12% 96%;
     --muted-foreground: 203 10% 45%;
-    
+
     --border: 203 15% 91%;
     --input: 203 15% 91%;
     --ring: 203 77% 19%;
-    
+
     /* CRM-specific colors */
-    --sidebar-bg: 203 20% 7%;        /* Very dark navy for sidebar */
+    --sidebar-bg: 203 20% 7%;
+    /* Very dark navy for sidebar */
     --sidebar-foreground: 203 15% 85%;
     --sidebar-active: 203 77% 19%;
     --sidebar-hover: 203 25% 12%;
-    
-    /* Status indicators */
-    --status-draft: 43 96% 56%;      /* Amber */
-    --status-active: 160 83% 39%;    /* Emerald */
-    --status-closed: 203 20% 50%;    /* Gray */
-    --status-overdue: 0 72% 51%;     /* Red */
-    
+
+    /* Sidebar dimensions - single source of truth */
+    --sidebar-width: 280px;
+    --sidebar-width-collapsed: 64px;
+    --sidebar-width-icon: 64px;
+
+    /* Status indicators - updated with user's preferred colors */
+    --status-draft: 42 45% 85%;
+    /* Warm cream */
+    --status-active: 86 25% 70%;
+    /* Sage green */
+    --status-closed: 150 7% 61%;
+    /* Muted green */
+    --status-overdue: 8 95% 72%;
+    /* Coral red */
+
+    /* Brand colors - user's preferred palette */
+    --brand-primary: 212 30% 57%;
+    /* Blue-gray */
+    --brand-muted: 210 5% 39%;
+    /* Muted gray */
+    --brand-accent: 28 62% 68%;
+    /* Warm gold */
+
+    /* Additional brand colors from user's palette */
+    --brand-secondary: 42 45% 85%;
+    /* Cream */
+    --brand-tertiary: 86 25% 70%;
+    /* Sage */
+    --brand-warm: 28 62% 68%;
+    /* Gold */
+    --brand-neutral: 150 7% 61%;
+    /* Muted green */
+    --brand-coral: 8 95% 72%;
+    /* Coral */
+    --brand-earth: 12 44% 47%;
+    /* Earth red */
+
+    /* Feedback colors */
+    --danger: 12 44% 47%;
+    /* Earth red */
+
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(203 77% 19%) 0%, hsl(203 60% 35%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(160 83% 39%) 0%, hsl(160 70% 50%) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(203 12% 98%) 100%);
-    
+    --gradient-primary: linear-gradient(135deg,
+        hsl(203 77% 19%) 0%,
+        hsl(203 60% 35%) 100%);
+    --gradient-accent: linear-gradient(135deg,
+        hsl(160 83% 39%) 0%,
+        hsl(160 70% 50%) 100%);
+    --gradient-subtle: linear-gradient(180deg,
+        hsl(0 0% 100%) 0%,
+        hsl(203 12% 98%) 100%);
+
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(203 20% 12% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(203 20% 12% / 0.1), 0 2px 4px -2px hsl(203 20% 12% / 0.05);
-    --shadow-lg: 0 10px 15px -3px hsl(203 20% 12% / 0.1), 0 4px 6px -4px hsl(203 20% 12% / 0.05);
+    --shadow-md:
+      0 4px 6px -1px hsl(203 20% 12% / 0.1),
+      0 2px 4px -2px hsl(203 20% 12% / 0.05);
+    --shadow-lg:
+      0 10px 15px -3px hsl(203 20% 12% / 0.1),
+      0 4px 6px -4px hsl(203 20% 12% / 0.05);
     --shadow-primary: 0 4px 14px 0 hsl(203 77% 19% / 0.25);
     --shadow-accent: 0 4px 14px 0 hsl(160 83% 39% / 0.25);
-    
+
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -93,16 +150,18 @@
 
   .dark {
     /* Core Brand Colors - Dark Mode */
-    --primary: 203 77% 25%;          /* Lighter navy for dark mode */
+    --primary: 203 77% 25%;
+    /* Lighter navy for dark mode */
     --primary-foreground: 0 0% 98%;
     --primary-light: 203 60% 40%;
     --primary-dark: 203 85% 15%;
-    
-    --accent: 160 83% 45%;           /* Brighter emerald for dark mode */
+
+    --accent: 160 83% 45%;
+    /* Brighter emerald for dark mode */
     --accent-foreground: 0 0% 98%;
     --accent-light: 160 70% 55%;
     --accent-dark: 160 90% 35%;
-    
+
     /* Success & Status Colors - Dark Mode */
     --success: 160 83% 45%;
     --success-foreground: 0 0% 98%;
@@ -110,40 +169,83 @@
     --warning-foreground: 0 0% 9%;
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 98%;
-    
+
     /* Neutral Palette - Dark Mode */
-    --background: 203 25% 8%;        /* Very dark navy */
+    --background: 203 25% 8%;
+    /* Very dark navy */
     --foreground: 203 15% 85%;
     --card: 203 20% 10%;
     --card-foreground: 203 15% 85%;
     --popover: 203 20% 10%;
     --popover-foreground: 203 15% 85%;
-    
+
     --secondary: 203 15% 15%;
     --secondary-foreground: 203 15% 85%;
     --muted: 203 15% 15%;
     --muted-foreground: 203 10% 60%;
-    
+
     --border: 203 15% 20%;
     --input: 203 15% 20%;
     --ring: 203 77% 25%;
-    
+
     /* CRM-specific colors - Dark Mode */
-    --sidebar-bg: 203 30% 5%;        /* Darker navy for sidebar */
+    --sidebar-bg: 203 30% 5%;
+    /* Darker navy for sidebar */
     --sidebar-foreground: 203 15% 80%;
     --sidebar-active: 203 77% 25%;
     --sidebar-hover: 203 25% 12%;
-    
-    /* Status indicators - Dark Mode */
-    --status-draft: 43 96% 62%;
-    --status-active: 160 83% 45%;
-    --status-closed: 203 20% 60%;
-    --status-overdue: 0 72% 55%;
-    
+
+    /* Sidebar dimensions - single source of truth */
+    --sidebar-width: 280px;
+    --sidebar-width-collapsed: 64px;
+    --sidebar-width-icon: 64px;
+
+    /* Status indicators - Dark Mode with user's palette */
+    --status-draft: 42 30% 32%;
+    /* Darker cream */
+    --status-active: 86 18% 30%;
+    /* Darker sage */
+    --status-closed: 150 6% 28%;
+    /* Darker muted green */
+    --status-overdue: 8 80% 55%;
+    /* Darker coral */
+
+    /* Brand colors - Dark Mode */
+    --brand-primary: 212 30% 65%;
+    /* Lighter blue-gray */
+    --brand-muted: 210 6% 70%;
+    /* Lighter muted gray */
+    --brand-accent: 28 62% 62%;
+    /* Darker warm gold */
+
+    /* Additional brand colors - Dark Mode */
+    --brand-secondary: 42 30% 32%;
+    /* Darker cream */
+    --brand-tertiary: 86 18% 30%;
+    /* Darker sage */
+    --brand-warm: 28 62% 62%;
+    /* Darker gold */
+    --brand-neutral: 150 6% 28%;
+    /* Darker muted green */
+    --brand-coral: 8 80% 55%;
+    /* Darker coral */
+    --brand-earth: 12 44% 50%;
+    /* Lighter earth red */
+
+    /* Feedback colors - Dark Mode */
+    --danger: 12 44% 50%;
+    /* Lighter earth red */
+
     /* Gradients - Dark Mode */
-    --gradient-primary: linear-gradient(135deg, hsl(203 77% 25%) 0%, hsl(203 60% 40%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(160 83% 45%) 0%, hsl(160 70% 55%) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(203 25% 8%) 0%, hsl(203 20% 12%) 100%);
+    --gradient-primary: linear-gradient(135deg,
+        hsl(203 77% 25%) 0%,
+        hsl(203 60% 40%) 100%);
+    --gradient-accent: linear-gradient(135deg,
+        hsl(160 83% 45%) 0%,
+        hsl(160 70% 55%) 100%);
+    --gradient-subtle: linear-gradient(180deg,
+        hsl(203 25% 8%) 0%,
+        hsl(203 20% 12%) 100%);
   }
 }
 
@@ -154,24 +256,68 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-family:
+      "Inter",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
-  
+
   /* CRM-specific utilities */
   .crm-gradient-primary {
     background: var(--gradient-primary);
   }
-  
+
   .crm-gradient-accent {
     background: var(--gradient-accent);
   }
-  
+
   .crm-shadow-card {
     box-shadow: var(--shadow-md);
   }
-  
+
   .crm-transition {
     transition: var(--transition-smooth);
+  }
+
+  /* Chart utilities */
+  .chart-indicator {
+    background-color: hsl(var(--color-bg, var(--muted)));
+    border-color: hsl(var(--color-border, var(--border)));
+  }
+
+  .chart-legend-item {
+    background-color: hsl(var(--color, var(--muted)));
+  }
+
+  /* Progress utilities */
+  .progress-indicator {
+    transform: translateX(calc(-100% + var(--progress, 0%)));
+  }
+
+  .progress-indicator[data-progress] {
+    transform: translateX(calc(-100% + attr(data-progress) * 1%));
+  }
+
+  /* Modal utilities */
+  .max-h-modal {
+    max-height: 20rem;
+    /* ~320px */
+  }
+
+  /* Custom scrollbar for horizontal Kanban */
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground));
+    border-radius: 9999px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 9999px;
   }
 }

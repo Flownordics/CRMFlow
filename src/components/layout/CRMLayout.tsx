@@ -1,23 +1,15 @@
-import { SidebarProvider } from "@/components/ui/sidebar"
-import { AppSidebar } from "./AppSidebar"
-import { Header } from "./Header"
+import { AppSidebar } from "./AppSidebar";
+import { Outlet } from "react-router-dom";
 
-interface CRMLayoutProps {
-  children: React.ReactNode
-}
-
-export function CRMLayout({ children }: CRMLayoutProps) {
+export function CRMLayout() {
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+    <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[auto_1fr]">
+      <aside className="hidden md:block md:sticky md:top-0 md:h-dvh">
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <Header />
-          <main className="flex-1 p-6 overflow-auto">
-            {children}
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
-  )
+      </aside>
+      <main className="px-4 py-6">
+        <Outlet />
+      </main>
+    </div>
+  );
 }

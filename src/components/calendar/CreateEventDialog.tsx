@@ -1,0 +1,470 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Dialog,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { AccessibleDialogContent } from "@/components/ui/accessible-dialog";
+import { useCreateEvent, CreateEventPayload } from "@/services/events";
+import { useCreateCalendarEvent, CreateEventPayload as GoogleCreateEventPayload, CrmReference } from "@/services/calendar";
+import { toastBus } from "@/lib/toastBus";
+import { logEventActivity } from "@/services/activity";
+import { Calendar, Clock, MapPin, User, Database, Globe } from "lucide-react";
+import { CompanySelect } from "@/components/selects/CompanySelect";
+import { SearchSelect } from "@/components/selects/SearchSelect";
+import { useI18n } from "@/lib/i18n";
+
+interface CreateEventDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onEventCreated: () => void;
+    showGoogleLayer?: boolean;
+    isGoogleConnected?: boolean;
+}
+
+export function CreateEventDialog({
+    open,
+    onOpenChange,
+    onEventCreated,
+    showGoogleLayer = false,
+    isGoogleConnected = false
+}: CreateEventDialogProps) {
+    const { t } = useI18n();
+    const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
+    const [location, setLocation] = useState("");
+    const [startDate, setStartDate] = useState("");
+    const [startTime, setStartTime] = useState("");
+    const [endDate, setEndDate] = useState("");
+    const [endTime, setEndTime] = useState("");
+    const [allDay, setAllDay] = useState(false);
+    const [attendees, setAttendees] = useState("");
+    const [selectedDealId, setSelectedDealId] = useState<string>("");
+    const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+    const [selectedQuoteId, setSelectedQuoteId] = useState<string>("");
+    const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+    const [eventKind, setEventKind] = useState<"meeting" | "call" | "deadline" | "other">("meeting");
+    const [eventColor, setEventColor] = useState<"primary" | "accent" | "warning" | "success" | "muted">("primary");
+    const [alsoCreateInGoogle, setAlsoCreateInGoogle] = useState(false);
+
+    const createNativeEvent = useCreateEvent();
+    const createGoogleEvent = useCreateCalendarEvent();
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!title.trim() || !startDate || !endDate) {
+            toastBus.emit({
+                title: "Validation Error",
+                description: "Please fill in all required fields",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        try {
+            const startDateTime = allDay || !startTime
+                ? `${startDate}T00:00:00Z`
+                : `${startDate}T${startTime}:00Z`;
+
+            const endDateTime = allDay || !endTime
+                ? `${endDate}T23:59:59Z`
+                : `${endDate}T${endTime}:00Z`;
+
+            // Parse attendees
+            const attendeesList = attendees.trim()
+                ? attendees.split(',').map(email => ({
+                    email: email.trim(),
+                    name: email.trim().split('@')[0],
+                    optional: false
+                }))
+                : [];
+
+            // Create native event first
+            const nativePayload: CreateEventPayload = {
+                title: title.trim(),
+                description: description.trim() || undefined,
+                start_at: startDateTime,
+                end_at: endDateTime,
+                all_day: allDay,
+                location: location.trim() || undefined,
+                attendees: attendeesList,
+                color: eventColor,
+                kind: eventKind,
+                deal_id: selectedDealId || undefined,
+                company_id: selectedCompanyId || undefined,
+                quote_id: selectedQuoteId || undefined,
+                order_id: selectedOrderId || undefined,
+            };
+
+            const nativeEvent = await createNativeEvent.mutateAsync(nativePayload);
+
+            // Log calendar event creation
+            try {
+                await logEventActivity('created', nativeEvent.id, {
+                    dealId: selectedDealId || undefined,
+                    companyId: selectedCompanyId || undefined,
+                    quoteId: selectedQuoteId || undefined,
+                    orderId: selectedOrderId || undefined,
+                    kind: eventKind,
+                    title: title.trim()
+                });
+            } catch (activityError) {
+                console.warn('Failed to log calendar activity:', activityError);
+            }
+
+            // If also creating in Google and connected
+            if (alsoCreateInGoogle && isGoogleConnected) {
+                try {
+                    const googlePayload: GoogleCreateEventPayload = {
+                        summary: title.trim(),
+                        description: description.trim() || undefined,
+                        location: location.trim() || undefined,
+                        start: {
+                            dateTime: startDateTime,
+                            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                        },
+                        end: {
+                            dateTime: endDateTime,
+                            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                        },
+                        attendees: attendeesList.map(att => ({
+                            email: att.email,
+                            displayName: att.name
+                        })),
+                        reminders: {
+                            useDefault: true
+                        },
+                        crmRef: {
+                            dealId: selectedDealId || undefined,
+                            companyId: selectedCompanyId || undefined,
+                            quoteId: selectedQuoteId || undefined,
+                            orderId: selectedOrderId || undefined,
+                            kind: eventKind
+                        }
+                    };
+
+                    await createGoogleEvent.mutateAsync(googlePayload);
+                } catch (googleError) {
+                    console.error('Failed to create Google event:', googleError);
+                    toastBus.emit({
+                        title: "Partial Success",
+                        description: "Event created in native calendar, but failed to sync with Google",
+                        variant: "warning"
+                    });
+                }
+            }
+
+            // Reset form
+            resetForm();
+
+            // Close dialog and notify parent
+            onOpenChange(false);
+            onEventCreated();
+
+            toastBus.emit({
+                title: "Event Created",
+                description: "Your calendar event has been created successfully",
+                variant: "success"
+            });
+        } catch (error) {
+            // Error handling is done in the mutation hook
+        }
+    };
+
+    const resetForm = () => {
+        setTitle("");
+        setDescription("");
+        setLocation("");
+        setStartDate("");
+        setStartTime("");
+        setEndDate("");
+        setEndTime("");
+        setAllDay(false);
+        setAttendees("");
+        setSelectedDealId("");
+        setSelectedCompanyId("");
+        setSelectedQuoteId("");
+        setSelectedOrderId("");
+        setEventKind("meeting");
+        setEventColor("primary");
+        setAlsoCreateInGoogle(false);
+    };
+
+    const handleCancel = () => {
+        resetForm();
+        onOpenChange(false);
+    };
+
+    // Set default dates when dialog opens
+    const handleOpenChange = (open: boolean) => {
+        if (open) {
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            setStartDate(now.toISOString().split('T')[0]);
+            setStartTime(now.toTimeString().slice(0, 5));
+            setEndDate(tomorrow.toISOString().split('T')[0]);
+            setEndTime(now.toTimeString().slice(0, 5));
+        }
+        onOpenChange(open);
+    };
+
+    const isLoading = createNativeEvent.isPending || createGoogleEvent.isPending;
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <AccessibleDialogContent
+                className="sm:max-w-[600px]"
+            >
+                {/* 🔒 These must render on the very first paint, unconditionally */}
+                <DialogHeader>
+                    <DialogTitle>{t('create_event') || "Create Event"}</DialogTitle>
+                    <DialogDescription>{`Create a new event in your native calendar${isGoogleConnected ? " with optional Google sync" : ""}`}</DialogDescription>
+                </DialogHeader>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="title">Event Title *</Label>
+                        <Input
+                            id="title"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Meeting with client"
+                            required
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="description">Description</Label>
+                        <Textarea
+                            id="description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Event details and agenda..."
+                            rows={3}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="location">{t('location')}</Label>
+                        <div className="relative">
+                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                id="location"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                placeholder="Office, Zoom, or physical address"
+                                className="pl-10"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Checkbox
+                            id="allDay"
+                            checked={allDay}
+                            onCheckedChange={(checked) => setAllDay(checked as boolean)}
+                        />
+                        <Label htmlFor="allDay">{t('all_day')}</Label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="startDate">Start Date *</Label>
+                            <Input
+                                id="startDate"
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="startTime">Start Time</Label>
+                            <Input
+                                id="startTime"
+                                type="time"
+                                value={startTime}
+                                onChange={(e) => setStartTime(e.target.value)}
+                                disabled={allDay}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="endDate">End Date *</Label>
+                            <Input
+                                id="endDate"
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="endTime">End Time</Label>
+                            <Input
+                                id="endTime"
+                                type="time"
+                                value={endTime}
+                                onChange={(e) => setEndTime(e.target.value)}
+                                disabled={allDay}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="attendees">{t('attendees')}</Label>
+                        <div className="relative">
+                            <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                id="attendees"
+                                value={attendees}
+                                onChange={(e) => setAttendees(e.target.value)}
+                                placeholder="email1@example.com, email2@example.com"
+                                className="pl-10"
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Separate multiple email addresses with commas
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="eventKind">Event Type</Label>
+                            <select
+                                id="eventKind"
+                                value={eventKind}
+                                onChange={(e) => setEventKind(e.target.value as any)}
+                                className="w-full px-3 py-2 border border-input rounded-md"
+                            >
+                                <option value="meeting">{t('meeting')}</option>
+                                <option value="call">{t('call')}</option>
+                                <option value="deadline">{t('deadline')}</option>
+                                <option value="other">{t('other')}</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="eventColor">Color</Label>
+                            <select
+                                id="eventColor"
+                                value={eventColor}
+                                onChange={(e) => setEventColor(e.target.value as any)}
+                                className="w-full px-3 py-2 border border-input rounded-md"
+                            >
+                                <option value="primary">{t('primary')}</option>
+                                <option value="accent">{t('accent')}</option>
+                                <option value="warning">{t('warning')}</option>
+                                <option value="success">{t('success')}</option>
+                                <option value="muted">{t('muted')}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* CRM Linking Section */}
+                    <div className="space-y-4 pt-4 border-t">
+                        <h3 className="text-sm font-medium">{t('link_to')} CRM</h3>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="company">{t('company')}</Label>
+                                <CompanySelect
+                                    value={selectedCompanyId}
+                                    onValueChange={setSelectedCompanyId}
+                                    placeholder="Select company..."
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="deal">{t('deal')}</Label>
+                                <SearchSelect
+                                    value={selectedDealId}
+                                    onValueChange={setSelectedDealId}
+                                    placeholder="Search deals..."
+                                    searchType="deals"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="quote">{t('quote')}</Label>
+                                <SearchSelect
+                                    value={selectedQuoteId}
+                                    onValueChange={setSelectedQuoteId}
+                                    placeholder="Search quotes..."
+                                    searchType="quotes"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="order">{t('order')}</Label>
+                                <SearchSelect
+                                    value={selectedOrderId}
+                                    onValueChange={setSelectedOrderId}
+                                    placeholder="Search orders..."
+                                    searchType="orders"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Google Sync Option */}
+                    {isGoogleConnected && (
+                        <div className="flex items-center space-x-2 pt-4 border-t">
+                            <Checkbox
+                                id="alsoCreateInGoogle"
+                                checked={alsoCreateInGoogle}
+                                onCheckedChange={(checked) => setAlsoCreateInGoogle(checked as boolean)}
+                            />
+                            <Label htmlFor="alsoCreateInGoogle" className="flex items-center gap-2">
+                                <Globe className="h-4 w-4" />
+                                {t('also_create_in_google')}
+                            </Label>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleCancel}
+                            disabled={isLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={isLoading || !title.trim() || !startDate || !endDate}
+                            className="flex items-center gap-2"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                    Creating...
+                                </>
+                            ) : (
+                                <>
+                                    <Database className="h-4 w-4" />
+                                    {t('create_event')}
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </AccessibleDialogContent>
+        </Dialog>
+    );
+}

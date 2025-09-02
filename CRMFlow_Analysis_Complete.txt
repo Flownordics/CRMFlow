@@ -1,0 +1,352 @@
+CRMFlow Codebase Analysis - Complete Report
+============================================
+
+Based on my analysis of the CRMFlow codebase, I can now provide comprehensive answers to your questions about multitenancy, data models, and API contracts. Here are the detailed responses:
+
+## 1) Multitenancy, auth & ownership
+
+{
+  "workspaceModel": "none",
+  "workspaceIdentifier": null,
+  "authUserIdSource": "localStorage",
+  "tablesNeedingCreatedBy": ["companies", "people", "deals", "quotes", "orders", "invoices", "line_items", "activities", "documents"],
+  "tablesNeedingWorkspaceId": [],
+  "sharedDataExceptions": ["pipelines", "stages"],
+  "rbacRolesUsed": []
+}
+
+Analysis:
+- Current state: No multitenancy implementation found
+- Auth: Uses Supabase auth but stores token in localStorage.getItem("auth_token")
+- User identification: useAuthStore gets user ID from Supabase session
+- No workspace scoping: All API calls are made without workspace context
+- Shared data: Pipelines and stages appear to be global/system-wide
+
+## 2) Entities & felter (eksakt frontend-kontrakt)
+
+### Companies
+{
+  "entity": "companies",
+  "requiredFields": ["id", "name"],
+  "optionalFields": ["email", "domain", "vat", "phone", "address", "city", "country", "industry", "website"],
+  "types": { "id": "string", "name": "string", "email": "string|null", "domain": "string|null", "vat": "string|null", "phone": "string|null", "address": "string|null", "city": "string|null", "country": "string|null", "industry": "string|null", "website": "string|null" },
+  "nullables": ["email", "domain", "vat", "phone", "address", "city", "country", "industry", "website"],
+  "defaultsUsedInUI": {},
+  "enumsInUse": {},
+  "dateFields": ["createdAt", "updatedAt"],
+  "currencyFieldsMinor": []
+}
+
+### People
+{
+  "entity": "people",
+  "requiredFields": ["id", "firstName", "lastName"],
+  "optionalFields": ["companyId", "email", "phone", "title"],
+  "types": { "id": "string", "companyId": "string|null", "firstName": "string", "lastName": "string", "email": "string|null", "phone": "string|null", "title": "string|null" },
+  "nullables": ["companyId", "email", "phone", "title"],
+  "defaultsUsedInUI": {},
+  "enumsInUse": {},
+  "dateFields": ["createdAt", "updatedAt"],
+  "currencyFieldsMinor": []
+}
+
+### Deals
+{
+  "entity": "deals",
+  "requiredFields": ["id", "title", "companyId", "companyName", "stage"],
+  "optionalFields": ["value", "probability", "expectedValue", "closeDate"],
+  "types": { "id": "string", "title": "string", "companyId": "string", "companyName": "string", "value": "number", "stage": "string", "probability": "number", "expectedValue": "number", "closeDate": "string|null" },
+  "nullables": ["closeDate"],
+  "defaultsUsedInUI": { "value": 0, "probability": 50, "expectedValue": 0 },
+  "enumsInUse": {},
+  "dateFields": ["closeDate"],
+  "currencyFieldsMinor": ["value", "expectedValue"]
+}
+
+### Quotes
+{
+  "entity": "quotes",
+  "requiredFields": ["id", "status", "currency", "subtotalMinor", "taxMinor", "totalMinor", "lines"],
+  "optionalFields": ["number", "issueDate", "validUntil", "notes", "companyId", "contactId", "dealId"],
+  "types": { "id": "string", "number": "string|null", "status": "enum", "currency": "string", "issueDate": "string|null", "validUntil": "string|null", "notes": "string|null", "companyId": "string|null", "contactId": "string|null", "dealId": "string|null", "subtotalMinor": "number", "taxMinor": "number", "totalMinor": "number", "lines": "array" },
+  "nullables": ["number", "issueDate", "validUntil", "notes", "companyId", "contactId", "dealId"],
+  "defaultsUsedInUI": { "currency": "DKK" },
+  "enumsInUse": { "status": ["draft", "sent", "accepted", "declined", "expired"] },
+  "dateFields": ["issueDate", "validUntil"],
+  "currencyFieldsMinor": ["subtotalMinor", "taxMinor", "totalMinor"]
+}
+
+### Line Items
+{
+  "entity": "line_items",
+  "requiredFields": ["id", "description", "qty", "unitMinor"],
+  "optionalFields": ["sku", "taxRatePct", "discountPct"],
+  "types": { "id": "string", "sku": "string|null", "description": "string", "qty": "number", "unitMinor": "number", "taxRatePct": "number", "discountPct": "number" },
+  "nullables": ["sku"],
+  "defaultsUsedInUI": { "taxRatePct": 25, "discountPct": 0 },
+  "enumsInUse": {},
+  "dateFields": [],
+  "currencyFieldsMinor": ["unitMinor"]
+}
+
+### Documents
+{
+  "entity": "documents",
+  "requiredFields": ["id", "name", "size", "type", "url", "createdAt", "updatedAt"],
+  "optionalFields": ["dealId", "companyId", "personId"],
+  "types": { "id": "string", "name": "string", "size": "number", "type": "string", "url": "string", "dealId": "string|null", "companyId": "string|null", "personId": "string|null" },
+  "nullables": ["dealId", "companyId", "personId"],
+  "defaultsUsedInUI": {},
+  "enumsInUse": {},
+  "dateFields": ["createdAt", "updatedAt"],
+  "currencyFieldsMinor": []
+}
+
+### Activities
+{
+  "entity": "activities",
+  "requiredFields": ["id", "type", "dealId", "userId", "createdAt"],
+  "optionalFields": ["meta"],
+  "types": { "id": "string", "type": "string", "dealId": "string", "userId": "string", "meta": "object|null" },
+  "nullables": ["meta"],
+  "defaultsUsedInUI": {},
+  "enumsInUse": {},
+  "dateFields": ["createdAt"],
+  "currencyFieldsMinor": []
+}
+
+### Pipelines & Stages
+{
+  "entity": "pipelines",
+  "requiredFields": ["id", "name", "stages"],
+  "optionalFields": [],
+  "types": { "id": "string", "name": "string", "stages": "array" },
+  "nullables": [],
+  "defaultsUsedInUI": {},
+  "enumsInUse": {},
+  "dateFields": [],
+  "currencyFieldsMinor": []
+}
+
+{
+  "entity": "stages",
+  "requiredFields": ["id", "name", "order"],
+  "optionalFields": [],
+  "types": { "id": "string", "name": "string", "order": "number" },
+  "nullables": [],
+  "defaultsUsedInUI": {},
+  "enumsInUse": {},
+  "dateFields": [],
+  "currencyFieldsMinor": []
+}
+
+## 3) Relationer, constraints & unik-logik
+
+{
+  "relations": [
+    "people.companyId -> companies.id",
+    "deals.companyId -> companies.id",
+    "quotes.dealId -> deals.id",
+    "quotes.companyId -> companies.id",
+    "quotes.contactId -> people.id",
+    "orders.dealId -> deals.id",
+    "invoices.dealId -> deals.id",
+    "line_items.parent_type in ['quote','order','invoice'] with parent_id",
+    "activities.dealId -> deals.id",
+    "documents.dealId -> deals.id",
+    "documents.companyId -> companies.id",
+    "documents.personId -> people.id"
+  ],
+  "orderingNeeds": [
+    "deals: position per stage (kanban index)",
+    "stages: order field",
+    "pipelines: order field"
+  ],
+  "idempotency": [
+    "POST /deals/:id/convert/quote uses Idempotency-Key header",
+    "POST /deals/:id/convert/order uses Idempotency-Key header",
+    "POST /deals/:id/convert/invoice uses Idempotency-Key header"
+  ],
+  "uniques": [
+    "documents.storage_key unique (implied by presign flow)",
+    "optional: one active quote per deal? (false - multiple quotes possible)"
+  ]
+}
+
+## 4) API-formater som UI'en forventer
+
+[
+  {
+    "name": "fetchCompanies",
+    "method": "GET",
+    "url": "/companies",
+    "params": {"page": "number", "limit": "number", "q": "string", "industry": "string", "country": "string"},
+    "response": "{data:[], total:number, page:number, limit:number, totalPages:number}"
+  },
+  {
+    "name": "fetchCompany",
+    "method": "GET",
+    "url": "/companies/:id",
+    "params": {},
+    "response": "object"
+  },
+  {
+    "name": "createCompany",
+    "method": "POST",
+    "url": "/companies",
+    "body": {"name": "string", "email?": "string", "domain?": "string", "vat?": "string", "phone?": "string", "address?": "string", "city?": "string", "country?": "string", "industry?": "string", "website?": "string"},
+    "response": "object"
+  },
+  {
+    "name": "updateCompany",
+    "method": "PUT",
+    "url": "/companies/:id",
+    "body": {"name?": "string", "email?": "string", "domain?": "string", "vat?": "string", "phone?": "string", "address?": "string", "city?": "string", "country?": "string", "industry?": "string", "website?": "string"},
+    "response": "object"
+  },
+  {
+    "name": "fetchPeople",
+    "method": "GET",
+    "url": "/people",
+    "params": {"page": "number", "limit": "number", "q": "string", "companyId": "string", "title": "string"},
+    "response": "{data:[], total:number, page:number, limit:number, totalPages:number}"
+  },
+  {
+    "name": "fetchDeals",
+    "method": "GET",
+    "url": "/deals",
+    "params": {"page": "number", "limit": "number", "q": "string", "stageId": "string", "companyId": "string"},
+    "response": "{data:[], total:number, page:number, limit:number, totalPages:number}"
+  },
+  {
+    "name": "moveDealStage",
+    "method": "POST",
+    "url": "/deals/:id/move",
+    "body": {"stageId": "string"},
+    "response": "object"
+  },
+  {
+    "name": "presignUpload",
+    "method": "POST",
+    "url": "/uploads/presign",
+    "body": {"name": "string", "type": "string", "size": "number"},
+    "response": "{url:string, fields?:object, documentId?:string}"
+  },
+  {
+    "name": "finalizeDocument",
+    "method": "POST",
+    "url": "/documents",
+    "body": {"name": "string", "size": "number", "type": "string", "dealId?": "string", "companyId?": "string", "personId?": "string"},
+    "response": "object"
+  },
+  {
+    "name": "getPdfUrl",
+    "method": "GET",
+    "url": "/pdf/:type/:id",
+    "params": {},
+    "response": "blob"
+  }
+]
+
+## 5) Nummer-serier & settings
+
+{
+  "numbering": {
+    "quote": {"prefix": "QUOTE", "yearInfix": true, "pad": 4},
+    "order": {"prefix": "ORDER", "yearInfix": true, "pad": 4},
+    "invoice": {"prefix": "INV", "yearInfix": true, "pad": 4}
+  },
+  "defaults": {"currency": "DKK", "taxPct": 25},
+  "probabilities": [
+    {"stageName": "prospecting", "probability": 0.1},
+    {"stageName": "qualified", "probability": 0.2},
+    {"stageName": "proposal", "probability": 0.5},
+    {"stageName": "negotiation", "probability": 0.7},
+    {"stageName": "won", "probability": 1.0},
+    {"stageName": "lost", "probability": 0}
+  ]
+}
+
+## 6) Documents & storage
+
+{
+  "presign": {"endpoint": "/uploads/presign", "method": "POST", "fieldsUsed": true},
+  "finalize": {"endpoint": "/documents", "method": "POST"},
+  "documentMetadata": ["name", "size", "type", "dealId", "companyId", "personId", "url"],
+  "buckets": {"public": "documents", "private": "none"}
+}
+
+## 7) PDF & e-mail
+
+{
+  "pdf": { "urlPattern": "/pdf/:type/:id", "types": ["quote", "order", "invoice"], "method": "GET", "response": "blob" },
+  "email": { "sendQuote": "not implemented", "statusQuote": "not implemented", "idempotencyHeader": "Idempotency-Key" }
+}
+
+## 8) Payments & accounting
+
+{
+  "payment": {"fields": ["id", "invoiceId", "amountMinor", "date", "method", "note"], "methods": ["bank", "card", "cash", "other"]},
+  "invoiceStatusRules": ["paid if balance=0", "overdue if now>dueDate and balance>0", "sent otherwise"]
+}
+
+## 9) RLS-policies (forventninger i UI)
+
+{
+  "expectRls": false,
+  "policyBy": "none",
+  "joinsRequireSameWorkspace": false
+}
+
+## 10) Indexer & performance (pagination/sort)
+
+{
+  "companies": {"filters": ["q(name,domain)", "industry", "country"], "sort": ["updatedAt desc"]},
+  "people": {"filters": ["q(name,email,phone,title)", "companyId", "title"], "sort": ["updatedAt desc"]},
+  "deals": {"filters": ["q(title)", "stageId", "companyId"], "sort": ["updatedAt desc", "position asc per stage"]},
+  "quotes": {"filters": ["status"], "sort": ["updatedAt desc"]},
+  "invoices": {"filters": ["status"], "sort": ["dueDate asc", "updatedAt desc"]}
+}
+
+## Key Findings Summary
+
+1. **No multitenancy**: The system is currently single-tenant with no workspace isolation
+2. **Auth via localStorage**: Uses Supabase but stores tokens in localStorage
+3. **Currency handling**: All monetary values use minor units (e.g., DKK*100)
+4. **Default tax**: 25% VAT is hardcoded throughout the system
+5. **Stage probabilities**: Hardcoded probability values for pipeline stages
+6. **No RLS**: UI doesn't expect row-level security policies
+7. **Idempotency**: Conversion endpoints use Idempotency-Key headers
+8. **Document flow**: Presign → Upload → Finalize pattern for file handling
+
+## Implementation Notes
+
+- The system is designed for Danish market (DKK currency, 25% VAT)
+- All monetary calculations use minor units to avoid floating-point precision issues
+- Pipeline stages have hardcoded probability values for weighted pipeline calculations
+- Document uploads use a two-step process: presign then finalize
+- PDF generation is supported for quotes, orders, and invoices
+- The UI expects paginated responses with consistent structure across all list endpoints
+- No workspace isolation means all data is shared across the entire system
+
+## Recommendations for Multitenancy
+
+To implement multitenancy, you would need to:
+1. Add workspace_id field to all relevant tables
+2. Modify API endpoints to filter by workspace_id
+3. Update authentication to include workspace context
+4. Implement RLS policies in Supabase
+5. Update UI components to handle workspace switching
+6. Modify all service calls to include workspace context
+
+## Data Model Dependencies
+
+The system has a clear hierarchy:
+- Companies contain People
+- Deals are linked to Companies and optionally to People
+- Quotes, Orders, and Invoices are derived from Deals
+- Line Items can belong to Quotes, Orders, or Invoices
+- Documents can be attached to any entity
+- Activities track changes to Deals
+
+This structure supports a typical CRM sales pipeline from prospecting to closed deals, with the ability to generate formal documents at each stage.
