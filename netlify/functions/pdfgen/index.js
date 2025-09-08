@@ -34,7 +34,6 @@ const PAGE_HEIGHT = 842;
 const MARGIN_TOP = 24;
 const MARGIN_BOTTOM = 24;
 const MARGIN_SIDE = 32;
-const CONTENT_WIDTH = PAGE_WIDTH - (MARGIN_SIDE * 2);
 
 // Safe content area
 const CONTENT_LEFT = MARGIN_SIDE;
