@@ -1,4 +1,3 @@
-import { apiClient } from "@/lib/api";
 import { USE_MOCKS } from "@/lib/debug";
 import { toastBus } from "@/lib/toastBus";
 
@@ -27,15 +26,13 @@ export async function getPdfUrl(type: PDFType, id: string): Promise<PDFResponse>
   }
 
   try {
-    // Call the Supabase Edge Function for PDF generation
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const response = await fetch(`${supabaseUrl}/functions/v1/pdf-generator`, {
+    // Call the Netlify Function for PDF generation (new professional version)
+    const response = await fetch('/.netlify/functions/pdfgen', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify({ type, id })
+      body: JSON.stringify({ type, data: { id } })
     });
 
     if (!response.ok) {
@@ -43,7 +40,21 @@ export async function getPdfUrl(type: PDFType, id: string): Promise<PDFResponse>
       throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const blob = await response.blob();
+    // Handle base64 encoded response from Netlify Functions
+    let blob;
+    if (response.headers.get('content-type') === 'application/pdf') {
+      // Direct PDF response
+      blob = await response.blob();
+    } else {
+      // Base64 encoded response
+      const base64Data = await response.text();
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      blob = new Blob([bytes], { type: 'application/pdf' });
+    }
     const url = URL.createObjectURL(blob);
 
     // Extract filename from Content-Disposition header or generate default
