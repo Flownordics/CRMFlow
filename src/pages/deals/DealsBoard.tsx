@@ -215,6 +215,7 @@ export default function DealsBoard() {
 
     // Keep track of processed deals to avoid duplicates
     const processedDeals = new Set<string>();
+    const skippedDeals: Array<{ id: string; stage_id: string; title: string }> = [];
 
     for (const d of deals) {
       // If filtering by stage, only include deals from that stage
@@ -249,7 +250,10 @@ export default function DealsBoard() {
       if (m[d.stage_id]) {
         m[d.stage_id].push(dealData);
       } else {
-        console.warn(`Deal ${d.id} has invalid stage_id: ${d.stage_id}. Skipping.`);
+        console.warn(`Deal ${d.id} has invalid stage_id: ${d.stage_id}. This deal belongs to a different pipeline and will not be displayed.`);
+        skippedDeals.push({ id: d.id, stage_id: d.stage_id, title: d.title });
+        // Optionally, we could add it to a special "Other Pipeline" section
+        // For now, we'll just skip it to maintain the current behavior
       }
     }
 
@@ -257,8 +261,13 @@ export default function DealsBoard() {
       stageKeys: Object.keys(m),
       stageCounts: Object.fromEntries(
         Object.entries(m).map(([stageId, deals]) => [stageId, deals.length])
-      )
+      ),
+      skippedDeals: skippedDeals.length > 0 ? skippedDeals : undefined
     });
+
+    if (skippedDeals.length > 0) {
+      console.warn(`[DealsBoard] Skipped ${skippedDeals.length} deals from other pipelines:`, skippedDeals);
+    }
 
     return m;
   }, [deals, stages, activeStageId]);

@@ -55,11 +55,17 @@ export const DEFAULT_STAGE_RULES: DealStageRule[] = [
     }
 ];
 
-// Get stage ID by name (case-insensitive) from stages table
-async function getStageIdByName(stageName: string): Promise<string | null> {
+// Get stage ID by name (case-insensitive) from stages table within a specific pipeline
+async function getStageIdByName(stageName: string, pipelineId?: string): Promise<string | null> {
     try {
-        console.log(`[DealStageAutomation] Looking up stage ID for name: "${stageName}"`);
-        const response = await apiClient.get(`/stages?name=ilike.${encodeURIComponent(stageName)}&select=id`);
+        console.log(`[DealStageAutomation] Looking up stage ID for name: "${stageName}"${pipelineId ? ` in pipeline: ${pipelineId}` : ''}`);
+
+        let url = `/stages?name=ilike.${encodeURIComponent(stageName)}&select=id`;
+        if (pipelineId) {
+            url += `&pipeline_id=eq.${pipelineId}`;
+        }
+
+        const response = await apiClient.get(url);
         const stages = response.data;
         console.log(`[DealStageAutomation] Found stages:`, stages);
         return stages && stages.length > 0 ? stages[0].id : null;
@@ -81,8 +87,20 @@ async function getStageNameById(stageId: string): Promise<string | null> {
     }
 }
 
+// Get pipeline ID for a stage
+async function getPipelineIdByStageId(stageId: string): Promise<string | null> {
+    try {
+        const response = await apiClient.get(`/stages?id=eq.${stageId}&select=pipeline_id`);
+        const stages = response.data;
+        return stages && stages.length > 0 ? stages[0].pipeline_id : null;
+    } catch (error) {
+        console.error(`Failed to find pipeline ID for stage "${stageId}":`, error);
+        return null;
+    }
+}
+
 // Get all stages for debugging
-async function getAllStages(): Promise<Array<{id: string, name: string}>> {
+async function getAllStages(): Promise<Array<{ id: string, name: string }>> {
     try {
         const response = await apiClient.get(`/stages?select=id,name`);
         return response.data || [];
@@ -125,11 +143,11 @@ export async function automateDealStage(
 ): Promise<{ updated: boolean; fromStage?: string; toStage?: string; reason?: string }> {
     try {
         console.log(`[DealStageAutomation] Starting automation for deal ${dealId} with trigger ${trigger}`);
-        
+
         // First, let's check what stages exist
         const allStages = await getAllStages();
         console.log(`[DealStageAutomation] Available stages in database:`, allStages);
-        
+
         // Get the deal
         const deal = await getDealById(dealId);
         if (!deal) {
@@ -141,7 +159,11 @@ export async function automateDealStage(
         const currentStageName = await getStageNameById(deal.stage_id);
         console.log(`[DealStageAutomation] Deal ${dealId} current stage: "${currentStageName}" (ID: ${deal.stage_id})`);
         console.log(`[DealStageAutomation] Trigger: "${trigger}"`);
-        
+
+        // Get the pipeline ID for the deal's current stage to ensure we move within the same pipeline
+        const pipelineId = await getPipelineIdByStageId(deal.stage_id);
+        console.log(`[DealStageAutomation] Deal ${dealId} current pipeline: ${pipelineId}`);
+
         // Find applicable rules
         const applicableRules = DEFAULT_STAGE_RULES.filter(rule => {
             if (rule.trigger !== trigger) return false;
@@ -159,12 +181,12 @@ export async function automateDealStage(
 
         // Apply the first applicable rule (in case of multiple matches)
         const rule = applicableRules[0];
-        const newStageId = await getStageIdByName(rule.toStage);
+        const newStageId = await getStageIdByName(rule.toStage, pipelineId || undefined);
 
         if (!newStageId) {
-            console.error(`[DealStageAutomation] Target stage "${rule.toStage}" not found in database`);
+            console.error(`[DealStageAutomation] Target stage "${rule.toStage}" not found in pipeline ${pipelineId || 'any'}`);
             console.error(`[DealStageAutomation] Available stages:`, await getAllStages());
-            return { updated: false, reason: `Target stage "${rule.toStage}" not found` };
+            return { updated: false, reason: `Target stage "${rule.toStage}" not found in current pipeline` };
         }
 
         // Don't update if already in the target stage
@@ -275,13 +297,14 @@ export async function batchAutomateDealStages(
             else failed++;
         } catch (error) {
             console.error(`Batch automation failed for deal ${deal.id}:`, error);
-            results.push({ dealId: deal.id, updated: false, error: error.message });
+            results.push({
+                dealId: deal.id,
+                updated: false,
+                error: error instanceof Error ? error.message : String(error)
+            });
             failed++;
         }
     }
 
     return { success, failed, results };
 }
-
-// Export types for use in other services
-export type { DealStageRule };
