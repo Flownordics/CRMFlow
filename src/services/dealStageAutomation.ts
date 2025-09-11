@@ -124,6 +124,12 @@ export async function automateDealStage(
     relatedEntity?: any
 ): Promise<{ updated: boolean; fromStage?: string; toStage?: string; reason?: string }> {
     try {
+        console.log(`[DealStageAutomation] Starting automation for deal ${dealId} with trigger ${trigger}`);
+        
+        // First, let's check what stages exist
+        const allStages = await getAllStages();
+        console.log(`[DealStageAutomation] Available stages in database:`, allStages);
+        
         // Get the deal
         const deal = await getDealById(dealId);
         if (!deal) {
@@ -168,7 +174,9 @@ export async function automateDealStage(
         }
 
         // Update the deal stage
+        console.log(`[DealStageAutomation] Updating deal ${dealId} from stage ${deal.stage_id} to stage ${newStageId}`);
         await updateDealStage(dealId, newStageId);
+        console.log(`[DealStageAutomation] Deal stage updated successfully`);
 
         // Log activity
         try {
@@ -182,11 +190,12 @@ export async function automateDealStage(
                     automated: true
                 }
             });
+            console.log(`[DealStageAutomation] Activity logged successfully`);
         } catch (error) {
             console.warn("Failed to log stage change activity:", error);
         }
 
-        console.log(`Deal ${dealId} automatically moved from "${currentStageName}" to "${rule.toStage}" due to ${trigger}`);
+        console.log(`[DealStageAutomation] Deal ${dealId} automatically moved from "${currentStageName}" to "${rule.toStage}" due to ${trigger}`);
 
         return {
             updated: true,
