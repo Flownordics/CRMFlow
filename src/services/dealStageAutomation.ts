@@ -81,6 +81,17 @@ async function getStageNameById(stageId: string): Promise<string | null> {
     }
 }
 
+// Get all stages for debugging
+async function getAllStages(): Promise<Array<{id: string, name: string}>> {
+    try {
+        const response = await apiClient.get(`/stages?select=id,name`);
+        return response.data || [];
+    } catch (error) {
+        console.error(`Failed to get all stages:`, error);
+        return [];
+    }
+}
+
 // Update deal stage
 async function updateDealStage(dealId: string, newStageId: string): Promise<void> {
     try {
@@ -145,7 +156,8 @@ export async function automateDealStage(
         const newStageId = await getStageIdByName(rule.toStage);
 
         if (!newStageId) {
-            console.warn(`Target stage "${rule.toStage}" not found`);
+            console.error(`[DealStageAutomation] Target stage "${rule.toStage}" not found in database`);
+            console.error(`[DealStageAutomation] Available stages:`, await getAllStages());
             return { updated: false, reason: `Target stage "${rule.toStage}" not found` };
         }
 
