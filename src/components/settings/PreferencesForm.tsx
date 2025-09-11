@@ -16,7 +16,7 @@ import { AlertCircle } from "lucide-react";
 const PreferencesSchema = z.object({
     locale: z.enum(["en", "da"]),
     theme: z.enum(["light", "dark", "system"]),
-    calendar_show_google: z.boolean(),
+    // Google integration removed - starting fresh
     calendar_default_sync: z.boolean(),
 });
 
@@ -31,7 +31,7 @@ export function PreferencesForm() {
         defaultValues: {
             locale: "en",
             theme: "system",
-            calendar_show_google: false,
+            // Google integration removed - starting fresh
             calendar_default_sync: false,
         },
     });
@@ -42,7 +42,7 @@ export function PreferencesForm() {
             form.reset({
                 locale: userSettings.locale ?? "en",
                 theme: userSettings.theme ?? "system",
-                calendar_show_google: userSettings.calendar_show_google ?? false,
+                // Google integration removed - starting fresh
                 calendar_default_sync: userSettings.calendar_default_sync ?? false,
             });
         }

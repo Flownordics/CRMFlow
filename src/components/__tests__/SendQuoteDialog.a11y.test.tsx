@@ -5,7 +5,7 @@ import { SendQuoteDialog } from '../quotes/SendQuoteDialog';
 // Mock the services
 vi.mock('@/services/email', () => ({
     getEmailProviderInfo: vi.fn().mockResolvedValue({
-        provider: 'gmail',
+        provider: 'manual',
         connected: true,
         email: 'test@example.com'
     }),

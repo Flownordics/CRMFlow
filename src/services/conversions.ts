@@ -10,6 +10,7 @@ import { usePeople } from "./people";
 import { createOrder, fetchOrder } from "./orders";
 import { fetchQuote } from "./quotes";
 import { createInvoice } from "./invoices";
+import { triggerDealStageAutomation } from "./dealStageAutomation";
 
 // Conversion response schemas
 export const QuoteResponse = z.object({
@@ -88,7 +89,16 @@ export async function ensureOrderForQuote(quoteId: string): Promise<{ id: string
       console.warn("[ensureOrderForQuote] Activity logging failed:", e);
     }
 
-    // 6) Delete the converted quote to avoid storage waste and confusion
+    // 6) Trigger deal stage automation (quote converted to order = Closed Won)
+    if (quote.deal_id) {
+      try {
+        await triggerDealStageAutomation('order_created', quote.deal_id, order);
+      } catch (e) {
+        console.warn("[ensureOrderForQuote] Deal stage automation failed:", e);
+      }
+    }
+
+    // 7) Delete the converted quote to avoid storage waste and confusion
     try {
       console.log(`[ensureOrderForQuote] Deleting converted quote: ${quote.id}`);
       await apiClient.delete(`/quotes?id=eq.${quote.id}`);
@@ -157,6 +167,15 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{ id: stri
       });
     } catch (e) {
       console.warn("[ensureInvoiceForOrder] Activity logging failed:", e);
+    }
+
+    // 6) Trigger deal stage automation (invoice created = Closed Won)
+    if (order.deal_id) {
+      try {
+        await triggerDealStageAutomation('invoice_created', order.deal_id, invoice);
+      } catch (e) {
+        console.warn("[ensureInvoiceForOrder] Deal stage automation failed:", e);
+      }
     }
 
     return { id: invoice.id };
@@ -265,6 +284,13 @@ export function useCreateQuoteFromDeal() {
         console.error("Failed to log activity:", error);
       }
 
+      // Trigger deal stage automation (quote created = move to Proposal if in Prospecting)
+      try {
+        await triggerDealStageAutomation('quote_created', dealId, quote);
+      } catch (error) {
+        console.warn("Deal stage automation failed:", error);
+      }
+
       toastBus.emit({
         title: "Quote Created",
         description: "Quote has been created successfully from the deal.",
@@ -302,6 +328,13 @@ export function useCreateOrderFromDeal() {
         console.error("Failed to log activity:", error);
       }
 
+      // Trigger deal stage automation (order created = Closed Won)
+      try {
+        await triggerDealStageAutomation('order_created', dealId, order);
+      } catch (error) {
+        console.warn("Deal stage automation failed:", error);
+      }
+
       toastBus.emit({
         title: "Order Created",
         description: "Order has been created successfully from the deal.",
@@ -337,6 +370,13 @@ export function useCreateInvoiceFromDeal() {
         });
       } catch (error) {
         console.error("Failed to log activity:", error);
+      }
+
+      // Trigger deal stage automation (invoice created = Closed Won)
+      try {
+        await triggerDealStageAutomation('invoice_created', dealId, invoice);
+      } catch (error) {
+        console.warn("Deal stage automation failed:", error);
       }
 
       toastBus.emit({

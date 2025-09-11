@@ -54,13 +54,13 @@ export default function DealDetail() {
           await syncDealToOwnerCalendar(deal, companyName);
           toastBus.emit({
             title: "Calendar synced",
-            description: "Deal close date has been synced to your Google Calendar"
+            description: "Deal close date has been updated"
           });
         } catch (calendarError) {
           console.error("Failed to sync to calendar:", calendarError);
           toastBus.emit({
             title: "Calendar sync failed",
-            description: "Failed to sync deal to Google Calendar. Please check your integration settings.",
+            description: "Failed to update deal in calendar. Please check your settings.",
             variant: "destructive"
           });
         }
@@ -70,7 +70,7 @@ export default function DealDetail() {
           await removeDealFromOwnerCalendar(deal.id, deal.owner_user_id);
           toastBus.emit({
             title: "Calendar updated",
-            description: "Deal has been removed from your Google Calendar"
+            description: "Deal has been removed from calendar"
           });
         } catch (calendarError) {
           console.error("Failed to remove from calendar:", calendarError);

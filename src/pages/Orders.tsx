@@ -42,6 +42,7 @@ import { useCompanyLookup } from "@/hooks/useCompanyLookup";
 import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
+import { triggerDealStageAutomation } from "@/services/dealStageAutomation";
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
@@ -114,16 +115,24 @@ const Orders: React.FC = () => {
     });
   };
 
-  const handleStatusChange = (orderId: string, newStatus: OrderUI["status"]) => {
-    // This function is not used in the current filteredOrders logic,
-    // but keeping it as it was in the original file.
-    // setOrders(
-    //   orders.map((order) =>
-    //     order.id === orderId
-    //       ? { ...order, status: newStatus, updatedAt: new Date().toISOString() }
-    //       : order,
-    // ),
-    // );
+  const handleStatusChange = async (orderId: string, newStatus: OrderUI["status"]) => {
+    // Update local state
+    setLocalOrderUpdates(prev => ({
+      ...prev,
+      [orderId]: { status: newStatus }
+    }));
+
+    // Find the order to get deal_id for automation
+    const order = orders.find(o => o.id === orderId);
+    if (order?.deal_id) {
+      try {
+        if (newStatus === 'cancelled') {
+          await triggerDealStageAutomation('order_cancelled', order.deal_id, { ...order, status: newStatus });
+        }
+      } catch (error) {
+        console.warn("Deal stage automation failed:", error);
+      }
+    }
 
     toast({
       title: "Status Updated",
@@ -379,6 +388,7 @@ const Orders: React.FC = () => {
               order={order}
               onOpenPdf={handleGeneratePDF}
               onOpenEditor={(order) => navigate(`/orders/${order.id}`)}
+              onStatusChange={handleStatusChange}
               onConvertToInvoice={async (order) => {
                 try {
                   const { ensureInvoiceForOrder } = await import("@/services/conversions");

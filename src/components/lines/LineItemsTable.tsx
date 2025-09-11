@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trash } from "lucide-react";
 import {
   computeLineTotals,
@@ -137,18 +138,23 @@ export function LineItemsTable({
                   {formatMoneyMinor(totalMinor, currency)}
                 </td>
                 <td className="p-2 text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Delete line"
-                    onClick={() => onDelete(l.id)}
-                  >
-                    <Trash
-                      aria-hidden="true"
-                      focusable="false"
-                      className="h-4 w-4"
-                    />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Delete line"
+                        onClick={() => onDelete(l.id)}
+                      >
+                        <Trash
+                          aria-hidden="true"
+                          focusable="false"
+                          className="h-4 w-4"
+                        />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete line</TooltipContent>
+                  </Tooltip>
                 </td>
               </tr>
             );

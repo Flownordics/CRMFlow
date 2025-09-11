@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, List, Grid3X3, CalendarDays, Clock } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
 
-type CalendarView = 'month' | 'week' | 'day';
+type CalendarView = 'list' | 'month' | 'week' | 'day';
 
 interface CalendarToolbarProps {
     currentDate: Date;
@@ -23,6 +23,8 @@ export function CalendarToolbar({
 }: CalendarToolbarProps) {
     const getVisibleRangeLabel = () => {
         switch (view) {
+            case 'list':
+                return 'All Events';
             case 'month':
                 return format(currentDate, 'MMMM yyyy');
             case 'week':
@@ -75,11 +77,21 @@ export function CalendarToolbar({
 
             <div className="flex items-center gap-1">
                 <Button
+                    variant={getViewButtonVariant('list')}
+                    size="sm"
+                    onClick={() => onViewChange('list')}
+                    aria-pressed={view === 'list'}
+                >
+                    <List className="h-4 w-4 mr-1" />
+                    List
+                </Button>
+                <Button
                     variant={getViewButtonVariant('month')}
                     size="sm"
                     onClick={() => onViewChange('month')}
                     aria-pressed={view === 'month'}
                 >
+                    <Grid3X3 className="h-4 w-4 mr-1" />
                     Month
                 </Button>
                 <Button
@@ -88,6 +100,7 @@ export function CalendarToolbar({
                     onClick={() => onViewChange('week')}
                     aria-pressed={view === 'week'}
                 >
+                    <CalendarDays className="h-4 w-4 mr-1" />
                     Week
                 </Button>
                 <Button
@@ -96,6 +109,7 @@ export function CalendarToolbar({
                     onClick={() => onViewChange('day')}
                     aria-pressed={view === 'day'}
                 >
+                    <Clock className="h-4 w-4 mr-1" />
                     Day
                 </Button>
             </div>

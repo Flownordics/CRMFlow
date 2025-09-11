@@ -2,18 +2,29 @@ import { cn } from "@/lib/utils";
 import { getEventTheme, tokenBg, tokenText, tokenRing } from "./eventTheme";
 import { MergedEvent } from "@/lib/calendar-utils";
 import { format, parseISO } from "date-fns";
-import { MapPin, Clock, Calendar, Database } from "lucide-react";
+import { MapPin, Clock, Calendar, Database, Edit, Trash2, MoreVertical, CheckSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { EditEventDialog } from "./EditEventDialog";
 
 interface EventItemProps {
     event: MergedEvent;
     className?: string;
+    onEventUpdated?: () => void;
 }
 
-export function EventItem({ event, className }: EventItemProps) {
+export function EventItem({ event, className, onEventUpdated }: EventItemProps) {
     const navigate = useNavigate();
     const { t } = useI18n();
+    const [showEditDialog, setShowEditDialog] = useState(false);
 
     const kind = event.kind || 'other';
     const theme = getEventTheme(kind);
@@ -32,6 +43,9 @@ export function EventItem({ event, className }: EventItemProps) {
                 break;
             case 'order':
                 navigate(`/orders/${id}`);
+                break;
+            case 'task':
+                navigate(`/tasks`);
                 break;
         }
     };
@@ -76,20 +90,44 @@ export function EventItem({ event, className }: EventItemProps) {
                     </h3>
                 </div>
 
-                {/* Source Badge */}
-                <span className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-                    event.source === 'native'
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                        : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                )}>
-                    {event.source === 'native' ? (
-                        <Database className="h-3 w-3" aria-hidden="true" />
-                    ) : (
-                        <Calendar className="h-3 w-3" aria-hidden="true" />
+                <div className="flex items-center gap-2">
+                    {/* Source Badge */}
+                    <span className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
+                        event.source === 'native'
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            : event.source === 'task'
+                                ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                    )}>
+                        {event.source === 'native' ? (
+                            <Database className="h-3 w-3" aria-hidden="true" />
+                        ) : event.source === 'task' ? (
+                            <CheckSquare className="h-3 w-3" aria-hidden="true" />
+                        ) : (
+                            <Calendar className="h-3 w-3" aria-hidden="true" />
+                        )}
+                        {event.source === 'task' ? 'Task' : t('event_source_native')}
+                    </span>
+
+                    {/* Actions Menu - Only for native events */}
+                    {event.source === 'native' && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                    <MoreVertical className="h-3 w-3" />
+                                    <span className="sr-only">Open menu</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     )}
-                    {event.source === 'native' ? t('event_source_native') : t('event_source_google')}
-                </span>
+                </div>
             </div>
 
             {/* Event Details */}
@@ -172,7 +210,30 @@ export function EventItem({ event, className }: EventItemProps) {
                         )}
                     </div>
                 )}
+
+                {/* Task Info (only for task events) */}
+                {event.source === 'task' && event.task_id && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                        <span
+                            className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => handleCrmNavigation('task', event.task_id!)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCrmNavigation('task', event.task_id!)}
+                        >
+                            Task: {event.task_status} • {event.task_priority}
+                        </span>
+                    </div>
+                )}
             </div>
+
+            {/* Edit Event Dialog */}
+            <EditEventDialog
+                event={event}
+                open={showEditDialog}
+                onOpenChange={setShowEditDialog}
+                onEventUpdated={onEventUpdated}
+            />
         </div>
     );
 }

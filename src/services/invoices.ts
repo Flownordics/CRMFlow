@@ -2,8 +2,11 @@ import { apiClient, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
+import { triggerDealStageAutomation } from "./dealStageAutomation";
 import { logActivity } from "./activity";
 import { toMinor } from "@/lib/money";
+import { supabase } from "@/integrations/supabase/client";
+import { toastBus } from "@/lib/toastBus";
 
 // Schemas
 export const Invoice = z.object({
@@ -52,6 +55,16 @@ export const PaymentPayload = z.object({
 });
 
 export type PaymentPayload = z.infer<typeof PaymentPayload>;
+
+// Email request schema
+export const InvoiceEmailRequest = z.object({
+    invoiceId: z.string(),
+    to: z.string().email(),
+    subject: z.string(),
+    message: z.string().optional(),
+});
+
+export type InvoiceEmailRequest = z.infer<typeof InvoiceEmailRequest>;
 
 // Helper function to derive invoice status
 export function deriveInvoiceStatus(invoice: Invoice): 'paid' | 'overdue' | 'partial' | 'sent' | 'draft' {
@@ -155,20 +168,29 @@ export async function addPayment(invoiceId: string, payload: PaymentPayload): Pr
             paid_minor: currentInvoice.paid_minor + payload.amountMinor
         });
 
-        const raw = normalizeApiData(response);
+        let updatedInvoice: Invoice;
 
-        if (typeof raw === "string") {
-            throw new Error("[invoice] Non-JSON response. Tjek Network: status/content-type/om der er redirect.");
+        // Handle 204 No Content response (common for PATCH operations)
+        if (response.status === 204) {
+            // Fetch the updated invoice data
+            updatedInvoice = await fetchInvoice(invoiceId);
+        } else {
+            const raw = normalizeApiData(response);
+
+            if (typeof raw === "string") {
+                throw new Error("[invoice] Non-JSON response. Tjek Network: status/content-type/om der er redirect.");
+            }
+
+            // PostgREST returns arrays, so we need to handle that
+            const invoiceData = Array.isArray(raw) ? raw[0] : raw;
+
+            if (!invoiceData) {
+                // If no data returned, fetch the updated invoice
+                updatedInvoice = await fetchInvoice(invoiceId);
+            } else {
+                updatedInvoice = Invoice.parse(invoiceData);
+            }
         }
-
-        // PostgREST returns arrays, so we need to handle that
-        const invoiceData = Array.isArray(raw) ? raw[0] : raw;
-
-        if (!invoiceData) {
-            throw new Error("[invoice] No invoice data returned from API");
-        }
-
-        const updatedInvoice = Invoice.parse(invoiceData);
 
         // Log the payment activity
         if (currentInvoice.deal_id) {
@@ -228,6 +250,265 @@ export function useAddPayment() {
             queryClient.invalidateQueries({ queryKey: qk.accounting() });
         },
     });
+}
+
+export function useUpdateInvoice() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, payload }: { id: string; payload: Parameters<typeof updateInvoice>[1] }) =>
+            updateInvoice(id, payload),
+        onSuccess: async (updatedInvoice, { id, payload }) => {
+            queryClient.invalidateQueries({ queryKey: qk.invoice(id) });
+            queryClient.invalidateQueries({ queryKey: qk.invoices() });
+
+            // Trigger deal stage automation for invoice status changes
+            if (updatedInvoice.deal_id && payload.status === 'paid') {
+                try {
+                    await triggerDealStageAutomation('invoice_paid', updatedInvoice.deal_id, updatedInvoice);
+                } catch (e) {
+                    console.warn("[useUpdateInvoice] Deal stage automation failed:", e);
+                }
+            }
+        },
+    });
+}
+
+export function useDeleteInvoice() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: deleteInvoice,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: qk.invoices() });
+            queryClient.invalidateQueries({ queryKey: qk.accounting() });
+        },
+    });
+}
+
+export function useSendInvoice() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: sendInvoice,
+        onSuccess: (updatedInvoice, id) => {
+            queryClient.invalidateQueries({ queryKey: qk.invoice(id) });
+            queryClient.invalidateQueries({ queryKey: qk.invoices() });
+        },
+    });
+}
+
+export function useSendInvoiceEmail() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: sendInvoiceEmail,
+        onSuccess: (result, { invoiceId }) => {
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: qk.invoice(invoiceId) });
+                queryClient.invalidateQueries({ queryKey: qk.invoices() });
+            }
+        },
+    });
+}
+
+// Update invoice
+export async function updateInvoice(id: string, payload: Partial<{
+    number: string;
+    status: Invoice["status"];
+    currency: string;
+    issue_date: string;
+    due_date: string;
+    notes: string;
+    company_id: string;
+    contact_id: string | null;
+    deal_id: string | null;
+    order_id: string | null;
+    subtotal_minor: number;
+    tax_minor: number;
+    total_minor: number;
+}>): Promise<Invoice> {
+    try {
+        const response = await apiClient.patch(`/invoices?id=eq.${id}`, payload);
+
+        // Handle 204 No Content response (common for PATCH operations)
+        if (response.status === 204) {
+            // Fetch the updated invoice data
+            const updatedInvoice = await fetchInvoice(id);
+            return updatedInvoice;
+        }
+
+        const raw = normalizeApiData(response);
+
+        if (typeof raw === "string") {
+            throw new Error("[updateInvoice] Non-JSON response");
+        }
+
+        const invoiceData = Array.isArray(raw) ? raw[0] : raw;
+
+        if (!invoiceData) {
+            // If no data returned, fetch the updated invoice
+            const updatedInvoice = await fetchInvoice(id);
+            return updatedInvoice;
+        }
+
+        return Invoice.parse(invoiceData);
+    } catch (error) {
+        console.error("Failed to update invoice:", error);
+        throw new Error("Failed to update invoice");
+    }
+}
+
+// Delete invoice
+export async function deleteInvoice(id: string): Promise<void> {
+    try {
+        await apiClient.delete(`/invoices?id=eq.${id}`);
+    } catch (error) {
+        console.error("Failed to delete invoice:", error);
+        throw new Error("Failed to delete invoice");
+    }
+}
+
+// Send invoice (update status to 'sent')
+export async function sendInvoice(id: string): Promise<Invoice> {
+    try {
+        return await updateInvoice(id, { status: 'sent' });
+    } catch (error) {
+        console.error("Failed to send invoice:", error);
+        throw new Error("Failed to send invoice");
+    }
+}
+
+// Send invoice email
+export async function sendInvoiceEmail(request: InvoiceEmailRequest): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+        // Validate request
+        const validatedRequest = InvoiceEmailRequest.parse(request);
+
+        // Check if Gmail is connected
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            throw new Error("User not authenticated");
+        }
+
+        const { data: integration, error: integrationError } = await supabase
+            .from('user_integrations')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('provider', 'google')
+            .eq('kind', 'gmail')
+            .single();
+
+        console.log('Gmail integration check:', {
+            integrationError,
+            integration: integration ? {
+                id: integration.id,
+                hasAccessToken: !!integration.access_token,
+                expiresAt: integration.expires_at,
+                email: integration.email
+            } : null
+        });
+
+        if (integrationError || !integration?.access_token) {
+            const error = new Error("Gmail not connected");
+            error.name = 'EmailNotConnectedError';
+            throw error;
+        }
+
+        // Generate idempotency key
+        const idempotencyKey = `invoice_email_${request.invoiceId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Send email via Netlify Function
+        const response = await fetch('/.netlify/functions/send-invoice', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            },
+            body: JSON.stringify({
+                invoice_id: validatedRequest.invoiceId,
+                recipient_email: validatedRequest.to,
+                subject: validatedRequest.subject,
+                message: validatedRequest.message,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to send email');
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Log email activity
+            const invoice = await fetchInvoice(validatedRequest.invoiceId);
+            if (invoice.deal_id) {
+                await logActivity({
+                    type: 'email_sent',
+                    dealId: invoice.deal_id,
+                    meta: {
+                        invoiceId: validatedRequest.invoiceId,
+                        to: validatedRequest.to,
+                        subject: validatedRequest.subject,
+                        gmailMessageId: result.messageId
+                    }
+                });
+            }
+
+            return {
+                success: true,
+                messageId: result.messageId
+            };
+        } else {
+            throw new Error(result.error || 'Failed to send email');
+        }
+
+    } catch (error) {
+        console.error('Failed to send invoice email:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+        // Don't show toast here - let the component handle it
+        console.error('Invoice email error details:', {
+            error: errorMessage,
+            stack: error instanceof Error ? error.stack : undefined,
+            request: request // Use original request instead of validatedRequest
+        });
+
+        return {
+            success: false,
+            error: errorMessage
+        };
+    }
+}
+
+// Generate HTML email content for invoice
+function generateInvoiceEmailHtml(request: InvoiceEmailRequest): string {
+    return `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Invoice</h2>
+            <p>Please find your invoice attached.</p>
+            ${request.message ? `<p>${request.message.replace(/\n/g, '<br>')}</p>` : ''}
+            <p>If you have any questions, please don't hesitate to contact us.</p>
+            <p>Best regards,<br>Your Team</p>
+        </div>
+    `;
+}
+
+// Generate text email content for invoice
+function generateInvoiceEmailText(request: InvoiceEmailRequest): string {
+    return `
+Invoice
+
+Please find your invoice attached.
+
+${request.message || ''}
+
+If you have any questions, please don't hesitate to contact us.
+
+Best regards,
+Your Team
+    `.trim();
 }
 
 export async function createInvoice(payload: {

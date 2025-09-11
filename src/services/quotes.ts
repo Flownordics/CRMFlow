@@ -2,6 +2,7 @@ import { apiClient, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
+import { triggerDealStageAutomation } from "./dealStageAutomation";
 
 // Adapter functions for DB ↔ UI conversion
 const lineDbToUi = (l: any) => ({
@@ -561,6 +562,17 @@ export function useUpdateQuoteHeader(id: string) {
 
       // Check if status changed to 'accepted' and trigger order conversion
       console.log("[useUpdateQuoteHeader] Status update successful, patch:", patch);
+
+      // Trigger deal stage automation for quote status changes (only for declined)
+      // Note: quote acceptance is handled by the order conversion flow below
+      if (updatedQuote.deal_id && patch.status === 'declined') {
+        try {
+          await triggerDealStageAutomation('quote_declined', updatedQuote.deal_id, updatedQuote);
+        } catch (e) {
+          console.warn("[useUpdateQuoteHeader] Deal stage automation failed:", e);
+        }
+      }
+
       if (patch.status === "accepted") {
         console.log("[useUpdateQuoteHeader] Status is 'accepted', triggering order conversion for quote:", id);
         try {
@@ -642,4 +654,19 @@ export function useDeleteQuote() {
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
     },
   });
+}
+
+// Search function for quotes
+export async function searchQuotes(query: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
+  try {
+    const result = await fetchQuotes({ q: query, limit: 20 });
+    return result.data.map(quote => ({
+      id: quote.id,
+      label: quote.title || `Quote #${quote.quote_number}`,
+      subtitle: quote.company_name ? `(${quote.company_name})` : undefined
+    }));
+  } catch (error) {
+    console.error("Failed to search quotes:", error);
+    return [];
+  }
 }

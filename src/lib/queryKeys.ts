@@ -100,4 +100,14 @@ export const qk = {
     gmail: () => ["integrations", "gmail"] as const,
     gmailEmail: () => ["integrations", "gmail", "email"] as const,
   },
+
+  tasks: {
+    all: () => ["tasks"] as const,
+    list: (filters?: Record<string, unknown>) => ["tasks", "list", filters ?? {}] as const,
+    detail: (id: string) => ["tasks", "detail", id] as const,
+    upcoming: () => ["tasks", "upcoming"] as const,
+    overdue: () => ["tasks", "overdue"] as const,
+    comments: (taskId: string) => ["tasks", "comments", taskId] as const,
+    activities: (taskId: string) => ["tasks", "activities", taskId] as const,
+  },
 };

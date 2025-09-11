@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
+import { toastBus } from "@/lib/toastBus";
 
 // Types for Google Calendar API
 export interface GoogleCalendarEvent {
@@ -529,18 +530,81 @@ export async function getCalendarStatus(): Promise<CalendarStatus> {
 }
 
 /**
+ * Set up Google Calendar push notifications
+ */
+export async function setupCalendarPushNotifications(): Promise<{ ok: boolean; error?: string }> {
+    try {
+        const integration = await getCalendarIntegration();
+        if (!integration) {
+            return { ok: false, error: 'Google Calendar not connected' };
+        }
+
+        const accessToken = await refreshTokenIfNeeded(integration);
+        const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook`;
+
+        // Set up push notification channel
+        const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/watch', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                id: `crmflow-${integration.user_id}-${Date.now()}`,
+                type: 'web_hook',
+                address: webhookUrl,
+                token: `crmflow-${integration.user_id}`,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.text();
+            console.error('Failed to set up push notifications:', errorData);
+            return { ok: false, error: 'Failed to set up push notifications' };
+        }
+
+        const watchData = await response.json();
+
+        // Store the resource ID in the integration using Supabase client
+        // Skip expiration for now to avoid timestamp issues
+        const { error: updateError } = await supabase
+            .from('user_integrations')
+            .update({
+                resource_id: watchData.resourceId,
+                // Skip expiration field to avoid timestamp issues
+                // expiration: watchData.expiration,
+            })
+            .eq('user_id', integration.user_id)
+            .eq('provider', 'google')
+            .eq('kind', 'calendar');
+
+        if (updateError) {
+            console.error('Failed to update integration with resource ID:', updateError);
+        }
+
+        return { ok: true };
+    } catch (error: any) {
+        console.error('Error setting up push notifications:', error);
+        return { ok: false, error: error.message || 'Failed to set up push notifications' };
+    }
+}
+
+/**
  * Sync Google Calendar
  */
 export async function syncGoogleCalendar(): Promise<{ ok: boolean; error?: string }> {
     try {
-        // For now, we'll just refresh the connection status
-        // In the future, this could call an edge function for actual sync
         const status = await getCalendarStatus();
         if (!status.connected) {
             return { ok: false, error: "Google Calendar not connected" };
         }
 
-        // Simulate sync by updating last sync time
+        // Set up push notifications for real-time sync
+        const pushResult = await setupCalendarPushNotifications();
+        if (!pushResult.ok) {
+            console.warn('Failed to set up push notifications:', pushResult.error);
+        }
+
         return { ok: true };
     } catch (error: any) {
         const msg = error?.response?.data?.message || error?.message || "Sync failed";
@@ -616,5 +680,33 @@ export function useCalendarConnection() {
         queryKey: qk.calendarConnection(),
         queryFn: getCalendarInfo,
         staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+}
+
+/**
+ * Hook to set up calendar sync
+ */
+export function useSetupCalendarSync() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: syncGoogleCalendar,
+        onSuccess: () => {
+            // Invalidate calendar connection to refresh status
+            queryClient.invalidateQueries({ queryKey: qk.calendarConnection() });
+            toastBus.emit({
+                title: "Success",
+                description: "Calendar sync set up successfully",
+                variant: "success"
+            });
+        },
+        onError: (error) => {
+            console.error('Failed to set up calendar sync:', error);
+            toastBus.emit({
+                title: "Error",
+                description: "Failed to set up calendar sync",
+                variant: "destructive"
+            });
+        },
     });
 }

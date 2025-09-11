@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Calendar, Users, Phone, Briefcase, Bell, Landmark, CalendarClock } from "lucide-react";
+import { Calendar, Users, Phone, Briefcase, Bell, Landmark, CalendarClock, CheckSquare } from "lucide-react";
 import { eventTypeTheme } from "./eventTheme";
 import { useI18n } from "@/lib/i18n";
 
@@ -9,8 +9,7 @@ interface CalendarFiltersProps {
     onCalendarChange: (calendar: string) => void;
     onTypeToggle: (type: string) => void;
     availableCalendars: string[];
-    showGoogleLayer?: boolean;
-    isGoogleConnected?: boolean;
+    // Google integration removed - starting fresh
 }
 
 export function CalendarFilters({
@@ -19,8 +18,7 @@ export function CalendarFilters({
     onCalendarChange,
     onTypeToggle,
     availableCalendars,
-    showGoogleLayer = false,
-    isGoogleConnected = false
+    // Google integration removed - starting fresh
 }: CalendarFiltersProps) {
     const { t } = useI18n();
     const eventTypes = Object.keys(eventTypeTheme);
@@ -30,6 +28,7 @@ export function CalendarFilters({
         focus: Briefcase,
         deadline: Bell,
         travel: Landmark,
+        task: CheckSquare,
         other: CalendarClock
     };
 
@@ -61,22 +60,7 @@ export function CalendarFilters({
                 </div>
             </div>
 
-            {/* Google Layer Status */}
-            {isGoogleConnected && (
-                <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Google Calendar</h3>
-                    <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-                        <div className="flex-1">
-                            <div className="text-xs font-medium">
-                                {showGoogleLayer ? t('event_source_google') : t('event_source_native')}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                {showGoogleLayer ? 'Google events visible' : 'Native events only'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Google integration removed - starting fresh */}
 
             {/* Event Type Filters */}
             <div>

@@ -29,7 +29,7 @@ import { useI18n } from "@/lib/i18n";
 import { SendQuoteDialog } from "@/components/quotes/SendQuoteDialog";
 import { EmailLogs } from "@/components/quotes/EmailLogs";
 import { OpenPdfButton } from "@/components/common/OpenPdfButton";
-import { useIsGmailConnected } from "@/services/integrations";
+// Google integration removed - starting fresh
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -52,7 +52,7 @@ export default function QuoteEditor() {
   const deleteLine = useDeleteQuoteLine(id);
   const deleteQuote = useDeleteQuote();
   const { t } = useI18n();
-  const { data: isGmailConnected } = useIsGmailConnected();
+  // Google integration removed - starting fresh
 
   const [creating, setCreating] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
@@ -232,7 +232,7 @@ export default function QuoteEditor() {
               className="flex items-center gap-2"
             >
               <Mail className="h-4 w-4" />
-              {isGmailConnected ? "Send" : "Connect Gmail"}
+              Send
             </Button>
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <AlertDialogTrigger asChild>

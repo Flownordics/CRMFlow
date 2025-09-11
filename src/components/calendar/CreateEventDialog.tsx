@@ -13,13 +13,16 @@ import {
 } from "@/components/ui/dialog";
 import { AccessibleDialogContent } from "@/components/ui/accessible-dialog";
 import { useCreateEvent, CreateEventPayload } from "@/services/events";
-import { useCreateCalendarEvent, CreateEventPayload as GoogleCreateEventPayload, CrmReference } from "@/services/calendar";
+// Google integration removed - starting fresh
 import { toastBus } from "@/lib/toastBus";
 import { logEventActivity } from "@/services/activity";
-import { Calendar, Clock, MapPin, User, Database, Globe } from "lucide-react";
+import { MapPin, User, Database } from "lucide-react";
 import { CompanySelect } from "@/components/selects/CompanySelect";
 import { SearchSelect } from "@/components/selects/SearchSelect";
 import { useI18n } from "@/lib/i18n";
+import { searchDeals } from "@/services/deals";
+import { searchQuotes } from "@/services/quotes";
+import { searchOrders } from "@/services/orders";
 
 interface CreateEventDialogProps {
     open: boolean;
@@ -34,7 +37,7 @@ export function CreateEventDialog({
     onOpenChange,
     onEventCreated,
     showGoogleLayer = false,
-    isGoogleConnected = false
+    isGoogleConnected = false,
 }: CreateEventDialogProps) {
     const { t } = useI18n();
     const [title, setTitle] = useState("");
@@ -50,12 +53,13 @@ export function CreateEventDialog({
     const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
     const [selectedQuoteId, setSelectedQuoteId] = useState<string>("");
     const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+    const [syncToGoogle, setSyncToGoogle] = useState(true);
     const [eventKind, setEventKind] = useState<"meeting" | "call" | "deadline" | "other">("meeting");
     const [eventColor, setEventColor] = useState<"primary" | "accent" | "warning" | "success" | "muted">("primary");
-    const [alsoCreateInGoogle, setAlsoCreateInGoogle] = useState(false);
+    // Google integration removed - starting fresh
 
     const createNativeEvent = useCreateEvent();
-    const createGoogleEvent = useCreateCalendarEvent();
+    // Google integration removed - starting fresh
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -98,10 +102,11 @@ export function CreateEventDialog({
                 attendees: attendeesList,
                 color: eventColor,
                 kind: eventKind,
-                deal_id: selectedDealId || undefined,
-                company_id: selectedCompanyId || undefined,
-                quote_id: selectedQuoteId || undefined,
-                order_id: selectedOrderId || undefined,
+                ...(selectedDealId && { deal_id: selectedDealId }),
+                ...(selectedCompanyId && { company_id: selectedCompanyId }),
+                ...(selectedQuoteId && { quote_id: selectedQuoteId }),
+                ...(selectedOrderId && { order_id: selectedOrderId }),
+                google_sync_enabled: syncToGoogle,
             };
 
             const nativeEvent = await createNativeEvent.mutateAsync(nativePayload);
@@ -120,47 +125,7 @@ export function CreateEventDialog({
                 console.warn('Failed to log calendar activity:', activityError);
             }
 
-            // If also creating in Google and connected
-            if (alsoCreateInGoogle && isGoogleConnected) {
-                try {
-                    const googlePayload: GoogleCreateEventPayload = {
-                        summary: title.trim(),
-                        description: description.trim() || undefined,
-                        location: location.trim() || undefined,
-                        start: {
-                            dateTime: startDateTime,
-                            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                        },
-                        end: {
-                            dateTime: endDateTime,
-                            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                        },
-                        attendees: attendeesList.map(att => ({
-                            email: att.email,
-                            displayName: att.name
-                        })),
-                        reminders: {
-                            useDefault: true
-                        },
-                        crmRef: {
-                            dealId: selectedDealId || undefined,
-                            companyId: selectedCompanyId || undefined,
-                            quoteId: selectedQuoteId || undefined,
-                            orderId: selectedOrderId || undefined,
-                            kind: eventKind
-                        }
-                    };
-
-                    await createGoogleEvent.mutateAsync(googlePayload);
-                } catch (googleError) {
-                    console.error('Failed to create Google event:', googleError);
-                    toastBus.emit({
-                        title: "Partial Success",
-                        description: "Event created in native calendar, but failed to sync with Google",
-                        variant: "warning"
-                    });
-                }
-            }
+            // Google integration removed - starting fresh
 
             // Reset form
             resetForm();
@@ -195,7 +160,7 @@ export function CreateEventDialog({
         setSelectedOrderId("");
         setEventKind("meeting");
         setEventColor("primary");
-        setAlsoCreateInGoogle(false);
+        // Google integration removed - starting fresh
     };
 
     const handleCancel = () => {
@@ -218,7 +183,7 @@ export function CreateEventDialog({
         onOpenChange(open);
     };
 
-    const isLoading = createNativeEvent.isPending || createGoogleEvent.isPending;
+    const isLoading = createNativeEvent.isPending;
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -228,7 +193,7 @@ export function CreateEventDialog({
                 {/* 🔒 These must render on the very first paint, unconditionally */}
                 <DialogHeader>
                     <DialogTitle>{t('create_event') || "Create Event"}</DialogTitle>
-                    <DialogDescription>{`Create a new event in your native calendar${isGoogleConnected ? " with optional Google sync" : ""}`}</DialogDescription>
+                    <DialogDescription>Create a new event in your native calendar</DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -373,6 +338,18 @@ export function CreateEventDialog({
                         </div>
                     </div>
 
+                    {/* Google Calendar Sync */}
+                    {showGoogleLayer && isGoogleConnected && (
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="syncToGoogle"
+                                checked={syncToGoogle}
+                                onCheckedChange={(checked) => setSyncToGoogle(checked as boolean)}
+                            />
+                            <Label htmlFor="syncToGoogle">Sync to Google Calendar</Label>
+                        </div>
+                    )}
+
                     {/* CRM Linking Section */}
                     <div className="space-y-4 pt-4 border-t">
                         <h3 className="text-sm font-medium">{t('link_to')} CRM</h3>
@@ -382,8 +359,7 @@ export function CreateEventDialog({
                                 <Label htmlFor="company">{t('company')}</Label>
                                 <CompanySelect
                                     value={selectedCompanyId}
-                                    onValueChange={setSelectedCompanyId}
-                                    placeholder="Select company..."
+                                    onChange={setSelectedCompanyId}
                                 />
                             </div>
 
@@ -391,9 +367,10 @@ export function CreateEventDialog({
                                 <Label htmlFor="deal">{t('deal')}</Label>
                                 <SearchSelect
                                     value={selectedDealId}
-                                    onValueChange={setSelectedDealId}
+                                    onChange={setSelectedDealId}
+                                    onSearch={searchDeals}
                                     placeholder="Search deals..."
-                                    searchType="deals"
+                                    emptyMessage="No deals found"
                                 />
                             </div>
                         </div>
@@ -403,9 +380,10 @@ export function CreateEventDialog({
                                 <Label htmlFor="quote">{t('quote')}</Label>
                                 <SearchSelect
                                     value={selectedQuoteId}
-                                    onValueChange={setSelectedQuoteId}
+                                    onChange={setSelectedQuoteId}
+                                    onSearch={searchQuotes}
                                     placeholder="Search quotes..."
-                                    searchType="quotes"
+                                    emptyMessage="No quotes found"
                                 />
                             </div>
 
@@ -413,28 +391,16 @@ export function CreateEventDialog({
                                 <Label htmlFor="order">{t('order')}</Label>
                                 <SearchSelect
                                     value={selectedOrderId}
-                                    onValueChange={setSelectedOrderId}
+                                    onChange={setSelectedOrderId}
+                                    onSearch={searchOrders}
                                     placeholder="Search orders..."
-                                    searchType="orders"
+                                    emptyMessage="No orders found"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    {/* Google Sync Option */}
-                    {isGoogleConnected && (
-                        <div className="flex items-center space-x-2 pt-4 border-t">
-                            <Checkbox
-                                id="alsoCreateInGoogle"
-                                checked={alsoCreateInGoogle}
-                                onCheckedChange={(checked) => setAlsoCreateInGoogle(checked as boolean)}
-                            />
-                            <Label htmlFor="alsoCreateInGoogle" className="flex items-center gap-2">
-                                <Globe className="h-4 w-4" />
-                                {t('also_create_in_google')}
-                            </Label>
-                        </div>
-                    )}
+                    {/* Google integration removed - starting fresh */}
 
                     <DialogFooter>
                         <Button

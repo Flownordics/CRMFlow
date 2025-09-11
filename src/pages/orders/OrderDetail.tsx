@@ -22,6 +22,11 @@ import { logPdfGenerated } from "@/services/activity";
 import { Plus } from "lucide-react";
 import { OrderEditorHeader } from "@/components/orders";
 import { OpenPdfButton } from "@/components/common/OpenPdfButton";
+import { ensureInvoiceForOrder } from "@/services/conversions";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/queryKeys";
+import { triggerDealStageAutomation } from "@/services/dealStageAutomation";
 
 // Mock data - TODO: Replace with actual API calls
 const mockOrder: Order = {
@@ -41,8 +46,11 @@ const mockOrder: Order = {
 
 export default function OrderDetail() {
   const { id = "" } = useParams();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [order, setOrder] = useState<Order>(mockOrder); // TODO: Replace with useOrder hook
   const [creating, setCreating] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
   // Mock line items - TODO: Replace with actual data
   const mockLines = [
@@ -78,7 +86,71 @@ export default function OrderDetail() {
     return { subtotal, tax, total: subtotal + tax };
   }, [mockLines]);
 
+  const handlePdf = async () => {
+    try {
+      const url = await getOrderPdfUrl(order.id);
+      await logPdfGenerated("order", order.id, order.dealId, url);
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+    }
+  };
 
+  const handleConvertToInvoice = async () => {
+    if (isConverting) return;
+
+    try {
+      setIsConverting(true);
+      const { id: invoiceId } = await ensureInvoiceForOrder(order.id);
+
+      // Update order status to invoiced
+      setOrder(prev => ({ ...prev, status: "invoiced" }));
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: qk.orders() });
+      queryClient.invalidateQueries({ queryKey: qk.invoices() });
+      if (order.dealId) {
+        queryClient.invalidateQueries({ queryKey: qk.deal(order.dealId) });
+      }
+
+      toast({
+        title: "Invoice Created",
+        description: `Order converted to invoice #${invoiceId}`,
+        variant: "success"
+      });
+    } catch (error) {
+      console.error("Failed to convert order to invoice:", error);
+      toast({
+        title: "Conversion Failed",
+        description: "Failed to convert order to invoice. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: Order["status"]) => {
+    const oldStatus = order.status;
+    setOrder(prev => ({ ...prev, status: newStatus }));
+
+    // TODO: Add API call to update order status
+
+    // Trigger deal stage automation for order status changes
+    if (order.dealId) {
+      try {
+        if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+          await triggerDealStageAutomation('order_cancelled', order.dealId, { ...order, status: newStatus });
+        }
+      } catch (error) {
+        console.warn("Deal stage automation failed:", error);
+      }
+    }
+
+    toast({
+      title: "Status Updated",
+      description: `Order status changed to ${newStatus}`,
+    });
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -98,14 +170,12 @@ export default function OrderDetail() {
       <OrderEditorHeader
         order={order}
         onOpenPdf={handlePdf}
-        onConvertToInvoice={() => {
-          // TODO: Implement convert to invoice
-          console.log("Convert to invoice");
-        }}
+        onConvertToInvoice={handleConvertToInvoice}
         onMarkFulfilled={() => {
           // TODO: Implement mark as fulfilled
           console.log("Mark as fulfilled");
         }}
+        onStatusChange={handleStatusChange}
       />
 
       {/* Linked Deal information */}

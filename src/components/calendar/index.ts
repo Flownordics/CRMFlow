@@ -1,7 +1,11 @@
 export { CreateEventDialog } from './CreateEventDialog';
+export { EditEventDialog } from './EditEventDialog';
 export { CalendarKpis } from './CalendarKpis';
 export { CalendarToolbar } from './CalendarToolbar';
 export { EventItem } from './EventItem';
 export { CalendarFilters } from './CalendarFilters';
 export { CalendarEmpty, CalendarLoadingState } from './CalendarEmpty';
+export { CalendarGrid } from './CalendarGrid';
+export { CalendarWeekView } from './CalendarWeekView';
+export { CalendarDayView } from './CalendarDayView';
 export { eventTypeTheme, getEventTheme, tokenBg, tokenText, tokenRing } from './eventTheme';

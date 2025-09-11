@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useMemo, useState, useCallback, memo } from "react";
 import { Stage } from "@/services/pipelines";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus } from "lucide-react";
 import { useMoveDeal } from "@/services/pipelines";
 import { cn } from "@/lib/utils";
@@ -240,18 +241,23 @@ export function KanbanBoard({
                                         {(dealsByStage[col.id] ?? []).length}
                                     </div>
                                     {onCreateInStage && (
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            aria-label="Add deal"
-                                            onClick={() => onCreateInStage(col.id)}
-                                        >
-                                            <Plus
-                                                aria-hidden="true"
-                                                focusable="false"
-                                                className="h-4 w-4"
-                                            />
-                                        </Button>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    aria-label="Add deal"
+                                                    onClick={() => onCreateInStage(col.id)}
+                                                >
+                                                    <Plus
+                                                        aria-hidden="true"
+                                                        focusable="false"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Add deal</TooltipContent>
+                                        </Tooltip>
                                     )}
                                 </div>
                             </div>

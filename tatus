@@ -1,0 +1,3 @@
+[33m819b53a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix PDF service: remove unused import and update endpoint to pdfgen
+[33m3e6334e[m Fix CompanySelect component errors and add Netlify configuration
+[33meb03d1a[m Initial commit: Complete CRMFlow application with all features and documentation

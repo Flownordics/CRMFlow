@@ -8,10 +8,9 @@ console.log("Environment variables:", {
   VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
 });
 
-const BASE = import.meta.env.VITE_SUPABASE_URL?.trim() + "/rest/v1";
+const BASE = import.meta.env.VITE_SUPABASE_URL?.trim() ? import.meta.env.VITE_SUPABASE_URL.trim() + "/rest/v1" : undefined;
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const USE_SUPABASE_CLIENT = true; // Use Supabase client instead of direct REST API
 
 // Hård politik: INGEN automatisk fallback til mocks i dev, medmindre USE_MOCKS=true.
 if (!BASE && !USE_MOCKS) {
@@ -23,7 +22,7 @@ if (!BASE && !USE_MOCKS) {
 console.log("[API] Using BASE URL:", BASE);
 
 export const apiClient = axios.create({
-  baseURL: BASE,
+  baseURL: BASE || undefined,
   withCredentials: false, // Changed from true to false to fix CORS issue
   headers: {
     Accept: "application/json",

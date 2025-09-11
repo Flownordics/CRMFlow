@@ -74,14 +74,7 @@ export default function LoginPage() {
         <Separator className="flex-1" />
       </div>
 
-      {/* Google */}
-      <Button
-        variant="outline"
-        className="w-full"
-        onClick={() => window.location.assign("/api/auth/google")}
-      >
-        Continue with Google
-      </Button>
+      {/* Google integration removed - starting fresh */}
 
       <div className="flex justify-between text-sm text-muted-foreground">
         <a className="underline" href="/register">

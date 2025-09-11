@@ -1,191 +1,112 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders, okJson, errorJson, getUserIntegration, upsertUserIntegration, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-serve(async (req) => {
-  // Handle CORS preflight requests
+Deno.serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders(getEnvVar('APP_URL')),
+    });
+  }
+
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return errorJson(405, 'Method not allowed', getEnvVar('APP_URL'));
   }
 
   try {
-    // Parse request body
-    const { userId, kind, refreshToken } = await req.json()
+    // Create Supabase admin client
+    const supabaseAdmin = createSupabaseAdmin();
 
-    if (!userId || !kind || !refreshToken) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameters' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    // Get request body
+    const body = await req.json();
+    const { userId, kind, force = false, refreshToken } = body;
+
+    if (!kind || !['gmail', 'calendar'].includes(kind)) {
+      return errorJson(400, 'Invalid kind parameter. Must be "gmail" or "calendar"', getEnvVar('APP_URL'));
     }
 
-    // Validate kind
-    if (!['gmail', 'calendar'].includes(kind)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid kind parameter' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    if (!userId) {
+      return errorJson(400, 'Missing userId parameter', getEnvVar('APP_URL'));
     }
 
-    // Get environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return new Response(
-        JSON.stringify({ error: 'Missing environment variables' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    // Get user integration
+    const integration = await getUserIntegration(supabaseAdmin, userId, kind);
+    if (!integration || !integration.refresh_token) {
+      return errorJson(400, 'No integration found or missing refresh token', getEnvVar('APP_URL'));
     }
 
-    // Create Supabase client with service role key
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Check if token needs refresh
+    const now = new Date();
+    const expiresAt = integration.expires_at ? new Date(integration.expires_at) : null;
+    const needsRefresh = force || !expiresAt || expiresAt <= now;
 
-    // Get the integration to find the client ID and secret
-    const { data: integration, error: integrationError } = await supabase
-      .from('user_integrations')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('kind', kind)
+    if (!needsRefresh) {
+      return okJson({
+        ok: true,
+        expiresAt: integration.expires_at,
+        message: 'Token still valid'
+      }, getEnvVar('APP_URL'));
+    }
+
+    // Get workspace credentials for the redirect URI (same as OAuth flow)
+    const { data: workspaceCreds } = await supabaseAdmin
+      .from('workspace_integrations')
+      .select('client_id, client_secret, redirect_uri')
+      .eq('workspace_id', integration.workspace_id)
       .eq('provider', 'google')
-      .single()
+      .eq('kind', kind)
+      .single();
 
-    if (integrationError || !integration) {
-      return new Response(
-        JSON.stringify({ error: 'Integration not found' }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    if (!workspaceCreds) {
+      return errorJson(500, 'Workspace credentials not found', getEnvVar('APP_URL'));
     }
 
-    // Get Google OAuth credentials from environment variables
-    // For Gmail, we'll use the standard Google OAuth credentials
-    const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID')
-    const googleClientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
-
-    if (!googleClientId || !googleClientSecret) {
-      return new Response(
-        JSON.stringify({ error: 'Google OAuth credentials not configured' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    // Refresh the token using Google OAuth API
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    // Refresh token using Google's OAuth2 endpoint
+    const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: googleClientId,
-        client_secret: googleClientSecret,
+        client_id: workspaceCreds.client_id,
+        client_secret: workspaceCreds.client_secret,
+        refresh_token: integration.refresh_token,
         grant_type: 'refresh_token',
-        refresh_token: refreshToken,
+        redirect_uri: workspaceCreds.redirect_uri,
       }),
-    })
+    });
 
-    if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.text()
-      console.error('Google token refresh failed:', errorData)
-
-      // Check if this is a refresh token error that requires reconsent
-      if (tokenResponse.status === 400) {
-        try {
-          const errorJson = JSON.parse(errorData)
-          if (errorJson.error === 'invalid_grant') {
-            return new Response(
-              JSON.stringify({
-                error: 'Refresh token expired or invalid. Reconsent required.',
-                code: 'REFRESH_TOKEN_EXPIRED',
-                requiresReconsent: true
-              }),
-              {
-                status: 401,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              }
-            )
-          }
-        } catch (e) {
-          // Continue with generic error
-        }
-      }
-
-      return new Response(
-        JSON.stringify({ error: 'Failed to refresh Google token' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    if (!refreshResponse.ok) {
+      const errorData = await refreshResponse.text();
+      console.error('Token refresh failed:', errorData);
+      return errorJson(400, 'Failed to refresh token', getEnvVar('APP_URL'));
     }
 
-    const tokenData = await tokenResponse.json()
+    const refreshData = await refreshResponse.json();
+    const { access_token, expires_in, scope } = refreshData;
 
-    // Update the integration with new tokens
-    const { error: updateError } = await supabase
-      .from('user_integrations')
-      .update({
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token || refreshToken, // Keep old if not provided
-        expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', integration.id)
+    // Calculate new expiration time
+    const newExpiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
 
-    if (updateError) {
-      console.error('Failed to update integration:', updateError)
+    // Update integration
+    await upsertUserIntegration(supabaseAdmin, {
+      ...integration,
+      access_token,
+      expires_at: newExpiresAt,
+      scopes: scope ? scope.split(' ') : integration.scopes,
+      last_synced_at: new Date().toISOString(),
+    });
 
-      return new Response(
-        JSON.stringify({ error: 'Failed to update integration' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    // Return the new token data
-    return new Response(
-      JSON.stringify({
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token || refreshToken,
-        expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
-        expiresIn: tokenData.expires_in,
-        success: true
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
+    return okJson({
+      ok: true,
+      access_token: access_token,
+      expiresAt: newExpiresAt,
+      message: 'Token refreshed successfully'
+    }, getEnvVar('APP_URL'));
 
   } catch (error) {
-    console.error('Error in google-refresh function:', error)
-
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
+    console.error('Token refresh error:', error);
+    return errorJson(500, 'Internal server error', getEnvVar('APP_URL'));
   }
-})
+});

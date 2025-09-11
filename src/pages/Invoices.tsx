@@ -39,13 +39,14 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Invoice } from "@/services/invoices";
-import { useInvoices } from "@/services/invoices";
+import { useInvoices, useDeleteInvoice } from "@/services/invoices";
 import { generatePDF } from "@/lib/pdf";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/EmptyState";
-import { InvoicesKpiHeader, InvoiceStatusFilters, InvoiceEmptyState, getInvoiceTheme, tokenBg, tokenText } from "@/components/invoices";
+import { InvoicesKpiHeader, InvoiceStatusFilters, InvoiceEmptyState, getInvoiceTheme, tokenBg, tokenText, AddPaymentDialog, EditInvoiceDialog, SendInvoiceDialog } from "@/components/invoices";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { formatMoneyMinor } from "@/lib/money";
@@ -55,9 +56,15 @@ const Invoices: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showSendDialog, setShowSendDialog] = useState(false);
+
   const { toast } = useToast();
   const { t } = useI18n();
   const { getCompanyName } = useCompanyLookup();
+  const deleteInvoice = useDeleteInvoice();
 
   // Fetch invoices from API
   const { data: invoicesData, isLoading, error } = useInvoices({
@@ -131,11 +138,39 @@ const Invoices: React.FC = () => {
     }
   };
 
-  const handleDeleteInvoice = (invoiceId: string) => {
-    toast({
-      title: "Invoice Deleted",
-      description: "The invoice has been removed.",
-    });
+  const handleDeleteInvoice = async (invoice: Invoice) => {
+    if (!confirm(`Are you sure you want to delete invoice ${invoice.number || invoice.id}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteInvoice.mutateAsync(invoice.id);
+      toast({
+        title: "Invoice Deleted",
+        description: "The invoice has been removed.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete invoice. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSendInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowSendDialog(true);
+  };
+
+  const handleEditInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowEditDialog(true);
+  };
+
+  const handleAddPayment = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowPaymentDialog(true);
   };
 
   const handleStatusChange = (
@@ -282,53 +317,87 @@ const Invoices: React.FC = () => {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="inline-flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t("open_pdf")}
-                        onClick={() => handleGeneratePDF(invoice)}
-                      >
-                        <Download className="h-4 w-4" aria-hidden="true" focusable="false" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t("send")}
-                        disabled={invoice.status === "paid"}
-                      >
-                        <Send className="h-4 w-4" aria-hidden="true" focusable="false" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t("add_payment")}
-                        disabled={invoice.status !== "sent" && invoice.status !== "overdue"}
-                      >
-                        <Coins className="h-4 w-4" aria-hidden="true" focusable="false" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigate(`/invoices/${invoice.id}`)}
-                        aria-label={`View ${invoice.number}`}
-                      >
-                        <Eye className="h-4 w-4" aria-hidden="true" focusable="false" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Edit ${invoice.number}`}
-                      >
-                        <Edit className="h-4 w-4" aria-hidden="true" focusable="false" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteInvoice(invoice.id)}
-                        aria-label={`Delete ${invoice.number}`}
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" focusable="false" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("open_pdf")}
+                            onClick={() => handleGeneratePDF(invoice)}
+                          >
+                            <Download className="h-4 w-4" aria-hidden="true" focusable="false" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Open PDF</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSendInvoice(invoice)}
+                            aria-label={t("send")}
+                            disabled={invoice.status === "paid"}
+                          >
+                            <Send className="h-4 w-4" aria-hidden="true" focusable="false" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Send invoice</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleAddPayment(invoice)}
+                            aria-label={t("add_payment")}
+                            disabled={invoice.status !== "sent" && invoice.status !== "overdue"}
+                          >
+                            <Coins className="h-4 w-4" aria-hidden="true" focusable="false" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Add payment</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/invoices/${invoice.id}`)}
+                            aria-label={`View ${invoice.number}`}
+                          >
+                            <Eye className="h-4 w-4" aria-hidden="true" focusable="false" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>View invoice</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditInvoice(invoice)}
+                            aria-label={`Edit ${invoice.number}`}
+                          >
+                            <Edit className="h-4 w-4" aria-hidden="true" focusable="false" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit invoice</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteInvoice(invoice)}
+                            aria-label={`Delete ${invoice.number}`}
+                            disabled={deleteInvoice.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" focusable="false" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete invoice</TooltipContent>
+                      </Tooltip>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -336,6 +405,43 @@ const Invoices: React.FC = () => {
             })}
           </TableBody>
         </Table>
+      )}
+
+      {/* Edit Invoice Dialog */}
+      {selectedInvoice && (
+        <EditInvoiceDialog
+          invoice={selectedInvoice}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          onInvoiceUpdated={() => {
+            // Refresh invoices list
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {/* Add Payment Dialog */}
+      {selectedInvoice && (
+        <AddPaymentDialog
+          invoice={selectedInvoice}
+          open={showPaymentDialog}
+          onOpenChange={setShowPaymentDialog}
+          onPaymentAdded={() => {
+            // Refresh invoices list
+            window.location.reload();
+          }}
+        />
+      )}
+      {selectedInvoice && (
+        <SendInvoiceDialog
+          invoice={selectedInvoice}
+          open={showSendDialog}
+          onOpenChange={setShowSendDialog}
+          onInvoiceSent={() => {
+            // Refresh invoices list
+            window.location.reload();
+          }}
+        />
       )}
     </div>
   );

@@ -9,7 +9,7 @@ interface CalendarEmptyProps {
     isLoading: boolean;
     onCreateEvent: () => void;
     onGoToSettings: () => void;
-    showGoogleLayer?: boolean;
+    // Google integration removed - starting fresh
 }
 
 export function CalendarEmpty({
@@ -17,7 +17,7 @@ export function CalendarEmpty({
     isLoading,
     onCreateEvent,
     onGoToSettings,
-    showGoogleLayer = false
+    // Google integration removed - starting fresh
 }: CalendarEmptyProps) {
     const { t } = useI18n();
 
@@ -35,7 +35,7 @@ export function CalendarEmpty({
                     </div>
                     <CardTitle>Native Calendar Ready</CardTitle>
                     <CardDescription>
-                        Your native calendar is working! Connect Google Calendar for additional features
+                        Your native calendar is working!
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="text-center space-y-4">
@@ -49,10 +49,10 @@ export function CalendarEmpty({
                         className="w-full"
                     >
                         <Settings className="h-4 w-4 mr-2" aria-hidden="true" />
-                        {t('connect_google_calendar')}
+                        {t('create_event')}
                     </Button>
                     <p className="text-sm text-muted-foreground">
-                        Navigate to Settings → Integrations → Google Calendar to connect your account
+                        Create your first event to get started
                     </p>
                 </CardContent>
             </Card>
@@ -65,10 +65,7 @@ export function CalendarEmpty({
                 <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" aria-hidden="true" />
                 <CardTitle>No Events</CardTitle>
                 <CardDescription>
-                    {showGoogleLayer
-                        ? "No events found in this time range (native + Google)"
-                        : "No events found in this time range"
-                    }
+                    No events found in this time range
                 </CardDescription>
             </CardHeader>
             <CardContent className="text-center">

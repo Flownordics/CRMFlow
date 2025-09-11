@@ -39,6 +39,7 @@ export function SearchSelect({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedOption, setSelectedOption] = useState<SearchSelectOption | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const hasLoadedInitialOptions = useRef(false);
 
   // Debounced search - define this first
   const performSearch = useCallback(async (query: string) => {
@@ -64,41 +65,47 @@ export function SearchSelect({
     }
   }, [value, options]);
 
-  // Load selected option when value changes but options are empty
+  // Load initial options when dropdown opens (only once)
   useEffect(() => {
-    if (value && options.length === 0) {
+    if (open && options.length === 0 && !isLoading && !hasLoadedInitialOptions.current) {
+      hasLoadedInitialOptions.current = true;
       performSearch("");
     }
-  }, [value, performSearch]);
-
-  // Load initial options when dropdown opens
-  useEffect(() => {
-    if (open && options.length === 0) {
-      performSearch("");
-    }
-  }, [open, performSearch]);
+  }, [open, options.length, isLoading, performSearch]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    searchTimeoutRef.current = setTimeout(() => {
-      performSearch(searchQuery);
-    }, 250);
+    // Only search if there's a query or if we don't have options yet
+    if (searchQuery.trim() || options.length === 0) {
+      searchTimeoutRef.current = setTimeout(() => {
+        performSearch(searchQuery);
+      }, 250);
+    }
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery, performSearch]);
+  }, [searchQuery, performSearch, options.length]);
 
   const handleSelect = (option: SearchSelectOption) => {
     setSelectedOption(option);
     onChange(option.id);
     setOpen(false);
     setSearchQuery("");
+  };
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      // Reset the flag when closing so we can load fresh options next time
+      hasLoadedInitialOptions.current = false;
+      setSearchQuery("");
+    }
   };
 
   const handleCreate = () => {
@@ -110,7 +117,7 @@ export function SearchSelect({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

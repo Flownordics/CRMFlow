@@ -1,104 +1,93 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { corsHeaders, okJson, errorJson, signState, getWorkspaceCreds, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-serve(async (req) => {
-  // Handle CORS preflight requests
+Deno.serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders(getEnvVar('APP_URL')),
+    });
+  }
+
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return errorJson(405, 'Method not allowed', getEnvVar('APP_URL'));
   }
 
   try {
-    // Get the kind parameter from query string
-    const url = new URL(req.url);
-    const kind = url.searchParams.get('kind');
-
-    if (!kind || !['gmail', 'calendar'].includes(kind)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or missing kind parameter. Must be "gmail" or "calendar"' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    // Get authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return errorJson(401, 'Missing or invalid authorization header', getEnvVar('APP_URL'));
     }
 
-    // Generate PKCE code verifier and challenge for enhanced security
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = await generateCodeChallenge(codeVerifier);
+    const accessToken = authHeader.slice('Bearer '.length);
 
-    // Store the code verifier temporarily (in production, use a more secure method)
-    // For now, we'll pass it as state parameter
-    const state = btoa(JSON.stringify({
-      codeVerifier,
+    // Create Supabase admin client
+    const supabaseAdmin = createSupabaseAdmin();
+
+    // Verify user token and get user info
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
+    if (userError || !user) {
+      return errorJson(401, 'Invalid access token', getEnvVar('APP_URL'));
+    }
+
+    // Get request body
+    const body = await req.json();
+    const { kind } = body;
+
+    if (!kind || !['gmail', 'calendar'].includes(kind)) {
+      return errorJson(400, 'Invalid kind parameter. Must be "gmail" or "calendar"', getEnvVar('APP_URL'));
+    }
+
+    // Get workspace ID from workspace_settings (single-tenant)
+    const { data: workspaceSettings, error: workspaceError } = await supabaseAdmin
+      .from('workspace_settings')
+      .select('id')
+      .limit(1)
+      .single();
+
+    if (workspaceError || !workspaceSettings) {
+      return errorJson(500, 'Workspace not configured', getEnvVar('APP_URL'));
+    }
+
+    // Get workspace credentials
+    const credentials = await getWorkspaceCreds(supabaseAdmin, workspaceSettings.id, kind);
+
+    // Build OAuth state
+    const state = signState({
+      user_id: user.id,
+      workspace_id: workspaceSettings.id,
       kind,
-      timestamp: Date.now()
-    }));
-
-    // Define scopes based on kind
-    const scopes = kind === 'gmail'
-      ? 'https://www.googleapis.com/auth/gmail.send'
-      : 'https://www.googleapis.com/auth/calendar';
+      redirect_origin: getEnvVar('APP_URL'),
+      ts: Date.now(),
+    }, getEnvVar('JWT_SECRET'));
 
     // Build Google OAuth URL
-    const googleOAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    // We need a client_id for the OAuth URL, but the actual credentials will be provided in the callback
-    // For now, we'll use a placeholder that will be replaced by the user's actual client_id
-    googleOAuthUrl.searchParams.set('client_id', 'your-google-client-id.apps.googleusercontent.com');
-    googleOAuthUrl.searchParams.set('redirect_uri', `${url.origin}/google-oauth-callback`);
-    googleOAuthUrl.searchParams.set('response_type', 'code');
-    googleOAuthUrl.searchParams.set('scope', scopes);
-    googleOAuthUrl.searchParams.set('access_type', 'offline');
-    googleOAuthUrl.searchParams.set('prompt', 'consent');
-    googleOAuthUrl.searchParams.set('code_challenge', codeChallenge);
-    googleOAuthUrl.searchParams.set('code_challenge_method', 'S256');
-    googleOAuthUrl.searchParams.set('state', state);
+    const scopes = kind === 'gmail'
+      ? 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly'
+      : 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email';
 
-    // Redirect to Google OAuth consent screen
-    return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders,
-        'Location': googleOAuthUrl.toString()
-      }
+    // Use frontend callback URL instead of Edge Function
+    const frontendRedirectUri = `${getEnvVar('APP_URL')}/oauth/callback`;
+
+    const params = new URLSearchParams({
+      client_id: credentials.client_id,
+      redirect_uri: frontendRedirectUri,
+      scope: scopes,
+      access_type: 'offline',
+      include_granted_scopes: 'true',
+      prompt: 'select_account',
+      response_type: 'code',
+      state,
     });
 
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+
+    return okJson({ authUrl }, getEnvVar('APP_URL'));
+
   } catch (error) {
-    console.error('Error in google-oauth-start function:', error);
-
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
+    console.error('OAuth start error:', error);
+    return errorJson(500, 'Internal server error', getEnvVar('APP_URL'));
   }
-})
-
-// Generate a random code verifier for PKCE
-function generateCodeVerifier(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return base64URLEncode(array);
-}
-
-// Generate code challenge from verifier
-async function generateCodeChallenge(codeVerifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(codeVerifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return base64URLEncode(new Uint8Array(digest));
-}
-
-// Base64URL encoding (RFC 4648)
-function base64URLEncode(buffer: Uint8Array): string {
-  const base64 = btoa(String.fromCharCode(...buffer));
-  return base64
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
+});

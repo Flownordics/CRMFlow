@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Copy, Mail, Phone, Globe, Building2, BadgeDollarSign, MapPin, Hash, Briefcase } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Company } from "@/lib/schemas/company";
@@ -44,13 +45,18 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">{company.invoiceEmail}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(company.invoiceEmail!, t("companies.invoiceEmail"))}
-                >
-                  <Copy className="h-3 w-3" aria-hidden="true" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(company.invoiceEmail!, t("companies.invoiceEmail"))}
+                    >
+                      <Copy className="h-3 w-3" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy email</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           ) : (
@@ -78,17 +84,22 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">{company.email}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(company.email!, t("companies.email"))}
-                >
-                  <Copy className="h-3 w-3" aria-hidden="true" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(company.email!, t("companies.email"))}
+                    >
+                      <Copy className="h-3 w-3" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy email</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           )}
-          
+
           {company.phone && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm">
@@ -97,13 +108,18 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">{company.phone}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(company.phone!, t("companies.phone"))}
-                >
-                  <Copy className="h-3 w-3" aria-hidden="true" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(company.phone!, t("companies.phone"))}
+                    >
+                      <Copy className="h-3 w-3" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy phone</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           )}
@@ -116,13 +132,18 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">{company.website}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(company.website!, t("companies.website"))}
-                >
-                  <Copy className="h-3 w-3" aria-hidden="true" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(company.website!, t("companies.website"))}
+                    >
+                      <Copy className="h-3 w-3" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy website</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           )}
@@ -150,7 +171,7 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
               <span className="text-muted-foreground">{company.address}</span>
             </div>
           )}
-          
+
           {company.city && (
             <div className="text-sm">
               <span className="font-medium">{t("companies.city")}: </span>

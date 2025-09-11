@@ -1,0 +1,30 @@
+// Node.js global type declarations for Supabase Edge Functions
+declare global {
+    // Environment variables access
+    const process: {
+        env: {
+            [key: string]: string | undefined;
+        };
+    };
+
+    // Crypto API (available in modern Node.js)
+    const crypto: {
+        randomUUID(): string;
+        getRandomValues(array: Uint8Array): Uint8Array;
+    };
+
+    // Console API
+    const console: {
+        log(...args: any[]): void;
+        error(...args: any[]): void;
+        warn(...args: any[]): void;
+        info(...args: any[]): void;
+    };
+}
+
+// Module declarations for Node.js imports
+declare module "@supabase/supabase-js" {
+    export * from "@supabase/supabase-js";
+}
+
+export { };

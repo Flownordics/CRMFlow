@@ -37,11 +37,14 @@ const PersonPage = lazy(() => import("@/pages/people/PersonPage"));
 const Calendar = lazy(() => import("@/pages/calendar/CalendarView"));
 const Documents = lazy(() => import("@/pages/documents/DocumentsPage"));
 const Accounting = lazy(() => import("@/pages/accounting/AccountingPage"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
+const Tasks = lazy(() => import("@/pages/Tasks"));
 const Settings = lazy(() => import("@/pages/settings/SettingsPage"));
 const Login = lazy(() => import("@/pages/auth/LoginPage"));
 const Register = lazy(() => import("@/pages/auth/RegisterPage"));
 const Forgot = lazy(() => import("@/pages/auth/ForgotPasswordPage"));
-const GoogleCallback = lazy(() => import("@/pages/oauth/GoogleCallback"));
+const OAuthComplete = lazy(() => import("@/pages/oauth/OAuthComplete"));
+const OAuthCallback = lazy(() => import("@/pages/oauth/OAuthCallback"));
 
 const App = () => {
   // Health check effect
@@ -77,7 +80,8 @@ const App = () => {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/forgot" element={<Forgot />} />
-                    <Route path="/oauth/google/callback" element={<GoogleCallback />} />
+                    <Route path="/oauth/complete" element={<OAuthComplete />} />
+                    <Route path="/oauth/callback" element={<OAuthCallback />} />
                     <Route
                       path="/"
                       element={
@@ -95,7 +99,6 @@ const App = () => {
                       </Route>
                       <Route path="quotes">
                         <Route index element={<Quotes />} />
-
                         <Route path=":id" element={<QuoteEditor />} />
                       </Route>
                       <Route path="orders">
@@ -112,6 +115,8 @@ const App = () => {
                       <Route path="calendar" element={<Calendar />} />
                       <Route path="documents" element={<Documents />} />
                       <Route path="accounting" element={<Accounting />} />
+                      <Route path="analytics" element={<Analytics />} />
+                      <Route path="tasks" element={<Tasks />} />
                       <Route path="settings" element={<Settings />} />
                       <Route path="*" element={<NotFound />} />
                     </Route>

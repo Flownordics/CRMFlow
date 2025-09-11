@@ -1,5 +1,6 @@
 import { EventRow } from "@/services/events";
 import { GoogleCalendarEvent } from "@/services/calendar";
+import { Task } from "@/services/tasks";
 
 export interface MergedEvent {
     id: string;
@@ -16,15 +17,20 @@ export interface MergedEvent {
     }>;
     color?: string;
     kind?: string;
-    source: 'native' | 'google';
+    source: 'native' | 'google' | 'task';
     // CRM links (only for native events)
     deal_id?: string;
     company_id?: string;
     quote_id?: string;
     order_id?: string;
+    // Task links (only for task events)
+    task_id?: string;
+    task_status?: string;
+    task_priority?: string;
     // Original event data
     nativeEvent?: EventRow;
     googleEvent?: GoogleCalendarEvent;
+    taskEvent?: Task;
 }
 
 /**
@@ -63,8 +69,8 @@ export function googleEventToMerged(event: GoogleCalendarEvent): MergedEvent {
         id: event.id || `google-${Date.now()}-${Math.random()}`,
         title: event.summary,
         description: event.description,
-        start_at: startAt,
-        end_at: endAt,
+        start_at: startAt || new Date().toISOString(),
+        end_at: endAt || new Date().toISOString(),
         all_day: allDay,
         location: event.location,
         attendees: event.attendees?.map(att => ({
@@ -80,13 +86,73 @@ export function googleEventToMerged(event: GoogleCalendarEvent): MergedEvent {
 }
 
 /**
- * Merge native and Google events, sorted by start time
+ * Convert task to merged event format
  */
-export function mergeEvents(nativeEvents: EventRow[], googleEvents: GoogleCalendarEvent[]): MergedEvent[] {
+export function taskToMerged(task: Task): MergedEvent {
+    if (!task.due_date) {
+        throw new Error('Task must have a due date to be converted to calendar event');
+    }
+
+    const dueDate = new Date(task.due_date);
+    const endDate = new Date(dueDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+    return {
+        id: `task-${task.id}`,
+        title: task.title,
+        description: task.description,
+        start_at: dueDate.toISOString(),
+        end_at: endDate.toISOString(),
+        all_day: false,
+        location: undefined,
+        attendees: [],
+        color: getTaskColor(task),
+        kind: 'task',
+        source: 'task',
+        task_id: task.id,
+        task_status: task.status,
+        task_priority: task.priority,
+        taskEvent: task,
+    };
+}
+
+/**
+ * Get color for task based on priority and status
+ */
+function getTaskColor(task: Task): string {
+    if (task.status === 'completed') {
+        return 'success';
+    }
+    if (task.status === 'cancelled') {
+        return 'muted';
+    }
+
+    switch (task.priority) {
+        case 'urgent':
+            return 'danger';
+        case 'high':
+            return 'warning';
+        case 'medium':
+            return 'primary';
+        case 'low':
+            return 'accent';
+        default:
+            return 'primary';
+    }
+}
+
+/**
+ * Merge native events, Google events, and tasks, sorted by start time
+ */
+export function mergeEvents(nativeEvents: EventRow[], googleEvents: GoogleCalendarEvent[], tasks: Task[] = []): MergedEvent[] {
     const nativeMerged = nativeEvents.map(nativeEventToMerged);
     const googleMerged = googleEvents.map(googleEventToMerged);
 
-    const allEvents = [...nativeMerged, ...googleMerged];
+    // Convert tasks with due dates to events
+    const taskMerged = tasks
+        .filter(task => task.due_date)
+        .map(taskToMerged);
+
+    const allEvents = [...nativeMerged, ...googleMerged, ...taskMerged];
 
     // Sort by start time
     return allEvents.sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
@@ -97,7 +163,7 @@ export function mergeEvents(nativeEvents: EventRow[], googleEvents: GoogleCalend
  */
 function inferColorFromGoogleEvent(event: GoogleCalendarEvent): string {
     // Check if there's a CRMFlow color in extended properties
-    const crmflowColor = event.extendedProperties?.private?.crmflowColor;
+    const crmflowColor = (event.extendedProperties?.private as any)?.crmflowColor;
     if (crmflowColor) {
         return crmflowColor;
     }

@@ -16,7 +16,7 @@ import { useCompanies } from "@/services/companies";
 import { usePeople } from "@/services/people";
 import { getQuotePdfUrl } from "@/services/pdf";
 import { logEmailSent } from "@/services/activity";
-import { useIsGmailConnected, useGmailEmail, getGmailStatus } from "@/services/integrations";
+import { isGmailAvailable } from "@/services/email";
 import { toastBus } from "@/lib/toastBus";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Send, CheckCircle, Download, Copy, Mail } from "lucide-react";
@@ -41,14 +41,12 @@ export function SendQuoteDialog({ quoteId, open, onOpenChange }: SendQuoteDialog
     const { data: quote } = useQuote(quoteId);
     const { data: companies } = useCompanies();
     const { data: people } = usePeople();
-    const { data: isGmailConnected, isLoading: isLoadingGmail } = useIsGmailConnected();
-    const { data: gmailEmail } = useGmailEmail();
 
-    // Enhanced Gmail status query
-    const { data: gmail, isLoading: gmailLoading } = useQuery({
-        queryKey: ["gmailStatus"],
-        queryFn: getGmailStatus,
-        staleTime: 60_000,
+    // Check Gmail integration status
+    const { data: gmailAvailable } = useQuery({
+        queryKey: ['gmail-available'],
+        queryFn: isGmailAvailable,
+        enabled: open,
     });
 
     const sendEmail = useSendQuoteEmail();
@@ -108,16 +106,14 @@ Your Sales Team`);
             await sendEmail.mutateAsync({
                 quoteId,
                 to: to.trim(),
-                cc: cc.trim() ? cc.split(',').map(email => email.trim()) : undefined,
-                subject: subject.trim() || undefined,
-                body: body.trim() || undefined,
-                attachPdf,
+                subject: subject.trim() || `Quote ${quoteId}`,
+                message: body.trim() || undefined,
             });
 
             // Log activity if quote has a deal
             if (quote?.deal_id) {
                 try {
-                    await logEmailSent(quoteId, quote.deal_id, to.trim(), 'gmail');
+                    await logEmailSent(quoteId, quote.deal_id, to.trim(), 'manual');
                 } catch (activityError) {
                     console.warn('Failed to log email activity:', activityError);
                 }
@@ -175,30 +171,9 @@ ${body || 'Please find attached your quote.'}`;
         }
     };
 
-    const handleConnectGmail = () => {
-        onOpenChange(false);
-        navigate('/settings?tab=integrations');
-    };
+    // Google integration removed - starting fresh
 
-    // Show loading state while checking Gmail connection
-    if (gmailLoading) {
-        return (
-            <Dialog open={open} onOpenChange={onOpenChange}>
-                <AccessibleDialogContent className="sm:max-w-[600px]">
-                    <DialogHeader>
-                        <AccessibleDialogTitle id="send-quote-title">Send tilbud</AccessibleDialogTitle>
-                        <AccessibleDialogDescription id="send-quote-desc">
-                            Checking email configuration...
-                        </AccessibleDialogDescription>
-                    </DialogHeader>
-
-                    <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
-                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></div>
-                    </div>
-                </AccessibleDialogContent>
-            </Dialog>
-        );
-    }
+    // Google integration removed - starting fresh
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -206,40 +181,11 @@ ${body || 'Please find attached your quote.'}`;
                 <DialogHeader>
                     <AccessibleDialogTitle id="send-quote-title">Send tilbud</AccessibleDialogTitle>
                     <AccessibleDialogDescription id="send-quote-desc">
-                        Send tilbuddet til kunden. Hvis Gmail ikke er forbundet, kan du downloade PDF og sende manuelt.
+                        Send tilbuddet til kunden. Du kan downloade PDF og sende manuelt.
                     </AccessibleDialogDescription>
                 </DialogHeader>
 
-                {/* Enhanced Email Connection Status */}
-                <div className="mb-4 rounded-lg border p-3">
-                    {gmailLoading ? (
-                        <div className="text-sm text-muted-foreground">
-                            {t('checking_gmail') || "Checking Gmail…"}
-                        </div>
-                    ) : gmail?.connected ? (
-                        <div className="flex items-center gap-2 text-success">
-                            <CheckCircle className="h-4 w-4" aria-hidden="true" />
-                            <span className="font-medium">
-                                {t('gmail_connected') || "Gmail Connected"}
-                            </span>
-                            <Badge variant="outline" data-testid="gmail-email-badge">{gmail.email}</Badge>
-                        </div>
-                    ) : (
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-warning">
-                                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                                <span>{t('gmail_not_connected') || "Gmail not connected"}</span>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleConnectGmail}
-                            >
-                                {t('connect_gmail') || "Connect Gmail"}
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                {/* Google integration removed - starting fresh */}
 
                 {/* Error Alert */}
                 {error && (
@@ -248,15 +194,7 @@ ${body || 'Please find attached your quote.'}`;
                         <AlertDescription className="text-destructive">
                             {error === 'EMAIL_NOT_CONNECTED' ? (
                                 <div className="flex items-center justify-between">
-                                    <span>Gmail is not connected. Please connect your account to send emails.</span>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleConnectGmail}
-                                        className="ml-2"
-                                    >
-                                        Connect Gmail
-                                    </Button>
+                                    <span>Email service not available. Please download PDF and send manually.</span>
                                 </div>
                             ) : (
                                 <div className="flex items-center justify-between">
@@ -289,6 +227,25 @@ ${body || 'Please find attached your quote.'}`;
                                     </div>
                                 </div>
                             )}
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {/* Gmail Integration Status */}
+                {gmailAvailable === false && (
+                    <Alert>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                            <div className="flex items-center justify-between">
+                                <span>Gmail integration not connected</span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate('/settings?tab=integrations')}
+                                >
+                                    Connect Gmail
+                                </Button>
+                            </div>
                         </AlertDescription>
                     </Alert>
                 )}
@@ -393,7 +350,7 @@ ${body || 'Please find attached your quote.'}`;
 
                         <Button
                             type="submit"
-                            disabled={sendEmail.isPending || !to.trim() || !isGmailConnected}
+                            disabled={sendEmail.isPending || !to.trim()}
                             className="flex items-center gap-2"
                         >
                             {sendEmail.isPending ? (

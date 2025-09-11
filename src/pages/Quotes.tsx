@@ -12,6 +12,7 @@ import {
   Grid3X3,
   List,
   FileText,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useCompanyLookup } from "@/hooks/useCompanyLookup";
 import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
+import { SendQuoteDialog } from "@/components/quotes/SendQuoteDialog";
 import {
   QuotesKpiHeader,
   QuotesStatusFilters,
@@ -48,6 +50,8 @@ const Quotes: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const { toast } = useToast();
   const { getCompanyName } = useCompanyLookup();
 
@@ -112,6 +116,11 @@ const Quotes: React.FC = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleSendQuote = (quote: Quote) => {
+    setSelectedQuoteId(quote.id);
+    setSendDialogOpen(true);
   };
 
   const handleDeleteQuote = (quoteId: string) => {
@@ -278,6 +287,20 @@ const Quotes: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleSendQuote(quote)}
+                            aria-label={`Send quote ${quote.number || quote.id}`}
+                          >
+                            <Mail className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Send Quote</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             asChild
                             aria-label={`View ${quote.number || quote.id}`}
                           >
@@ -332,7 +355,7 @@ const Quotes: React.FC = () => {
             <QuoteCard
               key={quote.id}
               quote={quote}
-              onSend={handleGeneratePDF}
+              onSend={handleSendQuote}
               onOpenPdf={handleGeneratePDF}
               onConvertToOrder={handleConvertToOrder}
             />
@@ -344,6 +367,17 @@ const Quotes: React.FC = () => {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
       />
+
+      {selectedQuoteId && (
+        <SendQuoteDialog
+          quoteId={selectedQuoteId}
+          open={sendDialogOpen}
+          onOpenChange={(open) => {
+            setSendDialogOpen(open);
+            if (!open) setSelectedQuoteId(null);
+          }}
+        />
+      )}
     </div>
   );
 };

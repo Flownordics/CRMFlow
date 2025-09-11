@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getOrderStatusTheme, statusTokenBg, statusTokenText, statusTokenRing } from "./statusTheme";
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -14,13 +15,15 @@ interface OrderCardProps {
     onOpenPdf?: (order: OrderUI) => void;
     onOpenEditor?: (order: OrderUI) => void;
     onConvertToInvoice?: (order: OrderUI) => void;
+    onStatusChange?: (order: OrderUI, newStatus: OrderUI["status"]) => void;
 }
 
 export function OrderCard({
     order,
     onOpenPdf,
     onOpenEditor,
-    onConvertToInvoice
+    onConvertToInvoice,
+    onStatusChange
 }: OrderCardProps) {
     const { getCompanyName } = useCompanyLookup();
     const theme = getOrderStatusTheme(order.status);
@@ -72,7 +75,31 @@ export function OrderCard({
                 </span>
             )}
 
-            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t">
+            <div className="mt-3 pt-3 border-t space-y-2">
+                {onStatusChange ? (
+                    <Select
+                        value={order.status || "draft"}
+                        onValueChange={(newStatus) => onStatusChange(order, newStatus as OrderUI["status"])}
+                    >
+                        <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="accepted">Accepted</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                            <SelectItem value="backorder">Backorder</SelectItem>
+                            <SelectItem value="invoiced">Invoiced</SelectItem>
+                        </SelectContent>
+                    </Select>
+                ) : (
+                    <div className="text-xs text-muted-foreground">
+                        Status: {order.status || "draft"}
+                    </div>
+                )}
+            </div>
+
+            <div className="flex items-center gap-1.5 mt-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
@@ -109,18 +136,23 @@ export function OrderCard({
                     <TooltipContent>Convert to invoice</TooltipContent>
                 </Tooltip>
 
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenEditor?.(order);
-                    }}
-                    aria-label="Open editor"
-                >
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenEditor?.(order);
+                            }}
+                            aria-label="Open editor"
+                        >
+                            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Open editor</TooltipContent>
+                </Tooltip>
             </div>
         </Card>
     );

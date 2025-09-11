@@ -522,3 +522,18 @@ export function useCreateDeal() {
     }
   });
 }
+
+// Search function for deals
+export async function searchDeals(query: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
+  try {
+    const result = await fetchDeals({ q: query, limit: 20 });
+    return result.data.map(deal => ({
+      id: deal.id,
+      label: deal.title,
+      subtitle: deal.company_name ? `(${deal.company_name})` : undefined
+    }));
+  } catch (error) {
+    console.error("Failed to search deals:", error);
+    return [];
+  }
+}

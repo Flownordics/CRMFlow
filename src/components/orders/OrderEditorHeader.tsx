@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getOrderStatusTheme, statusTokenBg, statusTokenText } from "./statusTheme";
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -11,13 +13,15 @@ interface OrderEditorHeaderProps {
     onOpenPdf?: () => void;
     onConvertToInvoice?: () => void;
     onMarkFulfilled?: () => void;
+    onStatusChange?: (status: OrderUI["status"]) => void;
 }
 
 export function OrderEditorHeader({
     order,
     onOpenPdf,
     onConvertToInvoice,
-    onMarkFulfilled
+    onMarkFulfilled,
+    onStatusChange
 }: OrderEditorHeaderProps) {
     const { getCompanyName } = useCompanyLookup();
     const theme = getOrderStatusTheme(order.status);
@@ -26,14 +30,32 @@ export function OrderEditorHeader({
     return (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-card">
             <div className="flex items-center gap-2 min-w-0">
-                <span className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-                    statusTokenBg(theme.color),
-                    statusTokenText(theme.color)
-                )}>
-                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                    {order.status || "draft"}
-                </span>
+                {onStatusChange ? (
+                    <Select
+                        value={order.status || "draft"}
+                        onValueChange={onStatusChange}
+                    >
+                        <SelectTrigger className="w-32">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="accepted">Accepted</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                            <SelectItem value="backorder">Backorder</SelectItem>
+                            <SelectItem value="invoiced">Invoiced</SelectItem>
+                        </SelectContent>
+                    </Select>
+                ) : (
+                    <span className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
+                        statusTokenBg(theme.color),
+                        statusTokenText(theme.color)
+                    )}>
+                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {order.status || "draft"}
+                    </span>
+                )}
                 <div className="font-medium truncate">
                     {order.number ?? generateFriendlyNumber(order.id, 'order')}
                 </div>
@@ -50,15 +72,30 @@ export function OrderEditorHeader({
                     </div>
                 </div>
 
-                <Button variant="outline" onClick={onOpenPdf} aria-label="Open PDF">
-                    PDF
-                </Button>
-                <Button variant="secondary" onClick={onConvertToInvoice} aria-label="Convert to invoice">
-                    Convert
-                </Button>
-                <Button onClick={onMarkFulfilled} aria-label="Mark as fulfilled">
-                    Fulfilled
-                </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" onClick={onOpenPdf} aria-label="Open PDF">
+                            PDF
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Open PDF</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="secondary" onClick={onConvertToInvoice} aria-label="Convert to invoice">
+                            Convert
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Convert to invoice</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button onClick={onMarkFulfilled} aria-label="Mark as fulfilled">
+                            Fulfilled
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Mark as fulfilled</TooltipContent>
+                </Tooltip>
             </div>
         </div>
     );

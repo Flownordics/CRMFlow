@@ -2,18 +2,24 @@
   command = "npm run build"
   publish = "dist"
 
-[build.environment]
-  NODE_VERSION = "18"
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  # Suppress punycode deprecation warning from dependencies
+  environment = { NODE_OPTIONS = "--no-deprecation" }
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-[functions]
-  directory = "supabase/functions"
+# Environment variables for Netlify Functions
+[context.production.environment]
+  VITE_SUPABASE_URL = "https://vziwouylxsfbummcvckx.supabase.co"
+  SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6aXdvdXlseHNmYnVtbWN2Y2t4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYzNDQ4MzAsImV4cCI6MjA1MTkyMDgzMH0.MkZb1Ag2AfnJK8EPIhPB2R9GcqFWJhygnOAnGRkKBAs"
+  NETLIFY_URL = "https://crmflow-app.netlify.app"
 
-[dev]
-  command = "npm run dev"
-  port = 5173
-  publish = "dist"
+[context.development.environment]
+  VITE_SUPABASE_URL = "https://vziwouylxsfbummcvckx.supabase.co"
+  SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6aXdvdXlseHNmYnVtbWN2Y2t4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYzNDQ4MzAsImV4cCI6MjA1MTkyMDgzMH0.MkZb1Ag2AfnJK8EPIhPB2R9GcqFWJhygnOAnGRkKBAs"
+  NETLIFY_URL = "http://localhost:8888"

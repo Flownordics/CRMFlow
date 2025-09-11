@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { useCalendarConnection, useCalendarEvents, useCreateCalendarEvent, getCalendarStatus, syncGoogleCalendar } from "@/services/calendar";
 import { useEvents, useCreateEvent } from "@/services/events";
+import { useCalendarEvents, useCalendarConnection, useSetupCalendarSync } from "@/services/calendar";
 import { useUserSettings, useUpdateUserSettings } from "@/services/settings";
+import { useTasks } from "@/services/tasks";
 import { useQuery } from "@tanstack/react-query";
 import {
   CreateEventDialog,
@@ -12,16 +13,18 @@ import {
   EventItem,
   CalendarFilters,
   CalendarEmpty,
-  CalendarLoadingState
+  CalendarLoadingState,
+  CalendarGrid,
+  CalendarWeekView,
+  CalendarDayView
 } from "@/components/calendar";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
-import { mergeEvents, filterEventsByKind, getEventsForToday, getEventsForThisWeek } from "@/lib/calendar-utils";
+import { filterEventsByKind, getEventsForToday, getEventsForThisWeek, nativeEventToMerged, googleEventToMerged, mergeEvents } from "@/lib/calendar-utils";
 import { useI18n } from "@/lib/i18n";
-import { CheckCircle, AlertTriangle } from "lucide-react";
 import { toastBus } from "@/lib/toastBus";
 
-type CalendarView = 'month' | 'week' | 'day';
+type CalendarView = 'list' | 'month' | 'week' | 'day';
 
 export default function CalendarView() {
   const { t } = useI18n();
@@ -35,125 +38,158 @@ export default function CalendarView() {
   const { data: userSettings } = useUserSettings();
   const updateUserSettings = useUpdateUserSettings();
 
-  // State for Google layer toggle
-  const [showGoogleLayer, setShowGoogleLayer] = useState(userSettings?.calendar_show_google ?? false);
-  const [syncLoading, setSyncLoading] = useState(false);
+  // Check Google Calendar connection status
+  const { data: calendarConnection, isLoading: connectionLoading } = useCalendarConnection();
+  const isGoogleConnected = calendarConnection?.connected || false;
 
-  // Update showGoogleLayer when userSettings change
-  useEffect(() => {
-    if (userSettings) {
-      setShowGoogleLayer(userSettings.calendar_show_google);
-    }
-  }, [userSettings]);
-
-  // Calendar status query
-  const { data: calStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery({
-    queryKey: ["calendarStatus"],
-    queryFn: getCalendarStatus,
-    staleTime: 60_000,
-  });
-
-  // Google Calendar integration
-  const { data: calendarInfo, isLoading: connectionLoading } = useCalendarConnection();
-  const { data: googleEvents, isLoading: googleEventsLoading, refetch: refetchGoogleEvents } = useCalendarEvents({
-    start: getDateRangeStart(currentDate, view).toISOString(),
-    end: getDateRangeEnd(currentDate, view).toISOString()
-  });
+  // Set up calendar sync
+  const setupCalendarSync = useSetupCalendarSync();
 
   // Native events
   const { data: nativeEvents, isLoading: nativeEventsLoading, refetch: refetchNativeEvents } = useEvents({
     from: getDateRangeStart(currentDate, view).toISOString(),
     to: getDateRangeEnd(currentDate, view).toISOString(),
-    kinds: selectedTypes.length > 0 ? selectedTypes : undefined,
+    kinds: selectedTypes.length > 0 ? selectedTypes.filter(kind => kind !== 'task') : undefined,
+  });
+
+  // Tasks with due dates in the current range
+  const { data: tasks, isLoading: tasksLoading, refetch: refetchTasks } = useTasks({
+    due_date_from: getDateRangeStart(currentDate, view).toISOString(),
+    due_date_to: getDateRangeEnd(currentDate, view).toISOString(),
+  });
+
+  // Google Calendar events - only fetch if connected and not in localhost
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const { data: googleEvents, isLoading: googleEventsLoading, refetch: refetchGoogleEvents } = useQuery({
+    queryKey: ['calendarEvents', getDateRangeStart(currentDate, view).toISOString(), getDateRangeEnd(currentDate, view).toISOString()],
+    queryFn: async () => {
+      if (!isGoogleConnected || isLocalhost) return [];
+      const { listEvents } = await import('@/services/calendar');
+      return listEvents({
+        start: getDateRangeStart(currentDate, view).toISOString(),
+        end: getDateRangeEnd(currentDate, view).toISOString(),
+      });
+    },
+    enabled: isGoogleConnected && !isLocalhost,
+    retry: 1,
   });
 
   // Event creation hooks
-  const createGoogleEvent = useCreateCalendarEvent();
   const createNativeEvent = useCreateEvent();
+
+  // Set up calendar sync when Google Calendar is connected (but not in localhost)
+  useEffect(() => {
+    if (isGoogleConnected && !isLocalhost && !setupCalendarSync.isPending) {
+      setupCalendarSync.mutate();
+    }
+  }, [isGoogleConnected, isLocalhost]); // Removed setupCalendarSync from dependencies to prevent loop
 
   // Fetch events when date/view changes
   useEffect(() => {
     refetchNativeEvents();
-    if (showGoogleLayer && calendarInfo?.connected) {
-      refetchGoogleEvents();
+    refetchTasks();
+  }, [currentDate, view, selectedTypes, refetchNativeEvents, refetchTasks]);
+
+  // Helper functions for date ranges
+  function getDateRangeStart(date: Date, view: CalendarView): Date {
+    switch (view) {
+      case 'month':
+        return startOfMonth(date);
+      case 'week':
+        return startOfWeek(date, { weekStartsOn: 1 });
+      case 'day':
+        return startOfDay(date);
+      default:
+        return startOfMonth(date);
     }
-  }, [currentDate, view, selectedTypes, showGoogleLayer, calendarInfo?.connected, refetchNativeEvents, refetchGoogleEvents]);
+  }
 
-  // Merge events
-  const mergedEvents = mergeEvents(
-    nativeEvents || [],
-    (showGoogleLayer && googleEvents) ? googleEvents : []
-  );
+  function getDateRangeEnd(date: Date, view: CalendarView): Date {
+    switch (view) {
+      case 'month':
+        return endOfMonth(date);
+      case 'week':
+        return endOfWeek(date, { weekStartsOn: 1 });
+      case 'day':
+        return endOfDay(date);
+      default:
+        return endOfMonth(date);
+    }
+  }
 
-  // Filter merged events by selected types
-  const filteredEvents = filterEventsByKind(mergedEvents, selectedTypes);
-
-  const handlePrevious = () => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      switch (view) {
-        case 'month':
-          newDate.setMonth(prev.getMonth() - 1);
-          break;
-        case 'week':
-          newDate.setDate(prev.getDate() - 7);
-          break;
-        case 'day':
-          newDate.setDate(prev.getDate() - 1);
-          break;
-      }
-      return newDate;
-    });
+  // Handle event creation
+  const handleCreateEvent = async () => {
+    try {
+      setShowCreateDialog(false);
+      refetchNativeEvents();
+      toastBus.emit({
+        title: "Success",
+        description: 'Event created successfully',
+        variant: "success"
+      });
+    } catch (error) {
+      console.error('Failed to create event:', error);
+      toastBus.emit({
+        title: "Error",
+        description: 'Failed to create event',
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleNext = () => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      switch (view) {
-        case 'month':
-          newDate.setMonth(prev.getMonth() + 1);
-          break;
-        case 'week':
-          newDate.setDate(prev.getDate() + 7);
-          break;
-        case 'day':
-          newDate.setDate(prev.getDate() + 1);
-          break;
-      }
-      return newDate;
-    });
+  // Handle date navigation
+  const handleDateChange = (newDate: Date) => {
+    setCurrentDate(newDate);
+  };
+
+  // Handle view change
+  const handleViewChange = (newView: CalendarView) => {
+    setView(newView);
+  };
+
+  // Navigation handlers for grid views
+  const handlePreviousMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const handlePreviousWeek = () => {
+    setCurrentDate(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000));
+  };
+
+  const handleNextWeek = () => {
+    setCurrentDate(prev => new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000));
+  };
+
+  const handlePreviousDay = () => {
+    setCurrentDate(prev => new Date(prev.getTime() - 24 * 60 * 60 * 1000));
+  };
+
+  const handleNextDay = () => {
+    setCurrentDate(prev => new Date(prev.getTime() + 24 * 60 * 60 * 1000));
   };
 
   const handleToday = () => {
     setCurrentDate(new Date());
   };
 
-  const handleViewChange = (newView: CalendarView) => {
-    setView(newView);
-    // Adjust current date to ensure it's within the new view range
-    const today = new Date();
-    if (view === 'month' && newView === 'week') {
-      setCurrentDate(startOfWeek(today));
-    } else if (view === 'month' && newView === 'day') {
-      setCurrentDate(today);
-    } else if (view === 'week' && newView === 'day') {
-      setCurrentDate(today);
+  const handleDateClick = (date: Date) => {
+    setCurrentDate(date);
+    if (view === 'month') {
+      setView('day');
     }
   };
 
-  const handleCreateEvent = () => {
-    setShowCreateDialog(true);
+  const handleEventClick = (event: MergedEvent) => {
+    // Handle event click - could open event details or navigate
+    console.log('Event clicked:', event);
   };
 
-  const handleEventCreated = () => {
-    setShowCreateDialog(false);
-    refetchNativeEvents();
-    if (showGoogleLayer && calendarInfo?.connected) {
-      refetchGoogleEvents();
-    }
-  };
-
-  const handleTypeToggle = (type: string) => {
+  // Handle type filtering
+  const handleTypeFilterChange = (type: string) => {
     setSelectedTypes(prev =>
       prev.includes(type)
         ? prev.filter(t => t !== type)
@@ -161,239 +197,163 @@ export default function CalendarView() {
     );
   };
 
-  const handleGoogleLayerToggle = async () => {
-    const newValue = !showGoogleLayer;
-    setShowGoogleLayer(newValue);
-
-    // Update user settings
-    try {
-      await updateUserSettings.mutateAsync({
-        calendar_show_google: newValue
-      });
-    } catch (error) {
-      console.error('Failed to update Google layer setting:', error);
-    }
-  };
-
-  const isLoading = connectionLoading || nativeEventsLoading || (showGoogleLayer && googleEventsLoading);
+  // Loading state
+  const isLoading = nativeEventsLoading || tasksLoading || connectionLoading || (isGoogleConnected && !isLocalhost && googleEventsLoading);
 
   if (isLoading) {
-    return (
-      <div className="space-y-4 p-4 md:p-6">
-        <CalendarLoadingState />
-      </div>
-    );
+    return <CalendarLoadingState />;
   }
 
-  // Calculate KPIs
-  const eventsToday = getEventsForToday(mergedEvents);
-  const eventsThisWeek = getEventsForThisWeek(mergedEvents);
+  // Merge native events, Google Calendar events, and tasks
+  const allEvents = mergeEvents(nativeEvents || [], googleEvents || [], tasks || []);
+
+  // Filter events by selected types
+  const filteredEvents = selectedTypes.length > 0
+    ? filterEventsByKind(allEvents, selectedTypes)
+    : allEvents;
+
+  // Get events for different views
+  const todayEvents = getEventsForToday(filteredEvents);
+  const weekEvents = getEventsForThisWeek(filteredEvents);
 
   return (
-    <div className="space-y-6 p-6" data-testid="calendar-view">
-      {/* Page Header */}
+    <div className="space-y-6">
       <PageHeader
-        title="Calendar"
-        subtitle={t('your_calendar')}
+        title={t('calendar')}
+        subtitle={t('calendar_description')}
         actions={
-          <Button onClick={handleCreateEvent} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" aria-hidden="true" />
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
             {t('create_event')}
           </Button>
         }
       />
 
-      {/* Gradient Divider */}
-      <div className="h-0.5 w-full bg-gradient-to-r from-accent/30 via-primary/30 to-transparent rounded-full" aria-hidden="true" />
-
-      {/* KPI Cards */}
+      {/* Calendar KPIs */}
       <CalendarKpis
-        events={mergedEvents}
+        events={filteredEvents}
         currentDate={currentDate}
-        isConnected={calendarInfo?.connected ?? false}
-        connectedEmail={calendarInfo?.email}
-        eventsToday={eventsToday.length}
-        eventsThisWeek={eventsThisWeek.length}
+        isConnected={isGoogleConnected && !isLocalhost}
+        eventsToday={todayEvents.length}
+        eventsThisWeek={weekEvents.length}
       />
+
+      {/* Localhost Notice */}
+      {isLocalhost && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <div className="text-yellow-600">⚠️</div>
+            <div className="text-sm text-yellow-800">
+              <strong>Development Mode:</strong> Google Calendar integration is disabled in localhost.
+              Deploy to Netlify to test Google Calendar features.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Calendar Toolbar */}
       <CalendarToolbar
         currentDate={currentDate}
         view={view}
         onViewChange={handleViewChange}
-        onPrevious={handlePrevious}
-        onNext={handleNext}
+        onPrevious={() => {
+          if (view === 'month') handlePreviousMonth();
+          else if (view === 'week') handlePreviousWeek();
+          else if (view === 'day') handlePreviousDay();
+          else handleDateChange(new Date(currentDate.getTime() - 24 * 60 * 60 * 1000));
+        }}
+        onNext={() => {
+          if (view === 'month') handleNextMonth();
+          else if (view === 'week') handleNextWeek();
+          else if (view === 'day') handleNextDay();
+          else handleDateChange(new Date(currentDate.getTime() + 24 * 60 * 60 * 1000));
+        }}
         onToday={handleToday}
       />
 
-      {/* Google Calendar Status */}
-      {statusLoading ? (
-        <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-          {t('checking_google_calendar') || "Checking Google Calendar…"}
-        </div>
-      ) : calStatus?.connected ? (
-        <div className="flex items-center gap-2 rounded-lg border p-3 bg-success/10">
-          <CheckCircle className="h-4 w-4 text-success" aria-hidden="true" />
-          <span className="text-sm font-medium text-success">
-            {t('connected_to_google_calendar') || "Connected to Google Calendar"} ({calStatus.email})
-          </span>
-          <div className="ml-auto flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.href = "/settings?tab=integrations"}
-              aria-label={t('manage') || "Manage integration"}
-            >
-              {t('manage') || "Manage"}
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={async () => {
-                setSyncLoading(true);
-                const r = await syncGoogleCalendar();
-                setSyncLoading(false);
-                if (r.ok) {
-                  toastBus.emit({
-                    title: t('calendar_synced') || "Calendar synced",
-                    variant: "success"
-                  });
-                } else {
-                  toastBus.emit({
-                    title: t('sync_failed') || "Sync failed",
-                    description: r.error,
-                    variant: "destructive"
-                  });
-                }
-                refetchStatus();
-              }}
-              aria-busy={syncLoading}
-            >
-              {syncLoading ? (t('syncing') || "Syncing…") : (t('sync_now') || "Sync now")}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between rounded-lg border p-3 bg-warning/10">
-          <div className="flex items-center gap-2 text-warning">
-            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-            <span className="text-sm">{t('google_calendar_not_connected') || "Google Calendar not connected"}</span>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => window.location.href = "/settings?tab=integrations"}>
-            {t('connect') || "Connect"}
-          </Button>
-        </div>
-      )}
+      {/* Calendar Filters */}
+      <CalendarFilters
+        selectedCalendar={selectedCalendar}
+        selectedTypes={selectedTypes}
+        onCalendarChange={setSelectedCalendar}
+        onTypeToggle={handleTypeFilterChange}
+        availableCalendars={['primary']}
+        showGoogleLayer={!isLocalhost}
+        isGoogleConnected={isGoogleConnected && !isLocalhost}
+      />
 
-      {/* Google Layer Toggle */}
-      {calStatus?.connected && (
-        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{t('show_google_events')}</span>
-            <Button
-              variant={showGoogleLayer ? "default" : "outline"}
-              size="sm"
-              onClick={handleGoogleLayerToggle}
-              disabled={updateUserSettings.isPending}
-            >
-              {showGoogleLayer ? "On" : "Off"}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Filters and Events */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Filters Sidebar */}
-        <div className="lg:col-span-1">
-          <CalendarFilters
-            selectedCalendar={selectedCalendar}
-            selectedTypes={selectedTypes}
-            onCalendarChange={setSelectedCalendar}
-            onTypeToggle={handleTypeToggle}
-            availableCalendars={['primary']}
-            showGoogleLayer={showGoogleLayer}
-            isGoogleConnected={calendarInfo?.connected ?? false}
-          />
-        </div>
-
-        {/* Events List */}
-        <div className="lg:col-span-3">
-          {isLoading ? (
-            <CalendarLoadingState />
-          ) : filteredEvents.length > 0 ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">
-                  {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
-                </h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    refetchNativeEvents();
-                    if (showGoogleLayer && calendarInfo?.connected) {
-                      refetchGoogleEvents();
-                    }
-                  }}
-                  disabled={isLoading}
-                >
-                  Refresh
-                </Button>
-              </div>
-
-              <div className="grid gap-4">
-                {filteredEvents.map((event) => (
-                  <EventItem key={event.id} event={event} />
-                ))}
-              </div>
-            </div>
-          ) : (
+      {/* Calendar Content */}
+      <div className="space-y-4">
+        {view === 'list' ? (
+          // List view (original)
+          filteredEvents.length === 0 ? (
             <CalendarEmpty
-              isConnected={calendarInfo?.connected ?? false}
+              isConnected={isGoogleConnected}
               isLoading={false}
-              onCreateEvent={handleCreateEvent}
-              onGoToSettings={() => window.location.href = '/settings'}
-              showGoogleLayer={showGoogleLayer}
+              onCreateEvent={() => setShowCreateDialog(true)}
+              onGoToSettings={() => { }}
             />
-          )}
-        </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredEvents.map((event) => (
+                <EventItem
+                  key={event.id}
+                  event={event}
+                  onEventUpdated={() => {
+                    refetchNativeEvents();
+                    refetchGoogleEvents();
+                    refetchTasks();
+                  }}
+                />
+              ))}
+            </div>
+          )
+        ) : view === 'month' ? (
+          // Month grid view
+          <CalendarGrid
+            currentDate={currentDate}
+            events={filteredEvents}
+            onDateChange={handleDateChange}
+            onPreviousMonth={handlePreviousMonth}
+            onNextMonth={handleNextMonth}
+            onToday={handleToday}
+            onEventClick={handleEventClick}
+            onDateClick={handleDateClick}
+          />
+        ) : view === 'week' ? (
+          // Week view
+          <CalendarWeekView
+            currentDate={currentDate}
+            events={filteredEvents}
+            onDateChange={handleDateChange}
+            onPreviousWeek={handlePreviousWeek}
+            onNextWeek={handleNextWeek}
+            onToday={handleToday}
+            onEventClick={handleEventClick}
+            onDateClick={handleDateClick}
+          />
+        ) : view === 'day' ? (
+          // Day view
+          <CalendarDayView
+            currentDate={currentDate}
+            events={filteredEvents}
+            onDateChange={handleDateChange}
+            onPreviousDay={handlePreviousDay}
+            onNextDay={handleNextDay}
+            onToday={handleToday}
+            onEventClick={handleEventClick}
+          />
+        ) : null}
       </div>
 
+      {/* Create Event Dialog */}
       <CreateEventDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
-        onEventCreated={handleEventCreated}
-        showGoogleLayer={showGoogleLayer}
-        isGoogleConnected={calendarInfo?.connected ?? false}
+        onEventCreated={handleCreateEvent}
+        showGoogleLayer={!isLocalhost}
+        isGoogleConnected={isGoogleConnected && !isLocalhost}
       />
     </div>
   );
-}
-
-// Helper functions
-function getDateRangeStart(date: Date, view: CalendarView): Date {
-  switch (view) {
-    case 'month':
-      return startOfMonth(date);
-    case 'week':
-      return startOfWeek(date);
-    case 'day':
-      return startOfDay(date);
-    default:
-      return startOfMonth(date);
-  }
-}
-
-function getDateRangeEnd(date: Date, view: CalendarView): Date {
-  switch (view) {
-    case 'month':
-      return endOfMonth(date);
-    case 'week':
-      return endOfWeek(date);
-    case 'day':
-      return endOfDay(date);
-    default:
-      return endOfMonth(date);
-  }
 }

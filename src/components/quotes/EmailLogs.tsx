@@ -91,7 +91,7 @@ export function EmailLogs({ quoteId }: EmailLogsProps) {
 
     const getProviderBadge = (provider: string) => {
         const providerNames: Record<string, string> = {
-            'gmail': 'Gmail',
+            // Google integration removed - starting fresh
             'resend': 'Resend',
             'smtp': 'SMTP',
             'none': 'None'

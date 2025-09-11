@@ -1,93 +1,125 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BrandingNumberingForm } from "@/components/settings/BrandingNumberingForm";
-import { StageProbabilitiesForm } from "@/components/settings/StageProbabilitiesForm";
-import { ConnectedAccountsForm } from "@/components/settings/ConnectedAccountsForm";
-import { PreferencesForm } from "@/components/settings/PreferencesForm";
-import { useWorkspaceSettings } from "@/hooks/useSettings";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { WorkspaceIntegrationsForm } from '@/components/settings/WorkspaceIntegrationsForm';
+import { ConnectedAccounts } from '@/components/settings/ConnectedAccounts';
+import { supabase } from '@/integrations/supabase/client';
 
-export default function SettingsPage() {
-  const { data: settings, isLoading, error } = useWorkspaceSettings();
+export function SettingsPage() {
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (isLoading) {
+  const getWorkspaceId = useCallback(async () => {
+    try {
+      // Get workspace ID from workspace_settings (single-tenant)
+      const { data: workspaceSettings, error } = await supabase
+        .from('workspace_settings')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error('Failed to get workspace ID:', error);
+        return;
+      }
+
+      setWorkspaceId(workspaceSettings.id);
+    } catch (error) {
+      console.error('Error getting workspace ID:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    getWorkspaceId();
+  }, [getWorkspaceId]);
+
+  if (loading) {
     return (
-      <div className="space-y-4 p-4 md:p-6">
-        <PageHeader
-          title="Settings"
-          subtitle="Manage your workspace configuration and preferences"
-        />
-        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-        <div className="space-y-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="space-y-4">
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-4 w-64" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            </div>
-          ))}
+      <div className="container mx-auto py-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (!workspaceId) {
     return (
-      <div className="space-y-4 p-4 md:p-6">
-        <PageHeader
-          title="Settings"
-          subtitle="Manage your workspace configuration and preferences"
-        />
-        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Failed to load settings. Please check your connection and try again.
-          </AlertDescription>
-        </Alert>
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Settings</CardTitle>
+            <CardDescription>Manage your application settings</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-red-600">Failed to load workspace configuration.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
-      <PageHeader
-        title="Settings"
-        subtitle="Manage your workspace configuration and preferences"
-      />
+    <div className="container mx-auto py-8">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your application settings and integrations.
+          </p>
+        </div>
 
-      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+        <Tabs defaultValue="integrations" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="integrations">Integrations</TabsTrigger>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
+          </TabsList>
 
-      <Tabs defaultValue="branding" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="branding" data-testid="branding-tab">Branding & Numbering</TabsTrigger>
-          <TabsTrigger value="probabilities">Stage Probabilities</TabsTrigger>
-          <TabsTrigger value="integrations">Connected Accounts</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-        </TabsList>
+          <TabsContent value="integrations" className="space-y-6">
+            <WorkspaceIntegrationsForm workspaceId={workspaceId} />
+            <ConnectedAccounts />
+          </TabsContent>
 
-        <TabsContent value="branding" className="space-y-4">
-          <BrandingNumberingForm settings={settings} />
-        </TabsContent>
+          <TabsContent value="general" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>General Settings</CardTitle>
+                <CardDescription>
+                  Configure general application settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  General settings will be available here in future updates.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="probabilities" className="space-y-4">
-          <StageProbabilitiesForm />
-        </TabsContent>
-
-        <TabsContent value="integrations" className="space-y-4">
-          <ConnectedAccountsForm />
-        </TabsContent>
-
-        <TabsContent value="preferences" className="space-y-4">
-          <PreferencesForm />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="security" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Security Settings</CardTitle>
+                <CardDescription>
+                  Manage your account security and privacy
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Security settings will be available here in future updates.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
+
+// Add default export for lazy loading
+export default SettingsPage;

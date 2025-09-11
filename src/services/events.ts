@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { qk } from "@/lib/queryKeys";
 import { toastBus } from "@/lib/toastBus";
+import { createEvent as createGoogleEvent, updateEvent as updateGoogleEvent, deleteEvent as deleteGoogleEvent } from "@/services/calendar";
 
 // Zod schema for EventRow
 export const EventRowSchema = z.object({
@@ -21,13 +22,14 @@ export const EventRowSchema = z.object({
     color: z.string().nullable(), // "primary|accent|warning|success|muted"
     kind: z.string().nullable(), // "meeting|call|deadline|other"
     // CRM-links (nullable)
-    deal_id: z.string().uuid().nullable(),
-    company_id: z.string().uuid().nullable(),
-    quote_id: z.string().uuid().nullable(),
-    order_id: z.string().uuid().nullable(),
+    deal_id: z.string().uuid().nullable().optional(),
+    company_id: z.string().uuid().nullable().optional(),
+    quote_id: z.string().uuid().nullable().optional(),
+    order_id: z.string().uuid().nullable().optional(),
     // Google sync fields (optional)
     google_event_id: z.string().nullable(),
     sync_state: z.enum(['none', 'pending', 'synced', 'error']).default('none'),
+    google_sync_enabled: z.boolean().default(true),
     // Ownership
     created_by: z.string().uuid(),
     // Audit
@@ -57,6 +59,8 @@ export const CreateEventPayloadSchema = z.object({
     company_id: z.string().uuid().optional(),
     quote_id: z.string().uuid().optional(),
     order_id: z.string().uuid().optional(),
+    // Google sync options
+    google_sync_enabled: z.boolean().optional(),
 });
 
 export type CreateEventPayload = z.infer<typeof CreateEventPayloadSchema>;
@@ -132,12 +136,15 @@ export async function createEvent(payload: CreateEventPayload): Promise<EventRow
 
         // Validate payload
         const validatedPayload = CreateEventPayloadSchema.parse(payload);
+        const shouldSyncToGoogle = validatedPayload.google_sync_enabled !== false; // Default to true
 
+        // Create event in CRM database
         const { data, error } = await supabase
             .from('events')
             .insert({
                 ...validatedPayload,
                 created_by: user.id,
+                sync_state: shouldSyncToGoogle ? 'pending' : 'none',
             })
             .select()
             .single();
@@ -148,6 +155,62 @@ export async function createEvent(payload: CreateEventPayload): Promise<EventRow
 
         // Parse and validate the response
         const event = EventRowSchema.parse(data);
+
+        // Sync to Google Calendar if enabled
+        if (shouldSyncToGoogle) {
+            try {
+                const googleEvent = await createGoogleEvent({
+                    summary: event.title,
+                    description: event.description || undefined,
+                    location: event.location || undefined,
+                    start: {
+                        dateTime: event.start_at,
+                        timeZone: 'UTC',
+                    },
+                    end: {
+                        dateTime: event.end_at,
+                        timeZone: 'UTC',
+                    },
+                    attendees: event.attendees.map(att => ({
+                        email: att.email,
+                        displayName: att.name,
+                    })),
+                    crmRef: {
+                        dealId: event.deal_id || undefined,
+                        companyId: event.company_id || undefined,
+                        quoteId: event.quote_id || undefined,
+                        orderId: event.order_id || undefined,
+                        kind: event.kind as any || 'other',
+                    },
+                });
+
+                // Update the event with Google Calendar ID
+                const { error: updateError } = await supabase
+                    .from('events')
+                    .update({
+                        google_event_id: googleEvent.id,
+                        sync_state: 'synced',
+                    })
+                    .eq('id', event.id);
+
+                if (updateError) {
+                    console.error('Failed to update event with Google Calendar ID:', updateError);
+                    // Update sync state to error
+                    await supabase
+                        .from('events')
+                        .update({ sync_state: 'error' })
+                        .eq('id', event.id);
+                }
+            } catch (googleError) {
+                console.error('Failed to sync event to Google Calendar:', googleError);
+                // Update sync state to error
+                await supabase
+                    .from('events')
+                    .update({ sync_state: 'error' })
+                    .eq('id', event.id);
+            }
+        }
+
         return event;
     } catch (error) {
         console.error('Error creating event:', error);
@@ -165,12 +228,28 @@ export async function updateEvent(id: string, payload: UpdateEventPayload): Prom
             throw new Error("User not authenticated");
         }
 
+        // Get the current event to check sync status
+        const { data: currentEvent, error: fetchError } = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', id)
+            .eq('created_by', user.id)
+            .single();
+
+        if (fetchError || !currentEvent) {
+            throw new Error("Event not found or access denied");
+        }
+
         // Validate payload
         const validatedPayload = UpdateEventPayloadSchema.parse(payload);
 
+        // Update event in CRM database
         const { data, error } = await supabase
             .from('events')
-            .update(validatedPayload)
+            .update({
+                ...validatedPayload,
+                sync_state: currentEvent.google_event_id ? 'pending' : 'none',
+            })
             .eq('id', id)
             .eq('created_by', user.id) // Ensure user owns the event
             .select()
@@ -182,6 +261,50 @@ export async function updateEvent(id: string, payload: UpdateEventPayload): Prom
 
         // Parse and validate the response
         const event = EventRowSchema.parse(data);
+
+        // Sync to Google Calendar if event is synced
+        if (currentEvent.google_event_id && currentEvent.sync_state === 'synced') {
+            try {
+                await updateGoogleEvent(currentEvent.google_event_id, {
+                    summary: event.title,
+                    description: event.description || undefined,
+                    location: event.location || undefined,
+                    start: {
+                        dateTime: event.start_at,
+                        timeZone: 'UTC',
+                    },
+                    end: {
+                        dateTime: event.end_at,
+                        timeZone: 'UTC',
+                    },
+                    attendees: event.attendees.map(att => ({
+                        email: att.email,
+                        displayName: att.name,
+                    })),
+                    crmRef: {
+                        dealId: event.deal_id || undefined,
+                        companyId: event.company_id || undefined,
+                        quoteId: event.quote_id || undefined,
+                        orderId: event.order_id || undefined,
+                        kind: event.kind as any || 'other',
+                    },
+                });
+
+                // Update sync state to synced
+                await supabase
+                    .from('events')
+                    .update({ sync_state: 'synced' })
+                    .eq('id', event.id);
+            } catch (googleError) {
+                console.error('Failed to sync event update to Google Calendar:', googleError);
+                // Update sync state to error
+                await supabase
+                    .from('events')
+                    .update({ sync_state: 'error' })
+                    .eq('id', event.id);
+            }
+        }
+
         return event;
     } catch (error) {
         console.error('Error updating event:', error);
@@ -199,6 +322,29 @@ export async function deleteEvent(id: string): Promise<void> {
             throw new Error("User not authenticated");
         }
 
+        // Get the current event to check if it's synced to Google Calendar
+        const { data: currentEvent, error: fetchError } = await supabase
+            .from('events')
+            .select('google_event_id, sync_state')
+            .eq('id', id)
+            .eq('created_by', user.id)
+            .single();
+
+        if (fetchError) {
+            throw new Error("Event not found or access denied");
+        }
+
+        // Delete from Google Calendar if synced
+        if (currentEvent?.google_event_id && currentEvent.sync_state === 'synced') {
+            try {
+                await deleteGoogleEvent(currentEvent.google_event_id);
+            } catch (googleError) {
+                console.error('Failed to delete event from Google Calendar:', googleError);
+                // Continue with local deletion even if Google deletion fails
+            }
+        }
+
+        // Delete from CRM database
         const { error } = await supabase
             .from('events')
             .delete()
@@ -259,10 +405,18 @@ export function useUpdateEvent() {
         onSuccess: () => {
             // Invalidate events queries
             queryClient.invalidateQueries({ queryKey: qk.events() });
-            toastBus.success("Event updated successfully");
+            toastBus.emit({
+                title: "Success",
+                description: "Event updated successfully",
+                variant: "success"
+            });
         },
         onError: (error) => {
-            toastBus.error("Failed to update event");
+            toastBus.emit({
+                title: "Error",
+                description: "Failed to update event",
+                variant: "destructive"
+            });
             console.error('Update event error:', error);
         },
     });
@@ -279,10 +433,18 @@ export function useDeleteEvent() {
         onSuccess: () => {
             // Invalidate events queries
             queryClient.invalidateQueries({ queryKey: qk.events() });
-            toastBus.success("Event deleted successfully");
+            toastBus.emit({
+                title: "Success",
+                description: "Event deleted successfully",
+                variant: "success"
+            });
         },
         onError: (error) => {
-            toastBus.error("Failed to delete event");
+            toastBus.emit({
+                title: "Error",
+                description: "Failed to delete event",
+                variant: "destructive"
+            });
             console.error('Delete event error:', error);
         },
     });

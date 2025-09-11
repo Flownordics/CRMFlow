@@ -1,4 +1,4 @@
-import { CalendarClock, Phone, Users, Briefcase, Bell, Landmark } from "lucide-react";
+import { CalendarClock, Phone, Users, Briefcase, Bell, Landmark, CheckSquare } from "lucide-react";
 
 export const eventTypeTheme = {
     meeting: { color: "accent", icon: Users },
@@ -6,6 +6,7 @@ export const eventTypeTheme = {
     focus: { color: "muted", icon: Briefcase },
     deadline: { color: "warning", icon: Bell },
     travel: { color: "secondary", icon: Landmark },
+    task: { color: "primary", icon: CheckSquare },
     other: { color: "success", icon: CalendarClock },
 } as const;
 

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCompanyDeals } from "@/services/companies";
 import { useI18n } from "@/lib/i18n";
 import { Handshake, Plus, ExternalLink } from "lucide-react";
@@ -101,11 +102,16 @@ export function CompanyDeals({ companyId, onAddDeal }: CompanyDealsProps) {
                   )}
                 </div>
               </div>
-              <Button variant="ghost" size="sm" asChild>
-                <a href={`/deals/${deal.id}`}>
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a href={`/deals/${deal.id}`}>
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View deal</TooltipContent>
+              </Tooltip>
             </div>
           ))}
         </div>

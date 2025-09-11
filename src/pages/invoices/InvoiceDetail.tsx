@@ -5,6 +5,7 @@ import { formatMoneyMinor } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
   SelectTrigger,
@@ -84,13 +85,18 @@ export default function InvoiceDetail() {
               onLogged={(url) => logPdfGenerated("invoice", invoice.id, invoice.dealId, url)}
               label="Generate PDF"
             />
-            <Button
-              onClick={() => setPaymentModalOpen(true)}
-              disabled={invoice.balance_minor === 0}
-            >
-              <DollarSign className="mr-2 h-4 w-4" />
-              Add Payment
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={() => setPaymentModalOpen(true)}
+                  disabled={invoice.balance_minor === 0}
+                >
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Add Payment
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add payment to invoice</TooltipContent>
+            </Tooltip>
           </div>
         }
       />
@@ -150,9 +156,14 @@ export default function InvoiceDetail() {
                 {invoice.deal_id}
               </a>
             </div>
-            <Button variant="ghost" size="sm" disabled title="Coming soon">
-              Sync from Deal
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" disabled>
+                  Sync from Deal
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Coming soon - Sync invoice data from linked deal</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       )}

@@ -1,609 +1,294 @@
-// Netlify Function - Professional PDF Invoice Generator
+// Netlify Function - Professional PDF Invoice Generator (Cleaned: no HS, no tracking, no notes)
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { createClient } from '@supabase/supabase-js';
 
-// Color palette
+// ===== Colors =====
 const COLORS = {
     primary: '#698BB5',
     dark: '#5E6367',
     green: '#98A095',
     lightGreen: '#C5CB9D',
     cream: '#ECE0CA',
-    gold: '#E1BB7A',
     tan: '#CDBA9A',
-    brown: '#D2AE89',
-    coral: '#FE968D',
-    red: '#AF4337',
     white: '#FFFFFF',
     lightGray: '#F8F6F0'
 };
 
-// Convert hex to RGB for pdf-lib
-const hexToRgb = (hex) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-        r: parseInt(result[1], 16) / 255,
-        g: parseInt(result[2], 16) / 255,
-        b: parseInt(result[3], 16) / 255
-    } : { r: 0, g: 0, b: 0 };
+const hexToRgb = (hex = '#000000') => {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return { r: parseInt(m[1], 16) / 255, g: parseInt(m[2], 16) / 255, b: parseInt(m[3], 16) / 255 };
 };
 
-// Layout constants
+// ===== Page geometry (A4) =====
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
-const MARGIN_TOP = 24;
-const MARGIN_BOTTOM = 24;
-const MARGIN_SIDE = 32;
-
-// Safe content area
+const MARGIN_TOP = 36;
+const MARGIN_BOTTOM = 48;
+const MARGIN_SIDE = 40;
 const CONTENT_LEFT = MARGIN_SIDE;
 const CONTENT_RIGHT = PAGE_WIDTH - MARGIN_SIDE;
 const CONTENT_WIDTH = CONTENT_RIGHT - CONTENT_LEFT;
 
-// Measure + aligned text (med wrap)
-const textWidth = (font, size, str) => font.widthOfTextAtSize(String(str ?? ''), size);
-
-const drawTextAligned = (page, text, {
-    x, y, size, font, color = COLORS.dark, align = 'left',
-    maxWidth, lineHeight
-}) => {
-    const { r, g, b } = hexToRgb(color);
-    const lh = lineHeight || Math.round(size * 1.2);
-    const drawOne = (line, yy) => {
-        const w = textWidth(font, size, line);
-        let xx = x; if (align === 'center') xx -= w / 2; if (align === 'right') xx -= w;
-        page.drawText(line, { x: xx, y: yy, size, font, color: rgb(r, g, b) });
-    };
-    if (!maxWidth) { drawOne(String(text ?? ''), y); return { lastY: y - lh, lines: 1 }; }
-
-    const words = String(text ?? '').split(/\s+/);
-    let cur = '', lines = [];
-    for (const w of words) {
-        const test = cur ? `${cur} ${w}` : w;
-        if (textWidth(font, size, test) <= maxWidth) cur = test;
-        else {
-            if (cur) lines.push(cur);
-            if (textWidth(font, size, w) > maxWidth) { // hard-break long word
-                let chunk = '';
-                for (const ch of w) {
-                    const t = chunk + ch;
-                    if (textWidth(font, size, t) <= maxWidth) chunk = t;
-                    else { if (chunk) { lines.push(chunk); chunk = ch; } }
-                }
-                cur = chunk;
-            } else cur = w;
-        }
+// ===== Draw helpers =====
+const drawText = (page, text, opts) => {
+    const { x, y, size, color = COLORS.dark, font, align = 'left', maxWidth } = opts;
+    const c = hexToRgb(color);
+    const t = text == null ? '' : String(text);
+    if (!maxWidth) {
+        let px = x;
+        const w = font.widthOfTextAtSize(t, size);
+        if (align === 'center') px = x - w / 2;
+        if (align === 'right') px = x - w;
+        page.drawText(t, { x: px, y, size, font, color: rgb(c.r, c.g, c.b) });
+        return;
     }
-    if (cur) lines.push(cur);
-    let yy = y; for (const line of lines) { drawOne(line, yy); yy -= lh; }
-    return { lastY: yy, lines: lines.length };
-};
-
-const drawRightInBox = (page, text, { boxX, boxWidth, paddingRight = 10, y, size, font, color = COLORS.dark }) =>
-    drawTextAligned(page, text, { x: boxX + boxWidth - paddingRight, y, size, font, color, align: 'right' });
-
-// Helper functions for PDF generation
-const drawText = (page, text, options) => {
-    const { x, y, size, color = COLORS.dark, font, align = 'left', maxWidth } = options;
-    const colorRgb = hexToRgb(color);
-
-    page.drawText(text, {
-        x,
-        y,
-        size,
-        font,
-        color: rgb(colorRgb.r, colorRgb.g, colorRgb.b),
-        ...(maxWidth && { maxWidth })
+    const lines = wrapText(t, maxWidth, font, size);
+    lines.forEach((line, i) => {
+        let px = x;
+        const w = font.widthOfTextAtSize(line, size);
+        if (align === 'center') px = x - w / 2;
+        if (align === 'right') px = x - w;
+        page.drawText(line, { x: px, y: y - i * (size + 2), size, font, color: rgb(c.r, c.g, c.b) });
     });
 };
 
-const drawLine = (page, startX, startY, endX, endY, color = COLORS.tan, width = 1) => {
-    const colorRgb = hexToRgb(color);
-    page.drawLine({
-        start: { x: startX, y: startY },
-        end: { x: endX, y: endY },
-        thickness: width,
-        color: rgb(colorRgb.r, colorRgb.g, colorRgb.b)
-    });
+const drawLine = (page, x1, y1, x2, y2, color = COLORS.tan, width = 1) => {
+    const c = hexToRgb(color);
+    page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: width, color: rgb(c.r, c.g, c.b) });
 };
 
-const drawRect = (page, x, y, width, height, options) => {
-    const { color, borderColor, borderWidth = 0 } = options;
-
+const drawRect = (page, x, y, width, height, { color, borderColor, borderWidth = 0 } = {}) => {
     if (color) {
-        const colorRgb = hexToRgb(color);
-        page.drawRectangle({
-            x,
-            y,
-            width,
-            height,
-            color: rgb(colorRgb.r, colorRgb.g, colorRgb.b)
-        });
+        const c = hexToRgb(color);
+        page.drawRectangle({ x, y, width, height, color: rgb(c.r, c.g, c.b) });
     }
-
     if (borderColor && borderWidth > 0) {
-        const borderRgb = hexToRgb(borderColor);
-        page.drawRectangle({
-            x,
-            y,
-            width,
-            height,
-            borderColor: rgb(borderRgb.r, borderRgb.g, borderRgb.b),
-            borderWidth
-        });
+        const b = hexToRgb(borderColor);
+        page.drawRectangle({ x, y, width, height, borderColor: rgb(b.r, b.g, b.b), borderWidth });
     }
 };
 
-const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('da-DK', {
-        style: 'currency',
-        currency: 'DKK'
-    }).format(amount);
-};
+const formatCurrency = (v) => new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK' }).format(v || 0);
 
 const wrapText = (text, maxWidth, font, fontSize) => {
-    const words = text.split(' ');
+    const words = (text || '').toString().split(/\s+/);
     const lines = [];
-    let currentLine = '';
-
-    for (const word of words) {
-        const testLine = currentLine + (currentLine ? ' ' : '') + word;
-        const textWidth = font.widthOfTextAtSize(testLine, fontSize);
-
-        if (textWidth <= maxWidth) {
-            currentLine = testLine;
-        } else {
-            if (currentLine) {
-                lines.push(currentLine);
-                currentLine = word;
-            } else {
-                lines.push(word);
-            }
-        }
+    let line = '';
+    for (const w of words) {
+        const t = line ? line + ' ' + w : w;
+        if (font.widthOfTextAtSize(t, fontSize) <= maxWidth) line = t;
+        else { if (line) lines.push(line); line = w; }
     }
-
-    if (currentLine) {
-        lines.push(currentLine);
-    }
-
+    if (line) lines.push(line);
     return lines;
 };
 
-// Font loading helper
+// ===== Fonts & Images =====
 const loadFonts = async (pdfDoc) => {
     try {
-        // Try to load Inter font from Google Fonts
-        const interRegularResponse = await fetch('https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2');
-        const interBoldResponse = await fetch('https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff2');
-
-        if (interRegularResponse.ok && interBoldResponse.ok) {
-            const regularFontBytes = await interRegularResponse.arrayBuffer();
-            const boldFontBytes = await interBoldResponse.arrayBuffer();
-
-            const regularFont = await pdfDoc.embedFont(new Uint8Array(regularFontBytes));
-            const boldFont = await pdfDoc.embedFont(new Uint8Array(boldFontBytes));
-
-            return { regularFont, boldFont };
+        const r = await fetch('https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2');
+        const b = await fetch('https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff2');
+        if (r.ok && b.ok) {
+            const rf = await pdfDoc.embedFont(new Uint8Array(await r.arrayBuffer()));
+            const bf = await pdfDoc.embedFont(new Uint8Array(await b.arrayBuffer()));
+            return { regular: rf, bold: bf };
         }
-    } catch (error) {
-        console.log('Failed to load Inter fonts, using StandardFonts:', error);
-    }
-
-    // Fallback to StandardFonts
-    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-    return { regularFont, boldFont };
+    } catch { }
+    return { regular: await pdfDoc.embedFont(StandardFonts.Helvetica), bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold) };
 };
 
-// Image loading helper
-const loadImage = async (pdfDoc, imageUrl) => {
-    try {
-        const response = await fetch(imageUrl);
-        if (response.ok) {
-            const imageBytes = await response.arrayBuffer();
-            return await pdfDoc.embedPng(new Uint8Array(imageBytes));
-        }
-    } catch (error) {
-        console.log('Failed to load image:', imageUrl, error);
-    }
+const loadPng = async (pdfDoc, url) => {
+    try { const res = await fetch(url); if (res.ok) return await pdfDoc.embedPng(new Uint8Array(await res.arrayBuffer())); } catch { }
     return null;
 };
 
-export const handler = async (event, context) => {
-    // CORS headers
-    const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    };
+// ===== Header (no tracking field) =====
+const computeHeaderHeight = (fonts, meta, colW) => {
+    let extra = 0;
+    const values = [meta.date, meta.paidBy || '-', meta.number, meta.orderId || '-']; // tracking removed
+    values.forEach((val) => {
+        const lines = wrapText(String(val ?? ''), colW, fonts.bold, 10).length;
+        if (lines > 1) extra = Math.max(extra, lines - 1);
+    });
+    return 110 + extra * 12;
+};
 
-    // Handle preflight
-    if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: ''
-        };
+const addHeader = (page, fonts, { logo, companyName, meta }) => {
+    const colW = 150;
+    const headerH = computeHeaderHeight(fonts, meta, colW);
+    const topY = PAGE_HEIGHT - MARGIN_TOP;
+
+    drawRect(page, CONTENT_LEFT - 18, topY - headerH + 12, 12, headerH - 24, { color: COLORS.tan });
+
+    if (logo) {
+        const maxH = 42; const ratio = maxH / logo.height; const w = Math.min(170, logo.width * ratio);
+        page.drawImage(logo, { x: CONTENT_LEFT, y: topY - maxH - 10, width: w, height: maxH });
+    } else {
+        drawText(page, companyName || 'VIRKSOMHED', { x: CONTENT_LEFT, y: topY - 28, size: 22, font: fonts.bold });
     }
 
-    // Only allow POST requests
-    if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            headers: corsHeaders,
-            body: JSON.stringify({ error: 'Method not allowed' })
-        };
-    }
+    drawText(page, 'FAKTURA', { x: CONTENT_RIGHT, y: topY - 16, size: 26, font: fonts.bold, align: 'right' });
 
+    const metaTop = topY - 66;
+    const label = (t, x, y) => drawText(page, t, { x, y, size: 9, font: fonts.regular });
+    const valueBlock = (t, x, y) => { const lines = wrapText(String(t ?? ''), colW, fonts.bold, 10); lines.forEach((ln, i) => drawText(page, ln, { x, y: y - i * 12, size: 10, font: fonts.bold })); return lines.length * 12; };
+
+    const c1 = CONTENT_RIGHT - colW * 2 - 18; const c2 = CONTENT_RIGHT - colW;
+    let y1 = metaTop; label('DATO', c1, y1); y1 -= 14; y1 -= valueBlock(meta.date, c1, y1); y1 -= 8; label('BETALING', c1, y1); y1 -= 14; y1 -= valueBlock(meta.paidBy || '-', c1, y1);
+    let y2 = metaTop; label('FAKTURA NR.', c2, y2); y2 -= 14; y2 -= valueBlock(meta.number, c2, y2); y2 -= 8; label('ORDRE ID', c2, y2); y2 -= 14; y2 -= valueBlock(meta.orderId || '-', c2, y2);
+
+    drawLine(page, CONTENT_LEFT, topY - headerH, CONTENT_RIGHT, topY - headerH, COLORS.tan, 1);
+    return topY - headerH - 10;
+};
+
+const addFooter = (page, fonts, pageIndex, totalPages, companyFooter) => {
+    const y = MARGIN_BOTTOM + 20;
+    drawLine(page, CONTENT_LEFT, y + 14, CONTENT_RIGHT, y + 14, COLORS.tan, 1);
+    drawText(page, companyFooter || '', { x: CONTENT_LEFT, y, size: 8, font: fonts.regular });
+    drawText(page, `Side ${pageIndex}/${totalPages}`, { x: CONTENT_RIGHT, y, size: 8, font: fonts.regular, align: 'right' });
+};
+
+// ===== Table model (NO HS column; fits content width exactly) =====
+const TABLE = {
+    pad: 10,
+    rowH: 26,
+    headerH: 28,
+    getColumns: () => {
+        const qty = 70; const unitPrice = 110; const total = 110;
+        const description = CONTENT_WIDTH - (qty + unitPrice + total); // fill the rest — guarantees fit
+        const totalWidth = CONTENT_WIDTH;
+        const sx = CONTENT_LEFT;
+        const x = { description: sx + TABLE.pad, qty: sx + description + TABLE.pad, unit: sx + description + qty + TABLE.pad, total: sx + description + qty + unitPrice + TABLE.pad };
+        const right = { qty: x.qty + qty - TABLE.pad, unit: x.unit + unitPrice - TABLE.pad, total: x.total + total - TABLE.pad };
+        return { widths: { description, qty, unitPrice, total, totalWidth }, x, right };
+    }
+};
+
+// Start a new page if not enough room
+const ensureSpace = (ctx, needed) => {
+    if (ctx.currentY - needed >= ctx.bottomSafeY) return false;
+    const p = ctx.pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    ctx.pages.push(p);
+    ctx.currentY = addHeader(p, ctx.fonts, ctx.header);
+    ctx.tableHeaderDrawn = false;
+    return true;
+};
+
+const drawTableHeader = (ctx) => {
+    const { widths, x, right } = ctx.cols;
+    const p = ctx.pages.at(-1);
+    drawRect(p, CONTENT_LEFT, ctx.currentY - TABLE.headerH, widths.totalWidth, TABLE.headerH, { color: COLORS.tan });
+    drawText(p, 'PRODUKT', { x: x.description, y: ctx.currentY - 18, size: 10, font: ctx.fonts.bold });
+    drawText(p, 'ENHEDER', { x: right.qty, y: ctx.currentY - 18, size: 10, font: ctx.fonts.bold, align: 'right' });
+    drawText(p, 'ENHEDSPRIS', { x: right.unit, y: ctx.currentY - 18, size: 10, font: ctx.fonts.bold, align: 'right' });
+    drawText(p, 'TOTAL', { x: right.total, y: ctx.currentY - 18, size: 10, font: ctx.fonts.bold, align: 'right' });
+    ctx.currentY -= TABLE.headerH; ctx.tableHeaderDrawn = true;
+};
+
+// ===== Handler =====
+export const handler = async (event) => {
+    const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' };
+    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
+    if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method not allowed' }) };
     try {
-        const { type, data, user } = JSON.parse(event.body);
+        const { type, data } = JSON.parse(event.body || '{}');
+        if (type !== 'invoice' || !data) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Unsupported or missing data' }) };
 
-        if (!type || !data) {
-            return {
-                statusCode: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: 'Missing required fields: type and data' })
-            };
-        }
-
-        // Get environment variables with fallbacks
         const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
         const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
+        if (!supabaseUrl || !supabaseServiceKey) return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Missing Supabase configuration' }) };
 
-        console.log('Environment check:', {
-            SUPABASE_URL: !!supabaseUrl,
-            SUPABASE_SERVICE_KEY: !!supabaseServiceKey,
-            VITE_SUPABASE_URL: !!process.env.VITE_SUPABASE_URL,
-            SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY
-        });
-
-        if (!supabaseUrl || !supabaseServiceKey) {
-            return {
-                statusCode: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    error: 'Missing Supabase configuration',
-                    details: {
-                        SUPABASE_URL: !!supabaseUrl,
-                        SUPABASE_SERVICE_ROLE_KEY: !!supabaseServiceKey,
-                        available: Object.keys(process.env).filter(key => key.includes('SUPABASE'))
-                    }
-                })
-            };
-        }
-
-        // Create Supabase client with service role key (bypasses RLS)
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-        let pdfContent;
-        let filename;
+        const { data: invData, error: invErr } = await supabase.from('invoices').select(`*, company:companies(*), person:people(*), deal:deals(*)`).eq('id', data.id);
+        if (invErr) return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Invoice query failed', details: invErr.message }) };
+        const invoice = invData?.[0];
+        if (!invoice) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Invoice not found' }) };
 
-        if (type === 'invoice') {
-            // Fetch invoice data from database
-            console.log('Looking for invoice with ID:', data.id);
-            console.log('User context:', { user, userId: user?.id });
+        const { data: items = [] } = await supabase.from('line_items').select('*').eq('parent_type', 'invoice').eq('parent_id', data.id).order('position');
 
-            // First check if invoice exists at all
-            const { data: allInvoices, error: allInvoicesError } = await supabase
-                .from('invoices')
-                .select('id, created_by')
-                .eq('id', data.id);
+        const invDate = new Date(invoice.created_at).toLocaleDateString('da-DK');
+        const subtotal = (invoice.subtotal_minor || 0) / 100;
+        const tax = (invoice.tax_minor || 0) / 100;
+        const total = (invoice.total_minor || 0) / 100;
 
-            console.log('All invoices check:', { allInvoices, allInvoicesError });
+        const pdfDoc = await PDFDocument.create();
+        const fonts = await loadFonts(pdfDoc);
+        const logo = invoice.company?.logo_url ? await loadPng(pdfDoc, invoice.company.logo_url) : null;
 
-            // Get full invoice data (service role key bypasses RLS, so no user filter needed)
-            const { data: invoiceData, error: invoiceError } = await supabase
-                .from('invoices')
-                .select(`
-                    *,
-                    company:companies(*),
-                    person:people(*),
-                    deal:deals(*)
-                `)
-                .eq('id', data.id);
+        const pages = [];
+        const first = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+        pages.push(first);
 
-            const invoice = invoiceData && invoiceData.length > 0 ? invoiceData[0] : null;
+        const header = { logo, companyName: invoice.company?.name || 'Virksomhed', meta: { date: invDate, number: invoice.number || invoice.invoice_number || `INV-${invoice.id.slice(-6)}`, paidBy: invoice.paid_by || invoice.payment_method || '-', orderId: invoice.order_id || '-' } };
 
-            console.log('Invoice query result:', { invoice, invoiceError });
+        let currentY = addHeader(first, fonts, header);
+        const bottomSafeY = MARGIN_BOTTOM + 60;
 
-            if (invoiceError) {
-                console.error('Invoice query failed:', invoiceError);
-                return {
-                    statusCode: 500,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        error: 'Invoice query failed',
-                        details: invoiceError.message,
-                        code: invoiceError.code
-                    })
-                };
-            }
+        const cols = TABLE.getColumns();
 
-            if (!invoice) {
-                console.error('Invoice not found with ID:', data.id);
-                return {
-                    statusCode: 404,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        error: 'Invoice not found',
-                        details: `No invoice found with ID: ${data.id}`
-                    })
-                };
-            }
+        const ctx = { pdfDoc, pages, fonts, header, currentY, bottomSafeY, cols, tableHeaderDrawn: false };
 
-            // Debug line item creation removed - using actual line items from database
+        // ===== SOLD BY / BILL TO =====
+        const gutter = 36; const colW = (CONTENT_WIDTH - gutter) / 2; const leftX = CONTENT_LEFT; const rightX = CONTENT_LEFT + colW + gutter;
+        const blockTitle = (t, x, y) => drawText(pages.at(-1), t, { x, y, size: 11, font: fonts.bold });
+        const bodyLine = (t, x, y) => drawText(pages.at(-1), t, { x, y, size: 9.5, font: fonts.regular });
 
-            // Fetch line items separately
-            let lineItems = [];
-            if (!invoiceError && invoice) {
-                console.log('Fetching line items for invoice:', data.id);
-                const { data: lineItemsData, error: lineItemsError } = await supabase
-                    .from('line_items')
-                    .select('*')
-                    .eq('parent_type', 'invoice')
-                    .eq('parent_id', data.id)
-                    .order('position');
+        blockTitle('SOLGT AF', leftX, ctx.currentY); blockTitle('FAKTURERES TIL', rightX, ctx.currentY); ctx.currentY -= 20;
 
-                console.log('Line items query result:', {
-                    lineItemsData,
-                    lineItemsError,
-                    count: lineItemsData?.length || 0
-                });
-                lineItems = lineItemsData || [];
-            } else {
-                console.log('Skipping line items fetch due to invoice error:', invoiceError);
-            }
+        const soldLines = [invoice.company?.name, invoice.company?.address, `${invoice.company?.postal_code || ''} ${invoice.company?.city || ''}`.trim(), invoice.company?.email, invoice.company?.phone].filter(Boolean);
+        const billLines = [invoice.person?.name || 'Kunde', invoice.person?.email, invoice.person?.phone].filter(Boolean);
+        const maxLines = Math.max(soldLines.length, billLines.length);
+        ensureSpace(ctx, maxLines * 14 + 12);
+        for (let i = 0; i < soldLines.length; i++) bodyLine(soldLines[i], leftX, ctx.currentY - i * 14);
+        for (let i = 0; i < billLines.length; i++) bodyLine(billLines[i], rightX, ctx.currentY - i * 14);
+        ctx.currentY -= maxLines * 14 + 24;
+        drawLine(pages.at(-1), CONTENT_LEFT, ctx.currentY + 8, CONTENT_RIGHT, ctx.currentY + 8, COLORS.tan, 1);
 
-            if (invoiceError) {
-                console.error('Invoice query error:', invoiceError);
-                return {
-                    statusCode: 500,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        error: 'Invoice query failed',
-                        details: invoiceError.message,
-                        code: invoiceError.code
-                    })
-                };
-            }
-
-            if (!invoice) {
-                console.error('Invoice not found for ID:', data.id);
-                return {
-                    statusCode: 404,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ error: 'Invoice not found', invoiceId: data.id })
-                };
-            }
-
-            // Create a professional PDF invoice using pdf-lib
-            const invoiceDate = new Date(invoice.created_at).toLocaleDateString('da-DK');
-            const dueDate = invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('da-DK') : 'Ikke angivet';
-
-            const subtotal = (invoice.subtotal_minor || 0) / 100;
-            const taxAmount = (invoice.tax_minor || 0) / 100;
-            const totalAmount = (invoice.total_minor || 0) / 100;
-
-            // Create PDF document
-            const pdfDoc = await PDFDocument.create();
-
-            // Load fonts (Inter with fallback to StandardFonts)
-            const { regularFont, boldFont } = await loadFonts(pdfDoc);
-
-            // Load logo if available
-            let logoImage = null;
-            if (invoice.company?.logo_url) {
-                logoImage = await loadImage(pdfDoc, invoice.company.logo_url);
-            }
-
-            // Get company name for header
-            const companyName = invoice.company?.name || 'Virksomhed';
-
-            // Add page
-            const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-            let currentY = PAGE_HEIGHT - MARGIN_TOP;
-
-            // Header bar
-            const headerHeight = 60;
-            drawRect(page, 0, currentY - headerHeight, PAGE_WIDTH, headerHeight, { color: COLORS.primary });
-
-            // Left: logo/navn
-            const logoMaxH = 40, logoMaxW = 140;
-            if (logoImage) {
-                const ratio = logoImage.width / logoImage.height;
-                const h = Math.min(logoMaxH, headerHeight - 20);
-                const w = Math.min(logoMaxW, h * ratio);
-                page.drawImage(logoImage, { x: CONTENT_LEFT, y: currentY - 10 - h, width: w, height: h });
-            } else {
-                drawTextAligned(page, companyName, { x: CONTENT_LEFT, y: currentY - 35, size: 20, font: boldFont, color: COLORS.white });
-            }
-
-            // Right: meta box
-            const metaBoxWidth = 260, metaBoxHeight = 84;
-            const metaBoxX = CONTENT_RIGHT - metaBoxWidth, metaBoxYTop = currentY - 10;
-            drawRect(page, metaBoxX, metaBoxYTop - metaBoxHeight, metaBoxWidth, metaBoxHeight, {
-                color: COLORS.cream, borderColor: COLORS.tan, borderWidth: 1
-            });
-
-            // Label "FAKTURA" (justeret til venstre for meta-boks)
-            drawTextAligned(page, 'FAKTURA', { x: metaBoxX - 8, y: currentY - 32, size: 24, font: boldFont, color: COLORS.white, align: 'right' });
-
-            // Meta indhold
-            const invoiceNumber = invoice.number || invoice.invoice_number || `INV-${invoice.id.slice(-6)}`;
-            const mbPad = 10; let mbY = metaBoxYTop - 16;
-            drawTextAligned(page, `Faktura nr: ${invoiceNumber}`, { x: metaBoxX + mbPad, y: mbY, size: 10, font: regularFont, maxWidth: metaBoxWidth - 2 * mbPad });
-            mbY -= 15;
-            drawTextAligned(page, `Dato: ${invoiceDate}`, { x: metaBoxX + mbPad, y: mbY, size: 10, font: regularFont }); mbY -= 15;
-            drawTextAligned(page, `Forfaldsdato: ${dueDate}`, { x: metaBoxX + mbPad, y: mbY, size: 10, font: regularFont });
-
-            currentY -= headerHeight + 30;
-
-            // Addresses (2 columns)
-            const gutter = 40;
-            const leftColWidth = Math.floor((CONTENT_WIDTH - gutter) / 2);
-            const rightColWidth = CONTENT_WIDTH - gutter - leftColWidth;
-
-            // Left (Fra:)
-            let leftY = currentY;
-            drawTextAligned(page, 'Fra:', { x: CONTENT_LEFT, y: leftY, size: 12, font: boldFont }); leftY -= 18;
-
-            const companyAddress = invoice.company?.address || 'Adresse ikke angivet';
-            const companyPostal = invoice.company?.postal_code || '';
-            const companyCity = invoice.company?.city || '';
-            const companyEmail = invoice.company?.email || '';
-            const companyPhone = invoice.company?.phone || '';
-
-            ({ lastY: leftY } = drawTextAligned(page, companyName, { x: CONTENT_LEFT, y: leftY, size: 11, font: boldFont, maxWidth: leftColWidth })); leftY -= 4;
-            ({ lastY: leftY } = drawTextAligned(page, companyAddress, { x: CONTENT_LEFT, y: leftY, size: 10, font: regularFont, maxWidth: leftColWidth })); leftY -= 2;
-            ({ lastY: leftY } = drawTextAligned(page, `${companyPostal} ${companyCity}`.trim(), { x: CONTENT_LEFT, y: leftY, size: 10, font: regularFont, maxWidth: leftColWidth }));
-            if (companyEmail) ({ lastY: leftY } = drawTextAligned(page, companyEmail, { x: CONTENT_LEFT, y: leftY - 2, size: 10, font: regularFont, maxWidth: leftColWidth }));
-            if (companyPhone) ({ lastY: leftY } = drawTextAligned(page, companyPhone, { x: CONTENT_LEFT, y: leftY - 2, size: 10, font: regularFont, maxWidth: leftColWidth }));
-
-            // Right (Til:)
-            let rightY = currentY;
-            drawTextAligned(page, 'Til:', { x: CONTENT_LEFT + leftColWidth + gutter, y: rightY, size: 12, font: boldFont }); rightY -= 18;
-
-            const personName = invoice.person?.name || 'Kunde';
-            const personEmail = invoice.person?.email || '';
-            const personPhone = invoice.person?.phone || '';
-
-            ({ lastY: rightY } = drawTextAligned(page, personName, { x: CONTENT_LEFT + leftColWidth + gutter, y: rightY, size: 11, font: boldFont, maxWidth: rightColWidth })); rightY -= 2;
-            if (personEmail) ({ lastY: rightY } = drawTextAligned(page, personEmail, { x: CONTENT_LEFT + leftColWidth + gutter, y: rightY, size: 10, font: regularFont, maxWidth: rightColWidth }));
-            if (personPhone) ({ lastY: rightY } = drawTextAligned(page, personPhone, { x: CONTENT_LEFT + leftColWidth + gutter, y: rightY, size: 10, font: regularFont, maxWidth: rightColWidth }));
-
-            currentY = Math.min(leftY, rightY) - 30;
-
-            // Line items table
-            const rowBaseH = 22;
-            const col = {
-                desc: CONTENT_LEFT,
-                qty: CONTENT_LEFT + 250,
-                unit: CONTENT_LEFT + 250 + 80,
-                total: CONTENT_LEFT + 250 + 80 + 100,
-            };
-            const widths = { desc: 250, qty: 80, unit: 100, total: 100 };
-
-            // Header
-            drawRect(page, CONTENT_LEFT, currentY - rowBaseH, CONTENT_WIDTH, rowBaseH, { color: COLORS.lightGreen });
-            drawTextAligned(page, 'Beskrivelse', { x: col.desc + 10, y: currentY - 16, size: 10, font: boldFont });
-            drawTextAligned(page, 'Antal', { x: col.qty + widths.qty - 10, y: currentY - 16, size: 10, font: boldFont, align: 'right' });
-            drawTextAligned(page, 'Enhedspris', { x: col.unit + widths.unit - 10, y: currentY - 16, size: 10, font: boldFont, align: 'right' });
-            drawTextAligned(page, 'Total', { x: col.total + widths.total - 10, y: currentY - 16, size: 10, font: boldFont, align: 'right' });
-            currentY -= rowBaseH;
-
-            // Rows
-            if (lineItems && lineItems.length > 0) {
-                for (let i = 0; i < lineItems.length; i++) {
-                    const it = lineItems[i];
-                    const rowColor = i % 2 === 0 ? COLORS.white : COLORS.cream;
-                    const description = it.description || 'Beskrivelse';
-                    const quantity = it.qty ?? 1;
-                    const unitPrice = (it.unit_minor || 0) / 100;
-                    const total = quantity * unitPrice;
-
-                    // measure wrapped height
-                    const { lines } = drawTextAligned(page, description, { x: col.desc + 10, y: currentY - 14, size: 9, font: regularFont, maxWidth: widths.desc - 20 });
-                    const rowH = Math.max(rowBaseH, Math.round(lines * 11 + 8));
-
-                    // background
-                    drawRect(page, CONTENT_LEFT, currentY - rowH, CONTENT_WIDTH, rowH, { color: rowColor });
-
-                    // text
-                    drawTextAligned(page, description, { x: col.desc + 10, y: currentY - 14, size: 9, font: regularFont, maxWidth: widths.desc - 20 });
-                    drawTextAligned(page, String(quantity), { x: col.qty + widths.qty - 10, y: currentY - 14, size: 9, font: regularFont, align: 'right' });
-                    drawTextAligned(page, formatCurrency(unitPrice), { x: col.unit + widths.unit - 10, y: currentY - 14, size: 9, font: regularFont, align: 'right' });
-                    drawTextAligned(page, formatCurrency(total), { x: col.total + widths.total - 10, y: currentY - 14, size: 9, font: regularFont, align: 'right' });
-
-                    currentY -= rowH;
-                }
-            } else {
-                drawRect(page, CONTENT_LEFT, currentY - rowBaseH, CONTENT_WIDTH, rowBaseH, { color: COLORS.cream });
-                drawTextAligned(page, 'Ingen linjeposter fundet', { x: col.desc + 10, y: currentY - 16, size: 9, font: regularFont });
-                currentY -= rowBaseH;
-            }
-
-            currentY -= 20;
-
-            const totalsBoxWidth = 320, totalsBoxHeight = 104;
-            const totalsBoxX = CONTENT_RIGHT - totalsBoxWidth;
-            drawRect(page, totalsBoxX, currentY - totalsBoxHeight, totalsBoxWidth, totalsBoxHeight, {
-                color: COLORS.lightGray, borderColor: COLORS.green, borderWidth: 1
-            });
-
-            let tY = currentY - 22;
-            drawTextAligned(page, 'Subtotal:', { x: totalsBoxX + 10, y: tY, size: 10, font: regularFont });
-            drawRightInBox(page, formatCurrency(subtotal), { boxX: totalsBoxX, boxWidth: totalsBoxWidth, y: tY, size: 10, font: regularFont });
-            tY -= 20;
-
-            drawTextAligned(page, 'Moms:', { x: totalsBoxX + 10, y: tY, size: 10, font: regularFont });
-            drawRightInBox(page, formatCurrency(taxAmount), { boxX: totalsBoxX, boxWidth: totalsBoxWidth, y: tY, size: 10, font: regularFont });
-            tY -= 18;
-
-            drawLine(page, totalsBoxX + 10, tY, totalsBoxX + totalsBoxWidth - 10, tY, COLORS.green, 1); tY -= 18;
-
-            drawTextAligned(page, 'TOTAL:', { x: totalsBoxX + 10, y: tY, size: 12, font: boldFont });
-            drawRightInBox(page, formatCurrency(totalAmount), { boxX: totalsBoxX, boxWidth: totalsBoxWidth, y: tY, size: 12, font: boldFont });
-
-            currentY -= totalsBoxHeight + 30;
-
-            // Payment section
-            ({ lastY: currentY } = drawTextAligned(page, `Betalingsbetingelser: ${invoice.payment_terms || 'Netto 30 dage'}`, {
-                x: CONTENT_LEFT, y: currentY, size: 10, font: regularFont, maxWidth: CONTENT_WIDTH
-            }));
-            ({ lastY: currentY } = drawTextAligned(page, `Noter: ${invoice.notes || 'Tak for din forretning!'}`, {
-                x: CONTENT_LEFT, y: currentY, size: 10, font: regularFont, maxWidth: CONTENT_WIDTH
-            }));
-
-            // QR code if available
-            if (invoice.payment_qr_url) {
-                const qrImage = await loadImage(pdfDoc, invoice.payment_qr_url);
-                if (qrImage) {
-                    const qrSize = 120;
-                    const qrX = CONTENT_RIGHT - qrSize;
-                    const qrY = currentY - qrSize - 10;
-                    page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-                }
-            }
-
-            // Footer
-            drawTextAligned(page, 'Side 1/1', { x: CONTENT_RIGHT, y: MARGIN_BOTTOM + 20, size: 8, font: regularFont, align: 'right', color: COLORS.dark });
-
-            // Generate PDF bytes
-            const pdfBytes = await pdfDoc.save();
-            pdfContent = Buffer.from(pdfBytes);
-
-            filename = `invoice-${invoice.invoice_number || invoice.id}.pdf`;
+        // ===== TABLE =====
+        if (!ctx.tableHeaderDrawn) drawTableHeader(ctx);
+        if (items.length === 0) {
+            ensureSpace(ctx, TABLE.rowH);
+            const p = pages.at(-1); drawRect(p, CONTENT_LEFT, ctx.currentY - TABLE.rowH, cols.widths.totalWidth, TABLE.rowH, { color: COLORS.cream });
+            drawText(p, 'Ingen linjeposter', { x: cols.x.description, y: ctx.currentY - 18, size: 9, font: fonts.regular });
+            ctx.currentY -= TABLE.rowH;
         } else {
-            return {
-                statusCode: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: 'Unsupported document type. Use "invoice"' })
-            };
+            items.forEach((it, idx) => {
+                const p = pages.at(-1);
+                const bg = idx % 2 === 0 ? COLORS.white : COLORS.lightGray;
+                const descMax = cols.widths.description - 2 * TABLE.pad;
+                const lines = wrapText(it.description || '—', descMax, fonts.regular, 9);
+                const rowH = Math.max(TABLE.rowH, lines.length * 11 + 8);
+                if (ensureSpace(ctx, rowH + 6)) drawTableHeader(ctx);
+                drawRect(p, CONTENT_LEFT, ctx.currentY - rowH, cols.widths.totalWidth, rowH, { color: bg });
+                lines.forEach((ln, i) => drawText(p, ln, { x: cols.x.description, y: ctx.currentY - 18 - i * 11, size: 9, font: fonts.regular }));
+                const qty = String(it.qty || 1); const unit = (it.unit_minor || 0) / 100; const tot = (it.qty || 1) * unit;
+                drawText(p, qty, { x: cols.right.qty, y: ctx.currentY - 18, size: 9, font: fonts.regular, align: 'right' });
+                drawText(p, formatCurrency(unit), { x: cols.right.unit, y: ctx.currentY - 18, size: 9, font: fonts.regular, align: 'right' });
+                drawText(p, formatCurrency(tot), { x: cols.right.total, y: ctx.currentY - 18, size: 9, font: fonts.regular, align: 'right' });
+                ctx.currentY -= rowH; drawLine(p, CONTENT_LEFT, ctx.currentY, CONTENT_RIGHT, ctx.currentY, COLORS.tan, 0.6);
+            });
         }
 
-        // Return the generated document
-        return {
-            statusCode: 200,
-            headers: {
-                ...corsHeaders,
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="${filename}"`,
-                'Content-Length': pdfContent.length.toString(),
-            },
-            body: pdfContent.toString('base64'),
-            isBase64Encoded: true
-        };
+        ctx.currentY -= 20;
 
-    } catch (error) {
-        console.error('Error in pdf-generator-v2 function:', error);
-        return {
-            statusCode: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                error: 'Internal server error',
-                details: error.message
-            })
-        };
-    }
+        // ===== TOTALS ONLY (notes/insurance/incoterms removed) =====
+        const totalsW = 300; const totalsH = 112; ensureSpace(ctx, totalsH + 12);
+        const tX = CONTENT_RIGHT - totalsW; const tY = ctx.currentY - totalsH + 4;
+        drawRect(pages.at(-1), tX, tY, totalsW, totalsH, { color: COLORS.white, borderColor: COLORS.tan, borderWidth: 1 });
+        const pad = 14; const lx = tX + pad; const rx = tX + totalsW - pad; let ty = ctx.currentY - 24;
+        drawText(pages.at(-1), 'Subtotal', { x: lx, y: ty, size: 10, font: fonts.regular }); drawText(pages.at(-1), formatCurrency(subtotal), { x: rx, y: ty, size: 10, font: fonts.regular, align: 'right' }); ty -= 18;
+        drawText(pages.at(-1), 'Moms', { x: lx, y: ty, size: 10, font: fonts.regular }); drawText(pages.at(-1), formatCurrency(tax), { x: rx, y: ty, size: 10, font: fonts.regular, align: 'right' }); ty -= 12;
+        drawLine(pages.at(-1), lx, ty, rx, ty, COLORS.tan, 1); ty -= 14;
+        drawText(pages.at(-1), 'Total', { x: lx, y: ty, size: 12, font: fonts.bold }); drawText(pages.at(-1), formatCurrency(total), { x: rx, y: ty, size: 12, font: fonts.bold, align: 'right' });
+
+        ctx.currentY = tY - 24;
+
+        // FOOTER
+        const totalPages = pages.length; const companyFooter = [invoice.company?.website, invoice.company?.email, invoice.company?.phone].filter(Boolean).join('  •  ');
+        pages.forEach((p, i) => addFooter(p, fonts, i + 1, totalPages, companyFooter));
+
+        const pdfBytes = await pdfDoc.save();
+        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="invoice-${invoice.invoice_number || invoice.id}.pdf"` }, body: Buffer.from(pdfBytes).toString('base64'), isBase64Encoded: true };
+    } catch (error) { return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Internal server error', details: error.message }) }; }
 };

@@ -543,3 +543,18 @@ export function useDeleteOrderLine(orderId: string) {
         },
     });
 }
+
+// Search function for orders
+export async function searchOrders(query: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
+    try {
+        const result = await fetchOrders({ q: query, limit: 20 });
+        return result.data.map(order => ({
+            id: order.id,
+            label: order.title || `Order #${order.order_number}`,
+            subtitle: order.company_name ? `(${order.company_name})` : undefined
+        }));
+    } catch (error) {
+        console.error("Failed to search orders:", error);
+        return [];
+    }
+}
