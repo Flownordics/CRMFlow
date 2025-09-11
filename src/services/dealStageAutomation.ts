@@ -17,8 +17,8 @@ export const DEFAULT_STAGE_RULES: DealStageRule[] = [
     // When a quote is created from a deal in "Prospecting", move to "Proposal"
     {
         trigger: 'quote_created',
-        fromStage: 'prospecting',
-        toStage: 'proposal'
+        fromStage: 'Prospecting',
+        toStage: 'Proposal'
     },
 
     // Note: quote_accepted trigger is handled by quote-to-order conversion flow
@@ -27,88 +27,54 @@ export const DEFAULT_STAGE_RULES: DealStageRule[] = [
     // When a quote is declined, move to "Closed Lost"
     {
         trigger: 'quote_declined',
-        toStage: 'closed-lost'
+        toStage: 'Closed Lost'
     },
 
     // When an order is created (quote converted to order), move to "Closed Won"
     {
         trigger: 'order_created',
-        toStage: 'closed-won'
+        toStage: 'Closed Won'
     },
 
     // When an order is cancelled, move back to "Negotiation"
     {
         trigger: 'order_cancelled',
-        toStage: 'negotiation'
+        toStage: 'Negotiation'
     },
 
     // When an invoice is created, ensure deal is in "Closed Won"
     {
         trigger: 'invoice_created',
-        toStage: 'closed-won'
+        toStage: 'Closed Won'
     },
 
     // When an invoice is paid, ensure deal is in "Closed Won" (redundant but explicit)
     {
         trigger: 'invoice_paid',
-        toStage: 'closed-won'
+        toStage: 'Closed Won'
     }
 ];
 
-// Get stage ID by name (case-insensitive) from pipelines
+// Get stage ID by name (case-insensitive) from stages table
 async function getStageIdByName(stageName: string): Promise<string | null> {
     try {
-        // First get all pipelines with their stages
-        const response = await apiClient.get(`/pipelines?select=id,stages`);
-        const pipelines = response.data;
-        
-        if (!pipelines || pipelines.length === 0) {
-            console.warn("No pipelines found");
-            return null;
-        }
-
-        // Look through all stages in all pipelines
-        for (const pipeline of pipelines) {
-            if (pipeline.stages && Array.isArray(pipeline.stages)) {
-                const stage = pipeline.stages.find((s: any) => 
-                    s.name && s.name.toLowerCase() === stageName.toLowerCase()
-                );
-                if (stage) {
-                    return stage.id;
-                }
-            }
-        }
-        
-        return null;
+        console.log(`[DealStageAutomation] Looking up stage ID for name: "${stageName}"`);
+        const response = await apiClient.get(`/stages?name=ilike.${encodeURIComponent(stageName)}&select=id`);
+        const stages = response.data;
+        console.log(`[DealStageAutomation] Found stages:`, stages);
+        return stages && stages.length > 0 ? stages[0].id : null;
     } catch (error) {
         console.error(`Failed to find stage by name "${stageName}":`, error);
         return null;
     }
 }
 
-// Get stage name by ID from pipelines
+// Get stage name by ID from stages table
 async function getStageNameById(stageId: string): Promise<string | null> {
     try {
-        // First get all pipelines with their stages
-        const response = await apiClient.get(`/pipelines?select=id,stages`);
-        const pipelines = response.data;
-        
-        if (!pipelines || pipelines.length === 0) {
-            console.warn("No pipelines found");
-            return null;
-        }
-
-        // Look through all stages in all pipelines
-        for (const pipeline of pipelines) {
-            if (pipeline.stages && Array.isArray(pipeline.stages)) {
-                const stage = pipeline.stages.find((s: any) => s.id === stageId);
-                if (stage) {
-                    return stage.name;
-                }
-            }
-        }
-        
-        return null;
+        const response = await apiClient.get(`/stages?id=eq.${stageId}&select=name`);
+        const stages = response.data;
+        return stages && stages.length > 0 ? stages[0].name : null;
     } catch (error) {
         console.error(`Failed to find stage name by ID "${stageId}":`, error);
         return null;
@@ -156,6 +122,8 @@ export async function automateDealStage(
 
         // Get current stage name for comparison
         const currentStageName = await getStageNameById(deal.stage_id);
+        console.log(`[DealStageAutomation] Deal ${dealId} current stage: "${currentStageName}" (ID: ${deal.stage_id})`);
+        console.log(`[DealStageAutomation] Trigger: "${trigger}"`);
         
         // Find applicable rules
         const applicableRules = DEFAULT_STAGE_RULES.filter(rule => {
@@ -165,8 +133,10 @@ export async function automateDealStage(
             return true;
         });
 
+        console.log(`[DealStageAutomation] Found ${applicableRules.length} applicable rules:`, applicableRules);
+
         if (applicableRules.length === 0) {
-            console.log(`No applicable stage automation rules for trigger "${trigger}" on deal ${dealId}`);
+            console.log(`[DealStageAutomation] No applicable stage automation rules for trigger "${trigger}" on deal ${dealId}`);
             return { updated: false, reason: 'No applicable rules' };
         }
 
