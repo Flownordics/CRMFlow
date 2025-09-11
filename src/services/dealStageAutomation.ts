@@ -55,24 +55,60 @@ export const DEFAULT_STAGE_RULES: DealStageRule[] = [
     }
 ];
 
-// Get stage ID by name (case-insensitive)
+// Get stage ID by name (case-insensitive) from pipelines
 async function getStageIdByName(stageName: string): Promise<string | null> {
     try {
-        const response = await apiClient.get(`/stages?name=ilike.${encodeURIComponent(stageName)}&select=id`);
-        const stages = response.data;
-        return stages && stages.length > 0 ? stages[0].id : null;
+        // First get all pipelines with their stages
+        const response = await apiClient.get(`/pipelines?select=id,stages`);
+        const pipelines = response.data;
+        
+        if (!pipelines || pipelines.length === 0) {
+            console.warn("No pipelines found");
+            return null;
+        }
+
+        // Look through all stages in all pipelines
+        for (const pipeline of pipelines) {
+            if (pipeline.stages && Array.isArray(pipeline.stages)) {
+                const stage = pipeline.stages.find((s: any) => 
+                    s.name && s.name.toLowerCase() === stageName.toLowerCase()
+                );
+                if (stage) {
+                    return stage.id;
+                }
+            }
+        }
+        
+        return null;
     } catch (error) {
         console.error(`Failed to find stage by name "${stageName}":`, error);
         return null;
     }
 }
 
-// Get stage name by ID
+// Get stage name by ID from pipelines
 async function getStageNameById(stageId: string): Promise<string | null> {
     try {
-        const response = await apiClient.get(`/stages?id=eq.${stageId}&select=name`);
-        const stages = response.data;
-        return stages && stages.length > 0 ? stages[0].name : null;
+        // First get all pipelines with their stages
+        const response = await apiClient.get(`/pipelines?select=id,stages`);
+        const pipelines = response.data;
+        
+        if (!pipelines || pipelines.length === 0) {
+            console.warn("No pipelines found");
+            return null;
+        }
+
+        // Look through all stages in all pipelines
+        for (const pipeline of pipelines) {
+            if (pipeline.stages && Array.isArray(pipeline.stages)) {
+                const stage = pipeline.stages.find((s: any) => s.id === stageId);
+                if (stage) {
+                    return stage.name;
+                }
+            }
+        }
+        
+        return null;
     } catch (error) {
         console.error(`Failed to find stage name by ID "${stageId}":`, error);
         return null;
@@ -118,10 +154,13 @@ export async function automateDealStage(
             return { updated: false, reason: 'Deal not found' };
         }
 
+        // Get current stage name for comparison
+        const currentStageName = await getStageNameById(deal.stage_id);
+        
         // Find applicable rules
         const applicableRules = DEFAULT_STAGE_RULES.filter(rule => {
             if (rule.trigger !== trigger) return false;
-            if (rule.fromStage && deal.stage_id !== rule.fromStage) return false;
+            if (rule.fromStage && currentStageName?.toLowerCase() !== rule.fromStage.toLowerCase()) return false;
             if (rule.condition && !rule.condition(deal, relatedEntity)) return false;
             return true;
         });
@@ -130,9 +169,6 @@ export async function automateDealStage(
             console.log(`No applicable stage automation rules for trigger "${trigger}" on deal ${dealId}`);
             return { updated: false, reason: 'No applicable rules' };
         }
-
-        // Get current stage name
-        const currentStageName = await getStageNameById(deal.stage_id);
 
         // Apply the first applicable rule (in case of multiple matches)
         const rule = applicableRules[0];

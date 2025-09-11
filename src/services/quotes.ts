@@ -594,6 +594,12 @@ export function useUpdateQuoteHeader(id: string) {
           // Invalidate quotes queries since the quote was deleted after conversion
           qc.invalidateQueries({ queryKey: qk.quotes() });
           qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
+
+          // Invalidate deals queries to refresh the Kanban board
+          qc.invalidateQueries({ queryKey: qk.deals() });
+          if (updatedQuote.deal_id) {
+            qc.invalidateQueries({ queryKey: qk.deal(updatedQuote.deal_id) });
+          }
         } catch (e) {
           console.warn("[quote→order] conversion failed", e);
 
