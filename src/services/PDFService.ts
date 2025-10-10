@@ -27,8 +27,8 @@ export async function getPdfUrl(type: PDFType, id: string): Promise<PDFResponse>
   }
 
   try {
-    // Call the Netlify Function for PDF generation (HTML-to-PDF with Puppeteer)
-    const response = await fetch('/.netlify/functions/pdf-html', {
+    // Call the Netlify Function for PDF generation (React PDF)
+    const response = await fetch('/.netlify/functions/pdf-react', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

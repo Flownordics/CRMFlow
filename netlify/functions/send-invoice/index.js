@@ -304,8 +304,8 @@ export const handler = async (event, context) => {
             };
             console.log('PDF request body:', JSON.stringify(pdfRequestBody));
 
-            // Use Netlify Function for PDF generation (HTML-to-PDF with Puppeteer)
-            const netlifyFunctionUrl = 'https://crmflow-app.netlify.app/.netlify/functions/pdf-html';
+            // Use Netlify Function for PDF generation (React PDF)
+            const netlifyFunctionUrl = 'https://crmflow-app.netlify.app/.netlify/functions/pdf-react';
             console.log('PDF generator URL:', netlifyFunctionUrl);
 
             const pdfResponse = await fetch(netlifyFunctionUrl, {

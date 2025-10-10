@@ -1,0 +1,12 @@
+{
+  "name": "pdf-react",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "React PDF generator for quotes, orders, and invoices",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "@react-pdf/renderer": "^4.3.1",
+    "react": "^18.3.1"
+  }
+}
+

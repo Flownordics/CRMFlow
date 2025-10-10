@@ -9,29 +9,9 @@
   # Suppress punycode deprecation warning from dependencies
   environment = { NODE_OPTIONS = "--no-deprecation" }
 
-# Specific configuration for PDF generation function
-[functions."pdf-html"]
-  # Increase memory and timeout for Puppeteer/Chromium
-  timeout = 26  # seconds (max for free tier)
-  # Don't bundle Chromium and puppeteer - they need native binaries
-  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
-  # Include the chromium binary and node_modules
-  included_files = ["pdf-html/node_modules/@sparticuz/chromium/**"]
-  # Disable bundling to preserve native modules
-  node_bundler = "esbuild"
-
-# Diagnostic function to test Chromium initialization
-[functions."chromium-test"]
-  timeout = 26
-  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
-  included_files = ["chromium-test/node_modules/@sparticuz/chromium/**"]
-  node_bundler = "esbuild"
-
-# Comprehensive PDF diagnostics function
-[functions."pdf-diagnostics"]
-  timeout = 26
-  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
-  included_files = ["pdf-diagnostics/node_modules/@sparticuz/chromium/**"]
+# Modern PDF generation using @react-pdf/renderer (reliable, fast, no binaries)
+[functions."pdf-react"]
+  timeout = 10  # seconds (should be quick with React PDF)
   node_bundler = "esbuild"
 
 [[redirects]]
