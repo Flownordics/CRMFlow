@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  # command = "npm run build"  # Temporarily disabled for CLI deploy
   publish = "dist"
   environment = { NODE_VERSION = "18" }
 
