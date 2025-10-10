@@ -8,7 +8,7 @@
     "dev:netlify": "netlify dev",
     "build": "vite build",
     "build:prod": "node scripts/build-production.js",
-    "postbuild": "mkdir dist\\.netlify\\functions && for /d %i in (supabase\\functions\\*) do xcopy \"%i\" \"dist\\.netlify\\functions\\%~ni\" /E /I /Y && xcopy \"netlify\\functions\\*\" \"dist\\.netlify\\functions\\\" /E /I /Y",
+    "postbuild:disabled": "mkdir dist\\.netlify\\functions && for /d %i in (supabase\\functions\\*) do xcopy \"%i\" \"dist\\.netlify\\functions\\%~ni\" /E /I /Y && xcopy \"netlify\\functions\\*\" \"dist\\.netlify\\functions\\\" /E /I /Y",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
