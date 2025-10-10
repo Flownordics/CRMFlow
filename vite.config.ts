@@ -16,22 +16,27 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime'],
   },
   build: {
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Core React libraries
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+          // Core React libraries - MUST be first to prevent duplication
+          if (id.includes('node_modules/react/') || 
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/scheduler/')) {
             return 'react-vendor';
           }
           
-          // React Router
-          if (id.includes('node_modules/react-router-dom')) {
+          // React Router (depends on React)
+          if (id.includes('node_modules/react-router-dom') ||
+              id.includes('node_modules/react-router') ||
+              id.includes('node_modules/@remix-run')) {
             return 'router';
           }
           
-          // Radix UI components
+          // Radix UI components (depends on React)
           if (id.includes('node_modules/@radix-ui')) {
             return 'radix-ui';
           }
