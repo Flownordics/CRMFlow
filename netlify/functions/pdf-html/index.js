@@ -150,22 +150,37 @@ export const handler = async (event) => {
         console.log('PDF generated, size:', pdfBuffer.length, 'bytes');
 
         await browser.close();
+        console.log('Browser closed successfully');
         browser = null;
 
         // Determine filename
         const docNumber = docData.number || docData.invoice_number || docData.order_number || docData.id.slice(-6);
         const filename = `${type}-${docNumber}.pdf`;
 
-        return {
+        console.log('Converting PDF to base64...');
+        const base64Pdf = pdfBuffer.toString('base64');
+        console.log('Base64 conversion complete, size:', base64Pdf.length, 'chars');
+
+        console.log('Preparing response...');
+        
+        // Return as JSON with base64 data (more reliable than isBase64Encoded)
+        const response = {
             statusCode: 200,
             headers: {
                 ...corsHeaders,
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="${filename}"`,
+                'Content-Type': 'application/json',
             },
-            body: pdfBuffer.toString('base64'),
-            isBase64Encoded: true,
+            body: JSON.stringify({
+                success: true,
+                pdf: base64Pdf,
+                filename: filename,
+                size: pdfBuffer.length,
+                contentType: 'application/pdf'
+            }),
         };
+        
+        console.log('Returning JSON response with PDF data');
+        return response;
 
     } catch (error) {
         console.error('PDF generation error:', {

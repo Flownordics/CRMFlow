@@ -70,32 +70,32 @@ export async function getPdfUrl(type: PDFType, id: string): Promise<PDFResponse>
       throw new Error(errorMessage);
     }
 
-    // Handle base64 encoded response from Netlify Functions
-    let blob;
-    if (response.headers.get('content-type') === 'application/pdf') {
-      // Direct PDF response
-      blob = await response.blob();
-    } else {
-      // Base64 encoded response
-      const base64Data = await response.text();
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      blob = new Blob([bytes], { type: 'application/pdf' });
-    }
-    const url = URL.createObjectURL(blob);
+    // Parse JSON response (new format)
+    const responseData = await response.json();
+    logger.debug('PDF response received:', {
+      success: responseData.success,
+      size: responseData.size,
+      filename: responseData.filename
+    });
 
-    // Extract filename from Content-Disposition header or generate default
-    const contentDisposition = response.headers.get('Content-Disposition');
-    let filename = `${type}-${id}.pdf`;
-    if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-      if (filenameMatch) {
-        filename = filenameMatch[1];
-      }
+    if (!responseData.success || !responseData.pdf) {
+      throw new Error('Invalid PDF response from server');
     }
+
+    // Decode base64 PDF data
+    const base64Data = responseData.pdf;
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    
+    logger.debug('PDF blob created, size:', blob.size);
+
+    // Use filename from response
+    const filename = responseData.filename || `${type}-${id}.pdf`;
 
     return {
       url,
