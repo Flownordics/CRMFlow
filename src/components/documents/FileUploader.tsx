@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { uploadDocument } from "@/services/documents";
 import { toastBus } from "@/lib/toastBus";
 import { Upload, Loader2 } from "lucide-react";
+import { logger } from '@/lib/logger';
 
 export function FileUploader({
   onUploaded,
@@ -47,7 +48,7 @@ export function FileUploader({
       });
 
     } catch (error) {
-      console.error("File upload failed:", error);
+      logger.error("File upload failed:", error);
 
       // Error toast
       toastBus.emit({

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 // React hooks
 import { useMutation } from "@tanstack/react-query";
+import { logger } from '@/lib/logger';
 
 export interface SendQuoteEmailRequest {
   quoteId: string;
@@ -36,7 +37,7 @@ export async function sendQuoteEmail(request: SendQuoteEmailRequest): Promise<Se
       .eq('kind', 'gmail')
       .single();
 
-    console.log('Gmail integration check:', {
+    logger.debug('Gmail integration check:', {
       integrationError,
       integration: integration ? {
         id: integration.id,
@@ -92,10 +93,10 @@ export async function sendQuoteEmail(request: SendQuoteEmailRequest): Promise<Se
     }
 
   } catch (error) {
-    console.error('Failed to send quote email:', error);
+    logger.error('Failed to send quote email:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-    console.error('Quote email error details:', {
+    logger.error('Quote email error details:', {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined,
       request: request

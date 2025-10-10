@@ -45,6 +45,9 @@ const Register = lazy(() => import("@/pages/auth/RegisterPage"));
 const Forgot = lazy(() => import("@/pages/auth/ForgotPasswordPage"));
 const OAuthComplete = lazy(() => import("@/pages/oauth/OAuthComplete"));
 const OAuthCallback = lazy(() => import("@/pages/oauth/OAuthCallback"));
+const CallLists = lazy(() => import("@/pages/CallLists"));
+const CallListDetail = lazy(() => import("@/pages/CallListDetail"));
+const TrashBin = lazy(() => import("@/pages/TrashBin"));
 
 const App = () => {
   // Health check effect
@@ -117,6 +120,11 @@ const App = () => {
                       <Route path="accounting" element={<Accounting />} />
                       <Route path="analytics" element={<Analytics />} />
                       <Route path="tasks" element={<Tasks />} />
+                      <Route path="call-lists">
+                        <Route index element={<CallLists />} />
+                        <Route path=":id" element={<CallListDetail />} />
+                      </Route>
+                      <Route path="trash" element={<TrashBin />} />
                       <Route path="settings" element={<Settings />} />
                       <Route path="*" element={<NotFound />} />
                     </Route>

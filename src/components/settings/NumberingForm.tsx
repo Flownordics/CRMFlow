@@ -9,6 +9,7 @@ import { NumberingFormSchema, type NumberingFormData } from "@/lib/schemas/setti
 import { useUpdateWorkspaceSettings } from "@/hooks/useSettings";
 import { type WorkspaceSettings } from "@/services/settings";
 import { useState } from "react";
+import { logger } from '@/lib/logger';
 
 interface NumberingFormProps {
     settings: WorkspaceSettings | null;
@@ -35,7 +36,7 @@ export function NumberingForm({ settings }: NumberingFormProps) {
             setIsEditing(false);
             form.reset(data);
         } catch (error) {
-            console.error("Failed to update numbering settings:", error);
+            logger.error("Failed to update numbering settings:", error);
         }
     };
 

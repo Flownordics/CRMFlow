@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { Task, CreateTaskData, UpdateTaskData } from "@/services/tasks";
 import { useCreateTask, useUpdateTask } from "@/services/tasks";
 import { usePeople } from "@/services/people";
+import { logger } from '@/lib/logger';
 
 const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -154,7 +155,7 @@ export function TaskForm({
       setTags([]);
       setDueDate(undefined);
     } catch (error) {
-      console.error('Failed to save task:', error);
+      logger.error('Failed to save task:', error);
     }
   };
 

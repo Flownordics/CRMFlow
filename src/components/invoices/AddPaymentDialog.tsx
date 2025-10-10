@@ -18,6 +18,7 @@ import { toastBus } from "@/lib/toastBus";
 import { useI18n } from "@/lib/i18n";
 import { formatMoneyMinor } from "@/lib/money";
 import { Invoice } from "@/services/invoices";
+import { logger } from '@/lib/logger';
 
 interface AddPaymentDialogProps {
     invoice: Invoice;
@@ -76,7 +77,7 @@ export function AddPaymentDialog({ invoice, open, onOpenChange, onPaymentAdded }
             onOpenChange(false);
             onPaymentAdded?.();
         } catch (error) {
-            console.error('Failed to add payment:', error);
+            logger.error('Failed to add payment:', error);
             toastBus.emit({
                 title: "Error",
                 description: "Failed to add payment. Please try again.",

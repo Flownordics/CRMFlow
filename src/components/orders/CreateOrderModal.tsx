@@ -32,6 +32,7 @@ import { PersonModal } from "@/components/people/PersonModal";
 import { useCreateCompany } from "@/services/companies";
 import { useCreatePerson } from "@/services/people";
 import { CalendarIcon, Plus, Trash2, Package, Percent, Copy } from "lucide-react";
+import { logger } from '@/lib/logger';
 
 interface CreateOrderModalProps {
   open: boolean;
@@ -271,7 +272,7 @@ export function CreateOrderModal({
           },
         });
       } catch (error) {
-        console.error("Failed to log activity:", error);
+        logger.error("Failed to log activity:", error);
       }
 
       // Call onSuccess callback if provided (for automation)
@@ -284,7 +285,7 @@ export function CreateOrderModal({
         navigate(`/orders/${order.id}`);
       }
     } catch (error) {
-      console.error("Failed to create order:", error);
+      logger.error("Failed to create order:", error);
       toastBus.emit({
         title: "Failed to create order",
         description: "Please try again",

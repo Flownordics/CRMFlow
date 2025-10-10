@@ -18,6 +18,7 @@ import { toastBus } from "@/lib/toastBus";
 import { useI18n } from "@/lib/i18n";
 import { Invoice } from "@/services/invoices";
 import { CompanySelect } from "@/components/selects/CompanySelect";
+import { logger } from '@/lib/logger';
 
 interface EditInvoiceDialogProps {
     invoice: Invoice;
@@ -88,7 +89,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange, onInvoiceUpdate
             onOpenChange(false);
             onInvoiceUpdated?.();
         } catch (error) {
-            console.error('Failed to update invoice:', error);
+            logger.error('Failed to update invoice:', error);
             toastBus.emit({
                 title: "Error",
                 description: "Failed to update invoice. Please try again.",
@@ -114,7 +115,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange, onInvoiceUpdate
             onOpenChange(false);
             onInvoiceUpdated?.();
         } catch (error) {
-            console.error('Failed to delete invoice:', error);
+            logger.error('Failed to delete invoice:', error);
             toastBus.emit({
                 title: "Error",
                 description: "Failed to delete invoice. Please try again.",

@@ -16,7 +16,20 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: true,
-    exclude: ["tests/e2e/**", "node_modules/**"],
+    exclude: [
+      "tests/e2e/**",
+      "node_modules/**",
+      ".netlify/**",
+      "**/node_modules/**"
+    ],
+    environmentOptions: {
+      jsdom: {
+        resources: "usable",
+      }
+    },
+    deps: {
+      inline: ["react", "react-dom"]
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

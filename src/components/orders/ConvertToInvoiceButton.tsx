@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ensureInvoiceForOrder } from "@/services/conversions";
+import { logger } from '@/lib/logger';
 
 interface ConvertToInvoiceButtonProps {
     orderIds: string[];
@@ -34,7 +35,7 @@ export function ConvertToInvoiceButton({
                     await ensureInvoiceForOrder(orderId);
                     results.success.push(orderId);
                 } catch (error) {
-                    console.error(`Failed to create invoice for order ${orderId}:`, error);
+                    logger.error(`Failed to create invoice for order ${orderId}:`, error);
                     results.failed.push(orderId);
                 }
             }

@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { toastBus } from "@/lib/toastBus";
+import { logger } from '@/lib/logger';
 
 // Types for Google Calendar API
 export interface GoogleCalendarEvent {
@@ -149,7 +150,7 @@ async function getCalendarIntegration(): Promise<CalendarIntegration | null> {
 
         return integration;
     } catch (error) {
-        console.error('Error getting calendar integration:', error);
+        logger.error('Error getting calendar integration:', error);
         return null;
     }
 }
@@ -165,7 +166,7 @@ async function refreshTokenIfNeeded(integration: CalendarIntegration): Promise<s
         const timeUntilExpiry = expiresAt.getTime() - now.getTime();
 
         if (timeUntilExpiry < 2 * 60 * 1000) { // Less than 2 minutes
-            console.log('Token expired, refreshing...');
+            logger.debug('Token expired, refreshing...');
             return await refreshGoogleToken(integration);
         }
     }
@@ -203,7 +204,7 @@ async function refreshGoogleToken(integration: CalendarIntegration): Promise<str
         const result = await response.json();
         return result.access_token;
     } catch (error) {
-        console.error('Error refreshing Google token:', error);
+        logger.error('Error refreshing Google token:', error);
         throw error;
     }
 }
@@ -273,7 +274,7 @@ export async function listEvents(range: { start: string; end: string }): Promise
             crmRef: extractCrmRefFromExtendedProperties(event)
         }));
     } catch (error) {
-        console.error('Error listing calendar events:', error);
+        logger.error('Error listing calendar events:', error);
         throw error;
     }
 }
@@ -346,7 +347,7 @@ export async function createEvent(payload: CreateEventPayload): Promise<GoogleCa
             crmRef: extractCrmRefFromExtendedProperties(result)
         };
     } catch (error) {
-        console.error('Error creating calendar event:', error);
+        logger.error('Error creating calendar event:', error);
         throw error;
     }
 }
@@ -403,7 +404,7 @@ export async function updateEvent(eventId: string, payload: Partial<CreateEventP
 
         return await response.json();
     } catch (error) {
-        console.error('Error updating calendar event:', error);
+        logger.error('Error updating calendar event:', error);
         throw error;
     }
 }
@@ -452,7 +453,7 @@ export async function deleteEvent(eventId: string): Promise<void> {
             throw new Error(`Google Calendar API error: ${response.status}`);
         }
     } catch (error) {
-        console.error('Error deleting calendar event:', error);
+        logger.error('Error deleting calendar event:', error);
         throw error;
     }
 }
@@ -480,7 +481,7 @@ export async function getCalendarInfo(): Promise<{ connected: boolean; email?: s
             email: integration.email
         };
     } catch (error) {
-        console.error('Error getting calendar info:', error);
+        logger.error('Error getting calendar info:', error);
         return null;
     }
 }
@@ -504,7 +505,7 @@ export async function getCalendarStatus(): Promise<CalendarStatus> {
             .eq('kind', 'calendar');
 
         if (error) {
-            console.warn("[calendar] Database error:", error);
+            logger.warn("[calendar] Database error:", error);
             // If it's a 406 or table doesn't exist, return not connected
             if (error.code === '406' || error.message?.includes('does not exist')) {
                 return { connected: false };
@@ -524,7 +525,7 @@ export async function getCalendarStatus(): Promise<CalendarStatus> {
             lastSyncAt: integration.updated_at || null
         };
     } catch (error) {
-        console.warn("[calendar] status err:", error);
+        logger.warn("[calendar] status err:", error);
         return { connected: false };
     }
 }
@@ -559,7 +560,7 @@ export async function setupCalendarPushNotifications(): Promise<{ ok: boolean; e
 
         if (!response.ok) {
             const errorData = await response.text();
-            console.error('Failed to set up push notifications:', errorData);
+            logger.error('Failed to set up push notifications:', errorData);
             return { ok: false, error: 'Failed to set up push notifications' };
         }
 
@@ -579,12 +580,12 @@ export async function setupCalendarPushNotifications(): Promise<{ ok: boolean; e
             .eq('kind', 'calendar');
 
         if (updateError) {
-            console.error('Failed to update integration with resource ID:', updateError);
+            logger.error('Failed to update integration with resource ID:', updateError);
         }
 
         return { ok: true };
     } catch (error: any) {
-        console.error('Error setting up push notifications:', error);
+        logger.error('Error setting up push notifications:', error);
         return { ok: false, error: error.message || 'Failed to set up push notifications' };
     }
 }
@@ -602,7 +603,7 @@ export async function syncGoogleCalendar(): Promise<{ ok: boolean; error?: strin
         // Set up push notifications for real-time sync
         const pushResult = await setupCalendarPushNotifications();
         if (!pushResult.ok) {
-            console.warn('Failed to set up push notifications:', pushResult.error);
+            logger.warn('Failed to set up push notifications:', pushResult.error);
         }
 
         return { ok: true };
@@ -701,7 +702,7 @@ export function useSetupCalendarSync() {
             });
         },
         onError: (error) => {
-            console.error('Failed to set up calendar sync:', error);
+            logger.error('Failed to set up calendar sync:', error);
             toastBus.emit({
                 title: "Error",
                 description: "Failed to set up calendar sync",

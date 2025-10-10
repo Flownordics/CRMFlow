@@ -24,6 +24,7 @@ import { Company } from "@/lib/schemas/company";
 import { useCreatePerson, useUpdatePerson } from "@/services/people";
 import { useCompanies } from "@/services/companies";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 interface PersonModalProps {
     person?: Person;
@@ -91,7 +92,7 @@ export function PersonModal({ person, companyId, open, onOpenChange, onSuccess, 
             onOpenChange(false);
         } catch (error) {
             toast.error("Failed to save person");
-            console.error("Error saving person:", error);
+            logger.error("Error saving person:", error);
         } finally {
             setIsSubmitting(false);
         }

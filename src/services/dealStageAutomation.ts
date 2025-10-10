@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { toastBus } from "@/lib/toastBus";
 import { logActivity } from "./activity";
+import { logger } from '@/lib/logger';
 
 // Deal stage automation rules
 export interface DealStageRule {
@@ -58,7 +59,7 @@ export const DEFAULT_STAGE_RULES: DealStageRule[] = [
 // Get stage ID by name (case-insensitive) from stages table within a specific pipeline
 async function getStageIdByName(stageName: string, pipelineId?: string): Promise<string | null> {
     try {
-        console.log(`[DealStageAutomation] Looking up stage ID for name: "${stageName}"${pipelineId ? ` in pipeline: ${pipelineId}` : ''}`);
+        logger.debug(`[DealStageAutomation] Looking up stage ID for name: "${stageName}"${pipelineId ? ` in pipeline: ${pipelineId}` : ''}`);
 
         let url = `/stages?name=ilike.${encodeURIComponent(stageName)}&select=id`;
         if (pipelineId) {
@@ -67,10 +68,10 @@ async function getStageIdByName(stageName: string, pipelineId?: string): Promise
 
         const response = await apiClient.get(url);
         const stages = response.data;
-        console.log(`[DealStageAutomation] Found stages:`, stages);
+        logger.debug(`[DealStageAutomation] Found stages:`, stages);
         return stages && stages.length > 0 ? stages[0].id : null;
     } catch (error) {
-        console.error(`Failed to find stage by name "${stageName}":`, error);
+        logger.error(`Failed to find stage by name "${stageName}":`, error);
         return null;
     }
 }
@@ -82,7 +83,7 @@ async function getStageNameById(stageId: string): Promise<string | null> {
         const stages = response.data;
         return stages && stages.length > 0 ? stages[0].name : null;
     } catch (error) {
-        console.error(`Failed to find stage name by ID "${stageId}":`, error);
+        logger.error(`Failed to find stage name by ID "${stageId}":`, error);
         return null;
     }
 }
@@ -94,7 +95,7 @@ async function getPipelineIdByStageId(stageId: string): Promise<string | null> {
         const stages = response.data;
         return stages && stages.length > 0 ? stages[0].pipeline_id : null;
     } catch (error) {
-        console.error(`Failed to find pipeline ID for stage "${stageId}":`, error);
+        logger.error(`Failed to find pipeline ID for stage "${stageId}":`, error);
         return null;
     }
 }
@@ -105,7 +106,7 @@ async function getAllStages(): Promise<Array<{ id: string, name: string }>> {
         const response = await apiClient.get(`/stages?select=id,name`);
         return response.data || [];
     } catch (error) {
-        console.error(`Failed to get all stages:`, error);
+        logger.error(`Failed to get all stages:`, error);
         return [];
     }
 }
@@ -118,7 +119,7 @@ async function updateDealStage(dealId: string, newStageId: string): Promise<void
             updated_at: new Date().toISOString()
         });
     } catch (error) {
-        console.error(`Failed to update deal ${dealId} stage to ${newStageId}:`, error);
+        logger.error(`Failed to update deal ${dealId} stage to ${newStageId}:`, error);
         throw error;
     }
 }
@@ -130,7 +131,7 @@ async function getDealById(dealId: string): Promise<any | null> {
         const deals = response.data;
         return deals && deals.length > 0 ? deals[0] : null;
     } catch (error) {
-        console.error(`Failed to fetch deal ${dealId}:`, error);
+        logger.error(`Failed to fetch deal ${dealId}:`, error);
         return null;
     }
 }
@@ -142,27 +143,27 @@ export async function automateDealStage(
     relatedEntity?: any
 ): Promise<{ updated: boolean; fromStage?: string; toStage?: string; reason?: string }> {
     try {
-        console.log(`[DealStageAutomation] Starting automation for deal ${dealId} with trigger ${trigger}`);
+        logger.debug(`[DealStageAutomation] Starting automation for deal ${dealId} with trigger ${trigger}`);
 
         // First, let's check what stages exist
         const allStages = await getAllStages();
-        console.log(`[DealStageAutomation] Available stages in database:`, allStages);
+        logger.debug(`[DealStageAutomation] Available stages in database:`, allStages);
 
         // Get the deal
         const deal = await getDealById(dealId);
         if (!deal) {
-            console.warn(`Deal ${dealId} not found for stage automation`);
+            logger.warn(`Deal ${dealId} not found for stage automation`);
             return { updated: false, reason: 'Deal not found' };
         }
 
         // Get current stage name for comparison
         const currentStageName = await getStageNameById(deal.stage_id);
-        console.log(`[DealStageAutomation] Deal ${dealId} current stage: "${currentStageName}" (ID: ${deal.stage_id})`);
-        console.log(`[DealStageAutomation] Trigger: "${trigger}"`);
+        logger.debug(`[DealStageAutomation] Deal ${dealId} current stage: "${currentStageName}" (ID: ${deal.stage_id})`);
+        logger.debug(`[DealStageAutomation] Trigger: "${trigger}"`);
 
         // Get the pipeline ID for the deal's current stage to ensure we move within the same pipeline
         const pipelineId = await getPipelineIdByStageId(deal.stage_id);
-        console.log(`[DealStageAutomation] Deal ${dealId} current pipeline: ${pipelineId}`);
+        logger.debug(`[DealStageAutomation] Deal ${dealId} current pipeline: ${pipelineId}`);
 
         // Find applicable rules
         const applicableRules = DEFAULT_STAGE_RULES.filter(rule => {
@@ -172,10 +173,10 @@ export async function automateDealStage(
             return true;
         });
 
-        console.log(`[DealStageAutomation] Found ${applicableRules.length} applicable rules:`, applicableRules);
+        logger.debug(`[DealStageAutomation] Found ${applicableRules.length} applicable rules:`, applicableRules);
 
         if (applicableRules.length === 0) {
-            console.log(`[DealStageAutomation] No applicable stage automation rules for trigger "${trigger}" on deal ${dealId}`);
+            logger.debug(`[DealStageAutomation] No applicable stage automation rules for trigger "${trigger}" on deal ${dealId}`);
             return { updated: false, reason: 'No applicable rules' };
         }
 
@@ -184,21 +185,21 @@ export async function automateDealStage(
         const newStageId = await getStageIdByName(rule.toStage, pipelineId || undefined);
 
         if (!newStageId) {
-            console.error(`[DealStageAutomation] Target stage "${rule.toStage}" not found in pipeline ${pipelineId || 'any'}`);
-            console.error(`[DealStageAutomation] Available stages:`, await getAllStages());
+            logger.error(`[DealStageAutomation] Target stage "${rule.toStage}" not found in pipeline ${pipelineId || 'any'}`);
+            logger.error(`[DealStageAutomation] Available stages:`, await getAllStages());
             return { updated: false, reason: `Target stage "${rule.toStage}" not found in current pipeline` };
         }
 
         // Don't update if already in the target stage
         if (deal.stage_id === newStageId) {
-            console.log(`Deal ${dealId} is already in stage "${rule.toStage}"`);
+            logger.debug(`Deal ${dealId} is already in stage "${rule.toStage}"`);
             return { updated: false, reason: 'Already in target stage' };
         }
 
         // Update the deal stage
-        console.log(`[DealStageAutomation] Updating deal ${dealId} from stage ${deal.stage_id} to stage ${newStageId}`);
+        logger.debug(`[DealStageAutomation] Updating deal ${dealId} from stage ${deal.stage_id} to stage ${newStageId}`);
         await updateDealStage(dealId, newStageId);
-        console.log(`[DealStageAutomation] Deal stage updated successfully`);
+        logger.debug(`[DealStageAutomation] Deal stage updated successfully`);
 
         // Log activity
         try {
@@ -212,12 +213,12 @@ export async function automateDealStage(
                     automated: true
                 }
             });
-            console.log(`[DealStageAutomation] Activity logged successfully`);
+            logger.debug(`[DealStageAutomation] Activity logged successfully`);
         } catch (error) {
-            console.warn("Failed to log stage change activity:", error);
+            logger.warn("Failed to log stage change activity:", error);
         }
 
-        console.log(`[DealStageAutomation] Deal ${dealId} automatically moved from "${currentStageName}" to "${rule.toStage}" due to ${trigger}`);
+        logger.debug(`[DealStageAutomation] Deal ${dealId} automatically moved from "${currentStageName}" to "${rule.toStage}" due to ${trigger}`);
 
         return {
             updated: true,
@@ -227,7 +228,7 @@ export async function automateDealStage(
         };
 
     } catch (error) {
-        console.error(`Failed to automate deal stage for deal ${dealId}:`, error);
+        logger.error(`Failed to automate deal stage for deal ${dealId}:`, error);
         throw error;
     }
 }
@@ -257,7 +258,7 @@ export function useAutomateDealStage() {
             }
         },
         onError: (error, variables) => {
-            console.error(`Deal stage automation failed for deal ${variables.dealId}:`, error);
+            logger.error(`Deal stage automation failed for deal ${variables.dealId}:`, error);
             toastBus.emit({
                 title: "Stage Automation Failed",
                 description: "Failed to automatically update deal stage",
@@ -276,7 +277,7 @@ export async function triggerDealStageAutomation(
     try {
         await automateDealStage(trigger, dealId, relatedEntity);
     } catch (error) {
-        console.error(`Failed to trigger deal stage automation:`, error);
+        logger.error(`Failed to trigger deal stage automation:`, error);
         // Don't throw - this is a background automation that shouldn't break the main flow
     }
 }
@@ -296,7 +297,7 @@ export async function batchAutomateDealStages(
             if (result.updated) success++;
             else failed++;
         } catch (error) {
-            console.error(`Batch automation failed for deal ${deal.id}:`, error);
+            logger.error(`Batch automation failed for deal ${deal.id}:`, error);
             results.push({
                 dealId: deal.id,
                 updated: false,

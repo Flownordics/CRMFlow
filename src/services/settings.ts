@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { qk } from "@/lib/queryKeys";
+import { logger } from '@/lib/logger';
 
 // ===== SCHEMAS =====
 
@@ -81,7 +82,7 @@ export async function getWorkspaceSettings(): Promise<WorkspaceSettings | null> 
 
         return WorkspaceSettings.parse(data[0]);
     } catch (error) {
-        console.error("Failed to fetch workspace settings:", error);
+        logger.error("Failed to fetch workspace settings:", error);
         throw error;
     }
 }
@@ -102,7 +103,7 @@ export async function upsertWorkspaceSettings(payload: Partial<WorkspaceSettings
 
         return WorkspaceSettings.parse(data);
     } catch (error) {
-        console.error("Failed to upsert workspace settings:", error);
+        logger.error("Failed to upsert workspace settings:", error);
         throw error;
     }
 }
@@ -123,7 +124,7 @@ export async function getStageProbabilities(): Promise<StageProbability[]> {
 
         return z.array(StageProbability).parse(data);
     } catch (error) {
-        console.error("Failed to fetch stage probabilities:", error);
+        logger.error("Failed to fetch stage probabilities:", error);
         throw error;
     }
 }
@@ -147,7 +148,7 @@ export async function upsertStageProbability(stageId: string, probability: numbe
 
         return StageProbability.parse(data);
     } catch (error) {
-        console.error("Failed to update stage probability:", error);
+        logger.error("Failed to update stage probability:", error);
         throw error;
     }
 }
@@ -178,7 +179,7 @@ export async function getUserSettings(): Promise<UserSettings | null> {
 
         return UserSettingsSchema.parse(data);
     } catch (error) {
-        console.error('Error getting user settings:', error);
+        logger.error('Error getting user settings:', error);
         throw error;
     }
 }
@@ -234,7 +235,7 @@ export async function updateUserSettings(payload: UpdateUserSettingsPayload): Pr
 
         return UserSettingsSchema.parse(data);
     } catch (error) {
-        console.error('Error updating user settings:', error);
+        logger.error('Error updating user settings:', error);
         throw error;
     }
 }

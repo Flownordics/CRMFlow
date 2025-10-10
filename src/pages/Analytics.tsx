@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { useAnalytics, formatCurrency, formatPercentage, formatGrowth } from "@/services/analytics";
 import { DateRange } from "@/services/analytics";
 import { DateRangePicker } from "@/components/analytics/DateRangePicker";
+import { logger } from '@/lib/logger';
 
 // Chart components (simplified for now - would use a proper charting library like Recharts)
 function RevenueTrendChart({ data }: { data: any[] }) {
@@ -234,7 +235,7 @@ export default function Analytics() {
 
     const handleExport = () => {
         // TODO: Implement export functionality
-        console.log("Export analytics data");
+        logger.debug("Export analytics data");
     };
 
     const handleRefresh = () => {

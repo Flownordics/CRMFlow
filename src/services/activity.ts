@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { z } from "zod";
 import { USE_MOCKS } from "@/lib/debug";
+import { logger } from '@/lib/logger';
 
 // Activity schema
 export const Activity = z.object({
@@ -43,8 +44,7 @@ export async function logActivity(activity: ActivityCreate): Promise<Activity> {
 
     const response = await apiClient.post("/activities", dbActivity);
 
-    console.log("🔍 Activity API Response:", response);
-    console.log("🔍 Response status:", response.status);
+    // Process activity API response
 
     // Handle 201 Created with empty response body (like companies)
     let result;
@@ -73,11 +73,11 @@ export async function logActivity(activity: ActivityCreate): Promise<Activity> {
       createdAt: result.created_at
     };
 
-    console.log("🔍 CamelCase Result:", camelCaseResult);
+    logger.debug("🔍 CamelCase Result:", camelCaseResult);
 
     return Activity.parse(camelCaseResult);
   } catch (error) {
-    console.error("Failed to log activity:", error);
+    logger.error("Failed to log activity:", error);
 
     // Fallback: log to console as a structured log
     const fallbackActivity = {
@@ -90,7 +90,7 @@ export async function logActivity(activity: ActivityCreate): Promise<Activity> {
       _fallback: true
     };
 
-    console.log("📝 Activity Log (Fallback):", {
+    logger.debug("📝 Activity Log (Fallback):", {
       timestamp: fallbackActivity.createdAt,
       type: fallbackActivity.type,
       dealId: fallbackActivity.dealId,
@@ -126,7 +126,7 @@ export async function fetchActivities(dealId: string): Promise<Activity[]> {
 
     return z.array(Activity).parse(camelCaseActivities);
   } catch (error) {
-    console.error(`Failed to fetch activities for deal ${dealId}:`, error);
+    logger.error(`Failed to fetch activities for deal ${dealId}:`, error);
 
     // Return empty array on error to prevent UI crashes
     return [];
@@ -163,7 +163,7 @@ export function useLogActivity() {
     },
     onError: (error) => {
       // Error is already handled in logActivity function
-      console.error("Activity logging failed:", error);
+      logger.error("Activity logging failed:", error);
     }
   });
 }

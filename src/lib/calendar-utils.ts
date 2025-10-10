@@ -219,8 +219,8 @@ export function filterEventsByKind(events: MergedEvent[], kinds: string[]): Merg
 /**
  * Get events for today
  */
-export function getEventsForToday(events: MergedEvent[]): MergedEvent[] {
-    const today = new Date();
+export function getEventsForToday(events: MergedEvent[], referenceDate?: Date): MergedEvent[] {
+    const today = referenceDate || new Date();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
 
@@ -233,8 +233,8 @@ export function getEventsForToday(events: MergedEvent[]): MergedEvent[] {
 /**
  * Get events for this week
  */
-export function getEventsForThisWeek(events: MergedEvent[]): MergedEvent[] {
-    const today = new Date();
+export function getEventsForThisWeek(events: MergedEvent[], referenceDate?: Date): MergedEvent[] {
+    const today = referenceDate || new Date();
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
     startOfWeek.setHours(0, 0, 0, 0);

@@ -18,6 +18,7 @@ import { useCreateCompany, useUpdateCompany } from "@/services/companies";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { Mail, Building2 } from "lucide-react";
+import { logger } from '@/lib/logger';
 
 interface CompanyModalProps {
     company?: Company;
@@ -97,7 +98,7 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
             onOpenChange(false);
         } catch (error) {
             toast.error(t("companies.saveError"));
-            console.error("Error saving company:", error);
+            logger.error("Error saving company:", error);
         } finally {
             setIsSubmitting(false);
         }

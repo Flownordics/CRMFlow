@@ -25,6 +25,7 @@ import { searchDeals } from "@/services/deals";
 import { searchQuotes } from "@/services/quotes";
 import { searchOrders } from "@/services/orders";
 import { MergedEvent } from "@/lib/calendar-utils";
+import { logger } from '@/lib/logger';
 
 interface EditEventDialogProps {
     event: MergedEvent;
@@ -155,7 +156,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
                     }
                 });
             } catch (activityError) {
-                console.warn('Failed to log event update activity:', activityError);
+                logger.warn('Failed to log event update activity:', activityError);
             }
 
             toastBus.emit({
@@ -167,7 +168,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
             onOpenChange(false);
             onEventUpdated?.();
         } catch (error) {
-            console.error('Failed to update event:', error);
+            logger.error('Failed to update event:', error);
             toastBus.emit({
                 title: "Error",
                 description: "Failed to update event. Please try again.",
@@ -196,7 +197,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
                     }
                 });
             } catch (activityError) {
-                console.warn('Failed to log event deletion activity:', activityError);
+                logger.warn('Failed to log event deletion activity:', activityError);
             }
 
             toastBus.emit({
@@ -208,7 +209,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
             onOpenChange(false);
             onEventUpdated?.();
         } catch (error) {
-            console.error('Failed to delete event:', error);
+            logger.error('Failed to delete event:', error);
             toastBus.emit({
                 title: "Error",
                 description: "Failed to delete event. Please try again.",

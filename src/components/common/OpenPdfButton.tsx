@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logger } from '@/lib/logger';
 
 type Props = {
     onGetUrl: () => Promise<string>;
@@ -34,7 +35,7 @@ export function OpenPdfButton({
 
             onLogged?.(url);
         } catch (err) {
-            console.error("[PDF] Failed to open PDF", err);
+            logger.error("[PDF] Failed to open PDF", err);
             // Optional: toast error
         } finally {
             setLoading(false);

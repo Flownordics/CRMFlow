@@ -3,6 +3,7 @@ import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { rpcReorderDeal } from "./deals";
+import { logger } from '@/lib/logger';
 
 export const Stage = z.object({
   id: z.string(),
@@ -48,7 +49,7 @@ export async function fetchPipelines(): Promise<Pipeline[]> {
     const { mockPipeline } = await import("./mockData");
     return [mockPipeline];
   } catch (error) {
-    console.error("Failed to fetch pipelines:", error);
+    logger.error("Failed to fetch pipelines:", error);
     // Fallback to mock data
     const { mockPipeline } = await import("./mockData");
     return [mockPipeline];
@@ -128,7 +129,7 @@ export async function fetchStageProbabilities(): Promise<Record<string, number>>
     // Fallback to default probabilities
     return {};
   } catch (error) {
-    console.error("Failed to fetch stage probabilities:", error);
+    logger.error("Failed to fetch stage probabilities:", error);
     // Fallback to default probabilities
     return {};
   }

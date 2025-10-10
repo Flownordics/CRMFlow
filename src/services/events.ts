@@ -4,6 +4,7 @@ import { z } from "zod";
 import { qk } from "@/lib/queryKeys";
 import { toastBus } from "@/lib/toastBus";
 import { createEvent as createGoogleEvent, updateEvent as updateGoogleEvent, deleteEvent as deleteGoogleEvent } from "@/services/calendar";
+import { logger } from '@/lib/logger';
 
 // Zod schema for EventRow
 export const EventRowSchema = z.object({
@@ -119,7 +120,7 @@ export async function listEvents(params: ListEventsParams): Promise<EventRow[]> 
         const events = z.array(EventRowSchema).parse(data);
         return events;
     } catch (error) {
-        console.error('Error listing events:', error);
+        logger.error('Error listing events:', error);
         throw error;
     }
 }
@@ -194,7 +195,7 @@ export async function createEvent(payload: CreateEventPayload): Promise<EventRow
                     .eq('id', event.id);
 
                 if (updateError) {
-                    console.error('Failed to update event with Google Calendar ID:', updateError);
+                    logger.error('Failed to update event with Google Calendar ID:', updateError);
                     // Update sync state to error
                     await supabase
                         .from('events')
@@ -202,7 +203,7 @@ export async function createEvent(payload: CreateEventPayload): Promise<EventRow
                         .eq('id', event.id);
                 }
             } catch (googleError) {
-                console.error('Failed to sync event to Google Calendar:', googleError);
+                logger.error('Failed to sync event to Google Calendar:', googleError);
                 // Update sync state to error
                 await supabase
                     .from('events')
@@ -213,7 +214,7 @@ export async function createEvent(payload: CreateEventPayload): Promise<EventRow
 
         return event;
     } catch (error) {
-        console.error('Error creating event:', error);
+        logger.error('Error creating event:', error);
         throw error;
     }
 }
@@ -296,7 +297,7 @@ export async function updateEvent(id: string, payload: UpdateEventPayload): Prom
                     .update({ sync_state: 'synced' })
                     .eq('id', event.id);
             } catch (googleError) {
-                console.error('Failed to sync event update to Google Calendar:', googleError);
+                logger.error('Failed to sync event update to Google Calendar:', googleError);
                 // Update sync state to error
                 await supabase
                     .from('events')
@@ -307,7 +308,7 @@ export async function updateEvent(id: string, payload: UpdateEventPayload): Prom
 
         return event;
     } catch (error) {
-        console.error('Error updating event:', error);
+        logger.error('Error updating event:', error);
         throw error;
     }
 }
@@ -339,7 +340,7 @@ export async function deleteEvent(id: string): Promise<void> {
             try {
                 await deleteGoogleEvent(currentEvent.google_event_id);
             } catch (googleError) {
-                console.error('Failed to delete event from Google Calendar:', googleError);
+                logger.error('Failed to delete event from Google Calendar:', googleError);
                 // Continue with local deletion even if Google deletion fails
             }
         }
@@ -355,7 +356,7 @@ export async function deleteEvent(id: string): Promise<void> {
             throw new Error(`Failed to delete event: ${error.message}`);
         }
     } catch (error) {
-        console.error('Error deleting event:', error);
+        logger.error('Error deleting event:', error);
         throw error;
     }
 }
@@ -388,7 +389,7 @@ export function useCreateEvent() {
         },
         onError: (error) => {
             toastBus.error("Failed to create event");
-            console.error('Create event error:', error);
+            logger.error('Create event error:', error);
         },
     });
 }
@@ -417,7 +418,7 @@ export function useUpdateEvent() {
                 description: "Failed to update event",
                 variant: "destructive"
             });
-            console.error('Update event error:', error);
+            logger.error('Update event error:', error);
         },
     });
 }
@@ -445,7 +446,7 @@ export function useDeleteEvent() {
                 description: "Failed to delete event",
                 variant: "destructive"
             });
-            console.error('Delete event error:', error);
+            logger.error('Delete event error:', error);
         },
     });
 }

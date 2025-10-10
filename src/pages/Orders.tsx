@@ -43,6 +43,7 @@ import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "@/services/dealStageAutomation";
+import { logger } from '@/lib/logger';
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
@@ -130,7 +131,7 @@ const Orders: React.FC = () => {
           await triggerDealStageAutomation('order_cancelled', order.deal_id, { ...order, status: newStatus });
         }
       } catch (error) {
-        console.warn("Deal stage automation failed:", error);
+        logger.warn("Deal stage automation failed:", error);
       }
     }
 

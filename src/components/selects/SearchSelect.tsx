@@ -5,6 +5,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logger } from '@/lib/logger';
 
 export interface SearchSelectOption {
   id: string;
@@ -48,7 +49,7 @@ export function SearchSelect({
       const results = await onSearch(query);
       setOptions(results);
     } catch (error) {
-      console.error("Search failed:", error);
+      logger.error("Search failed:", error);
       setOptions([]);
     } finally {
       setIsLoading(false);

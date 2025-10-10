@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { useCompanies } from "@/services/companies";
+import { logger } from '@/lib/logger';
 
 export default function DealDetail() {
   const { id = "" } = useParams();
@@ -57,7 +58,7 @@ export default function DealDetail() {
             description: "Deal close date has been updated"
           });
         } catch (calendarError) {
-          console.error("Failed to sync to calendar:", calendarError);
+          logger.error("Failed to sync to calendar:", calendarError);
           toastBus.emit({
             title: "Calendar sync failed",
             description: "Failed to update deal in calendar. Please check your settings.",
@@ -73,7 +74,7 @@ export default function DealDetail() {
             description: "Deal has been removed from calendar"
           });
         } catch (calendarError) {
-          console.error("Failed to remove from calendar:", calendarError);
+          logger.error("Failed to remove from calendar:", calendarError);
         }
       }
 
@@ -82,7 +83,7 @@ export default function DealDetail() {
         description: "Close date has been updated successfully"
       });
     } catch (error) {
-      console.error("Failed to update deal:", error);
+      logger.error("Failed to update deal:", error);
       toastBus.emit({
         title: "Update failed",
         description: "Failed to update deal close date",

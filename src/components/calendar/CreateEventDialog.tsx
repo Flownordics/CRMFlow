@@ -23,6 +23,7 @@ import { useI18n } from "@/lib/i18n";
 import { searchDeals } from "@/services/deals";
 import { searchQuotes } from "@/services/quotes";
 import { searchOrders } from "@/services/orders";
+import { logger } from '@/lib/logger';
 
 interface CreateEventDialogProps {
     open: boolean;
@@ -122,7 +123,7 @@ export function CreateEventDialog({
                     title: title.trim()
                 });
             } catch (activityError) {
-                console.warn('Failed to log calendar activity:', activityError);
+                logger.warn('Failed to log calendar activity:', activityError);
             }
 
             // Google integration removed - starting fresh

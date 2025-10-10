@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { SearchSelect, SearchSelectOption } from "./SearchSelect";
 import { searchCompanies } from "@/services/companies";
 import { Company } from "@/lib/schemas/company";
+import { logger } from '@/lib/logger';
 
 interface CompanySelectProps {
   value?: string;
@@ -23,15 +24,15 @@ export function CompanySelect({
   const handleSearch = async (query: string): Promise<SearchSelectOption[]> => {
     try {
       // Add debugging
-      console.log("CompanySelect: Starting search for:", query);
+      logger.debug("CompanySelect: Starting search for:", query);
       
       if (typeof searchCompanies !== 'function') {
-        console.error("CompanySelect: searchCompanies is not a function:", typeof searchCompanies);
+        logger.error("CompanySelect: searchCompanies is not a function:", typeof searchCompanies);
         throw new Error("searchCompanies function not available");
       }
 
       const companies = await searchCompanies(query);
-      console.log("CompanySelect: Search results:", companies);
+      logger.debug("CompanySelect: Search results:", companies);
 
       // Check for exact matches (case-insensitive) for duplicate detection
       if (query.trim()) {
@@ -54,7 +55,7 @@ export function CompanySelect({
         subtitle: company.website ? `(${company.website})` : undefined
       }));
     } catch (error) {
-      console.error("CompanySelect: Search failed:", error);
+      logger.error("CompanySelect: Search failed:", error);
       // Return empty array instead of throwing to prevent crashes
       return [];
     }

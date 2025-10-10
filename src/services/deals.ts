@@ -5,6 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { USE_MOCKS } from "@/lib/debug";
 import { syncDealToCalendar, removeDealFromCalendar, DealCalendarEvent } from "@/lib/google-calendar";
+import { handleError, createBusinessLogicError, createAPIError } from "@/lib/errorHandler";
+import { invalidateDealQueries, createOptimizedQueryClient } from "@/lib/queryCache";
+import { logger } from "@/lib/logger";
+import { normalizeApiResponse, handleApiError, createMockResponse, handleMockApiCall } from "@/lib/sharedUtils";
+import { executeApiWithRecovery, executeCalendarSyncWithRecovery } from "@/lib/errorRecovery";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -47,7 +52,7 @@ export async function fetchDeals(params: {
   q?: string;
   stage_id?: string;
   company_id?: string;
-} = {}) {
+} = {}): Promise<PaginatedResponse<Deal>> {
   const { page = 1, limit = 20, q = "", stage_id, company_id } = params;
 
   if (USE_MOCKS) {
@@ -69,6 +74,9 @@ export async function fetchDeals(params: {
     // Standard Supabase REST parameters
     queryParams.append('select', '*');
     queryParams.append('order', 'updated_at.desc');
+    
+    // Filter out soft-deleted records
+    queryParams.append('deleted_at', 'is.null');
 
     // Pagination
     const offset = (page - 1) * limit;
@@ -113,12 +121,11 @@ export async function fetchDeals(params: {
       totalPages: Math.ceil(total / limit)
     } as PaginatedResponse<Deal>;
   } catch (error) {
-    console.error("Failed to fetch deals:", error);
-    throw new Error("Failed to fetch deals");
+    throw handleError(error, 'fetchDeals');
   }
 }
 
-export async function fetchDeal(id: string) {
+export async function fetchDeal(id: string): Promise<Deal> {
   if (USE_MOCKS) {
     // For now, return mock data
     const { mockDeals } = await import("./mockData");
@@ -128,7 +135,7 @@ export async function fetchDeal(id: string) {
   }
 
   try {
-    const response = await apiClient.get(`/deals?id=eq.${id}&select=*`);
+    const response = await apiClient.get(`/deals?id=eq.${id}&deleted_at=is.null&select=*`);
     const raw = normalizeApiData(response);
 
     if (typeof raw === "string") {
@@ -145,8 +152,7 @@ export async function fetchDeal(id: string) {
 
     return Deal.parse(raw);
   } catch (error) {
-    console.error(`Failed to fetch deal ${id}:`, error);
-    throw new Error("Failed to fetch deal");
+    throw handleError(error, `fetchDeal(${id})`);
   }
 }
 
@@ -177,11 +183,11 @@ export async function updateDeal(id: string, updates: Partial<Deal>): Promise<De
 
     return Deal.parse(raw);
   } catch (error) {
-    console.error("Failed to update deal:", error);
-    throw new Error("Failed to update deal");
+    throw handleError(error, `updateDeal(${id})`);
   }
 }
 
+// Soft delete a deal
 export async function deleteDeal(id: string): Promise<void> {
   if (USE_MOCKS) {
     // Mock implementation for now
@@ -195,10 +201,42 @@ export async function deleteDeal(id: string): Promise<void> {
   }
 
   try {
-    await apiClient.delete(`/deals?id=eq.${id}`);
+    // Soft delete by setting deleted_at timestamp
+    await apiClient.patch(`/deals?id=eq.${id}`, {
+      deleted_at: new Date().toISOString()
+    });
   } catch (error) {
-    console.error("Failed to delete deal:", error);
-    throw new Error("Failed to delete deal");
+    throw handleError(error, `deleteDeal(${id})`);
+  }
+}
+
+// Restore a soft-deleted deal
+export async function restoreDeal(id: string): Promise<void> {
+  try {
+    await apiClient.patch(`/deals?id=eq.${id}`, {
+      deleted_at: null
+    });
+  } catch (error) {
+    throw handleError(error, `restoreDeal(${id})`);
+  }
+}
+
+// Fetch deleted deals
+export async function fetchDeletedDeals(limit: number = 50) {
+  try {
+    const response = await apiClient.get(
+      `/deals?deleted_at=not.is.null&select=*&order=deleted_at.desc&limit=${limit}`
+    );
+    const raw = normalizeApiData(response);
+
+    if (typeof raw === "string") {
+      throw new Error("[deals] Non-JSON response.");
+    }
+
+    return z.array(Deal).parse(raw);
+  } catch (error) {
+    logger.error("Failed to fetch deleted deals", { error }, 'DeletedDeals');
+    throw new Error("Failed to fetch deleted deals");
   }
 }
 
@@ -231,8 +269,7 @@ export async function setDealOwner(dealId: string, userId: string): Promise<Deal
 
     return Deal.parse(raw);
   } catch (error) {
-    console.error("Failed to set deal owner:", error);
-    throw new Error("Failed to set deal owner");
+    throw handleError(error, `setDealOwner(${dealId}, ${userId})`);
   }
 }
 
@@ -256,8 +293,13 @@ export async function syncDealToOwnerCalendar(deal: Deal, companyName?: string):
 
     return await syncDealToCalendar(dealEvent);
   } catch (error) {
-    console.error("Failed to sync deal to calendar:", error);
-    throw error;
+    logger.error("Failed to sync deal to calendar", { error, dealId: deal.id }, 'CalendarSync');
+
+    // Attempt recovery
+    const recoverySuccess = await executeCalendarSyncWithRecovery(deal.id, deal.owner_user_id, 'sync');
+    if (!recoverySuccess) {
+      throw error;
+    }
   }
 }
 
@@ -272,8 +314,13 @@ export async function removeDealFromOwnerCalendar(dealId: string, ownerUserId: s
   try {
     await removeDealFromCalendar(dealId, ownerUserId);
   } catch (error) {
-    console.error("Failed to remove deal from calendar:", error);
-    throw error;
+    logger.error("Failed to remove deal from calendar", { error, dealId, ownerUserId }, 'CalendarSync');
+
+    // Attempt recovery
+    const recoverySuccess = await executeCalendarSyncWithRecovery(dealId, ownerUserId, 'remove');
+    if (!recoverySuccess) {
+      throw error;
+    }
   }
 }
 
@@ -307,8 +354,7 @@ export async function moveDealStage(id: string, stage_id: string) {
 
     return Deal.parse(raw);
   } catch (error) {
-    console.error(`Failed to move deal ${id} to stage ${stage_id}:`, error);
-    throw new Error("Failed to move deal stage");
+    throw handleError(error, `moveDealStage(${id}, ${stage_id})`);
   }
 }
 
@@ -345,8 +391,7 @@ export async function createDeal(deal: Omit<Deal, 'id'>) {
 
     return Deal.parse(createdDeal);
   } catch (error) {
-    console.error("Failed to create deal:", error);
-    throw new Error("Failed to create deal");
+    throw handleError(error, 'createDeal');
   }
 }
 
@@ -374,8 +419,7 @@ export async function rpcReorderDeal(dealId: string, newStageId: string, newInde
       throw new Error(`Failed to reorder deal: ${response.status}`);
     }
   } catch (error) {
-    console.error(`Failed to reorder deal ${dealId}:`, error);
-    throw new Error("Failed to reorder deal");
+    throw handleError(error, `rpcReorderDeal(${dealId})`);
   }
 }
 
@@ -388,7 +432,12 @@ export function useDeals(params: {
 } = {}) {
   return useQuery({
     queryKey: qk.deals(params),
-    queryFn: () => fetchDeals(params)
+    queryFn: () => fetchDeals(params),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 }
 
@@ -397,6 +446,11 @@ export function useDeal(id: string) {
     queryKey: qk.deal(id),
     queryFn: () => fetchDeal(id),
     enabled: !!id,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 }
 
@@ -445,9 +499,8 @@ export function useUpdateDeal() {
       // Activity logging is handled in the component
     },
     onSettled: (data, error, { id }) => {
-      // Always refetch after error or success
-      qc.invalidateQueries({ queryKey: qk.deals() });
-      qc.invalidateQueries({ queryKey: qk.deal(id) });
+      // Use optimized invalidation
+      invalidateDealQueries(qc, id);
     },
   });
 }
@@ -484,10 +537,27 @@ export function useDeleteDeal() {
     onSuccess: () => {
       // Activity logging is handled in the component
     },
-    onSettled: () => {
-      // Always refetch after error or success
-      qc.invalidateQueries({ queryKey: qk.deals() });
+    onSettled: (data, error, id) => {
+      // Use optimized invalidation
+      invalidateDealQueries(qc, id);
     },
+  });
+}
+
+export function useRestoreDeal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: restoreDeal,
+    onSuccess: (_, id) => {
+      invalidateDealQueries(qc, id);
+    },
+  });
+}
+
+export function useDeletedDeals() {
+  return useQuery({
+    queryKey: ['deleted-deals'],
+    queryFn: () => fetchDeletedDeals(50)
   });
 }
 
@@ -533,7 +603,7 @@ export async function searchDeals(query: string): Promise<Array<{ id: string; la
       subtitle: deal.company_name ? `(${deal.company_name})` : undefined
     }));
   } catch (error) {
-    console.error("Failed to search deals:", error);
+    handleError(error, 'searchDeals');
     return [];
   }
 }

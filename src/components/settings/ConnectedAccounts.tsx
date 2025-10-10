@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { getUserIntegrations, disconnectIntegration, startGoogleConnect } from '@/services/integrations';
 import { UserIntegration } from '@/services/integrations';
+import { logger } from '@/lib/logger';
 
 export function ConnectedAccounts() {
   const [loading, setLoading] = useState(true);
@@ -25,7 +26,7 @@ export function ConnectedAccounts() {
       const data = await getUserIntegrations();
       setIntegrations(data);
     } catch (error) {
-      console.error('Failed to load user integrations:', error);
+      logger.error('Failed to load user integrations:', error);
       toast({
         title: 'Error',
         description: 'Failed to load integration status',
@@ -46,7 +47,7 @@ export function ConnectedAccounts() {
       // Note: The page will redirect, so we don't need to handle success here
       // The OAuthComplete page will handle the success/error and redirect back
     } catch (error) {
-      console.error('OAuth error:', error);
+      logger.error('OAuth error:', error);
       toast({
         title: 'Connection Failed',
         description: 'Failed to start Google OAuth. Please try again.',
@@ -70,7 +71,7 @@ export function ConnectedAccounts() {
       // Reload integrations
       await loadIntegrations();
     } catch (error) {
-      console.error('Disconnect error:', error);
+      logger.error('Disconnect error:', error);
       toast({
         title: 'Error',
         description: 'Failed to disconnect integration',

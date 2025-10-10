@@ -2,6 +2,7 @@ import { apiClient } from "./api";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserIntegrations, refreshGoogleTokenIfNeeded } from "@/services/integrations";
+import { logger } from '@/lib/logger';
 
 // Calendar Event schemas
 export const CalendarEvent = z.object({
@@ -65,7 +66,7 @@ async function getGoogleCalendarToken(userId: string): Promise<string | null> {
 
     return calendarIntegration.accessToken;
   } catch (error) {
-    console.error("Failed to get Google Calendar token:", error);
+    logger.error("Failed to get Google Calendar token:", error);
     return null;
   }
 }
@@ -77,7 +78,7 @@ export async function syncDealToCalendar(dealEvent: DealCalendarEvent): Promise<
   try {
     const token = await getGoogleCalendarToken(dealEvent.owner_user_id);
     if (!token) {
-      console.log("No Google Calendar integration found for user:", dealEvent.owner_user_id);
+      logger.debug("No Google Calendar integration found for user:", dealEvent.owner_user_id);
       return null;
     }
 
@@ -145,7 +146,7 @@ export async function syncDealToCalendar(dealEvent: DealCalendarEvent): Promise<
 
     return eventId;
   } catch (error) {
-    console.error("Failed to sync deal to calendar:", error);
+    logger.error("Failed to sync deal to calendar:", error);
     throw error;
   }
 }
@@ -183,7 +184,7 @@ export async function removeDealFromCalendar(dealId: string, userId: string): Pr
     // Remove from deal_integrations
     await removeCalendarEventId(dealId);
   } catch (error) {
-    console.error("Failed to remove deal from calendar:", error);
+    logger.error("Failed to remove deal from calendar:", error);
     throw error;
   }
 }
@@ -204,7 +205,7 @@ async function getExistingCalendarEventId(dealId: string): Promise<string | null
 
     return null;
   } catch (error) {
-    console.error("Failed to get existing calendar event ID:", error);
+    logger.error("Failed to get existing calendar event ID:", error);
     return null;
   }
 }
@@ -224,7 +225,7 @@ async function storeCalendarEventId(dealId: string, eventId: string): Promise<vo
       }
     });
   } catch (error) {
-    console.error("Failed to store calendar event ID:", error);
+    logger.error("Failed to store calendar event ID:", error);
     throw error;
   }
 }
@@ -238,7 +239,7 @@ async function removeCalendarEventId(dealId: string): Promise<void> {
       `/deal_integrations?deal_id=eq.${dealId}&provider=eq.google&kind=eq.calendar`
     );
   } catch (error) {
-    console.error("Failed to remove calendar event ID:", error);
+    logger.error("Failed to remove calendar event ID:", error);
     throw error;
   }
 }

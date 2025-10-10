@@ -22,6 +22,7 @@ import { formatMoneyMinor } from "@/lib/money";
 import { toastBus } from "@/lib/toastBus";
 import { PersonSelect } from "@/components/selects/PersonSelect";
 import { PersonModal } from "@/components/people/PersonModal";
+import { logger } from '@/lib/logger';
 
 interface EditDealDrawerProps {
     open: boolean;
@@ -147,7 +148,7 @@ export function EditDealDrawer({ open, onOpenChange, deal, stages, stageProbPctB
             toastBus.emit({ title: "Success", description: "Deal updated successfully", variant: "success" });
             onOpenChange(false);
         } catch (error) {
-            console.error("Failed to update deal:", error);
+            logger.error("Failed to update deal:", error);
             toastBus.emit({ title: "Error", description: "Failed to update deal", variant: "destructive" });
         } finally {
             setIsSubmitting(false);
@@ -168,7 +169,7 @@ export function EditDealDrawer({ open, onOpenChange, deal, stages, stageProbPctB
             onOpenChange(false);
             setShowDeleteConfirm(false);
         } catch (error) {
-            console.error("Failed to delete deal:", error);
+            logger.error("Failed to delete deal:", error);
             toastBus.emit({ title: "Error", description: "Failed to delete deal", variant: "destructive" });
         }
     };

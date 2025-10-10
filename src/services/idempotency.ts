@@ -3,6 +3,7 @@
  * Prevents duplicate operations within a time window
  */
 
+import { logger } from '@/lib/logger';
 const STORAGE_PREFIX = 'crmflow_automation_';
 const DEFAULT_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
@@ -34,7 +35,7 @@ export function isIdempotent(key: string, ttlMs: number = DEFAULT_TTL_MS): boole
     sessionStorage.removeItem(storageKey);
     return false;
   } catch (error) {
-    console.warn('[Idempotency] Error checking idempotency:', error);
+    logger.warn('[Idempotency] Error checking idempotency:', error);
     return false; // On error, allow operation to proceed
   }
 }
@@ -53,7 +54,7 @@ export function markIdempotent(key: string, ttlMs: number = DEFAULT_TTL_MS): voi
     
     sessionStorage.setItem(storageKey, JSON.stringify(entry));
   } catch (error) {
-    console.warn('[Idempotency] Error marking idempotent:', error);
+    logger.warn('[Idempotency] Error marking idempotent:', error);
   }
 }
 
@@ -65,7 +66,7 @@ export function clearIdempotent(key: string): void {
     const storageKey = `${STORAGE_PREFIX}${key}`;
     sessionStorage.removeItem(storageKey);
   } catch (error) {
-    console.warn('[Idempotency] Error clearing idempotency:', error);
+    logger.warn('[Idempotency] Error clearing idempotency:', error);
   }
 }
 

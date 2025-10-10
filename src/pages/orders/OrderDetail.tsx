@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { Order, OrderSchema } from "@/lib/api";
 import { formatMoneyMinor, computeLineTotals } from "@/lib/money";
@@ -27,45 +27,63 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "@/services/dealStageAutomation";
-
-// Mock data - TODO: Replace with actual API calls
-const mockOrder: Order = {
-  id: "1",
-  number: "O-2024-001",
-  quoteId: "quote-1",
-  dealId: "deal-1", // Link to source Deal
-  companyId: "company-1",
-  personId: "person-1",
-  amount: 15000,
-  currency: "USD",
-  status: "confirmed",
-  expectedDeliveryDate: "2024-03-15T00:00:00Z",
-  createdAt: "2024-01-15T10:00:00Z",
-  updatedAt: "2024-01-15T10:00:00Z",
-};
+import { logger } from '@/lib/logger';
+import { useOrder, useUpdateOrderHeader, useUpsertOrderLine, useDeleteOrderLine } from "@/services/orders";
 
 export default function OrderDetail() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [order, setOrder] = useState<Order>(mockOrder); // TODO: Replace with useOrder hook
   const [creating, setCreating] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
 
-  // Mock line items - TODO: Replace with actual data
-  const mockLines = [
-    {
-      id: "1",
-      description: "Product A",
-      qty: 2,
-      unitMinor: 7500, // $75.00
-      taxRatePct: 25,
-      discountPct: 0,
-    },
-  ];
+  // Fetch order data with React Query
+  const { data: order, isLoading, error } = useOrder(id);
+  
+  // Mutations
+  const updateHeaderMutation = useUpdateOrderHeader(id);
+  const upsertLineMutation = useUpsertOrderLine(id);
+  const deleteLineMutation = useDeleteOrderLine(id);
+
+  // Loading and error states
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading order...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-destructive mb-4">Failed to load order</p>
+          <Button onClick={() => navigate("/orders")}>Back to Orders</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Order not found</p>
+          <Button onClick={() => navigate("/orders")}>Back to Orders</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const lines = order.lines || [];
 
   const totals = useMemo(() => {
-    const subtotal = mockLines.reduce((acc, l) => {
+    const subtotal = lines.reduce((acc, l) => {
       const { afterDiscMinor } = computeLineTotals({
         qty: l.qty,
         unitMinor: l.unitMinor,
@@ -74,7 +92,7 @@ export default function OrderDetail() {
       });
       return acc + afterDiscMinor;
     }, 0);
-    const tax = mockLines.reduce((acc, l) => {
+    const tax = lines.reduce((acc, l) => {
       const { taxMinor } = computeLineTotals({
         qty: l.qty,
         unitMinor: l.unitMinor,
@@ -84,14 +102,14 @@ export default function OrderDetail() {
       return acc + taxMinor;
     }, 0);
     return { subtotal, tax, total: subtotal + tax };
-  }, [mockLines]);
+  }, [lines]);
 
   const handlePdf = async () => {
     try {
       const url = await getOrderPdfUrl(order.id);
       await logPdfGenerated("order", order.id, order.dealId, url);
     } catch (error) {
-      console.error("Failed to generate PDF:", error);
+      logger.error("Failed to generate PDF:", error);
     }
   };
 
@@ -102,11 +120,9 @@ export default function OrderDetail() {
       setIsConverting(true);
       const { id: invoiceId } = await ensureInvoiceForOrder(order.id);
 
-      // Update order status to invoiced
-      setOrder(prev => ({ ...prev, status: "invoiced" }));
-
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: qk.orders() });
+      queryClient.invalidateQueries({ queryKey: qk.order(id) });
       queryClient.invalidateQueries({ queryKey: qk.invoices() });
       if (order.dealId) {
         queryClient.invalidateQueries({ queryKey: qk.deal(order.dealId) });
@@ -118,7 +134,7 @@ export default function OrderDetail() {
         variant: "success"
       });
     } catch (error) {
-      console.error("Failed to convert order to invoice:", error);
+      logger.error("Failed to convert order to invoice:", error);
       toast({
         title: "Conversion Failed",
         description: "Failed to convert order to invoice. Please try again.",
@@ -131,25 +147,55 @@ export default function OrderDetail() {
 
   const handleStatusChange = async (newStatus: Order["status"]) => {
     const oldStatus = order.status;
-    setOrder(prev => ({ ...prev, status: newStatus }));
 
-    // TODO: Add API call to update order status
+    try {
+      // Update order status via API
+      await updateHeaderMutation.mutateAsync({ status: newStatus });
 
-    // Trigger deal stage automation for order status changes
-    if (order.dealId) {
-      try {
-        if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
-          await triggerDealStageAutomation('order_cancelled', order.dealId, { ...order, status: newStatus });
+      // Trigger deal stage automation for order status changes
+      if (order.dealId) {
+        try {
+          if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+            await triggerDealStageAutomation('order_cancelled', order.dealId, { ...order, status: newStatus });
+          }
+        } catch (error) {
+          logger.warn("Deal stage automation failed:", error);
         }
-      } catch (error) {
-        console.warn("Deal stage automation failed:", error);
       }
-    }
 
-    toast({
-      title: "Status Updated",
-      description: `Order status changed to ${newStatus}`,
-    });
+      toast({
+        title: "Status Updated",
+        description: `Order status changed to ${newStatus}`,
+      });
+    } catch (error) {
+      logger.error("Failed to update order status:", error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update order status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleMarkFulfilled = async () => {
+    if (!window.confirm("Mark this order as fulfilled?")) return;
+
+    try {
+      await updateHeaderMutation.mutateAsync({ status: "delivered" });
+      
+      toast({
+        title: "Order Fulfilled",
+        description: "Order has been marked as delivered",
+        variant: "success"
+      });
+    } catch (error) {
+      logger.error("Failed to mark order as fulfilled:", error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to mark order as fulfilled. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -171,10 +217,7 @@ export default function OrderDetail() {
         order={order}
         onOpenPdf={handlePdf}
         onConvertToInvoice={handleConvertToInvoice}
-        onMarkFulfilled={() => {
-          // TODO: Implement mark as fulfilled
-          console.log("Mark as fulfilled");
-        }}
+        onMarkFulfilled={handleMarkFulfilled}
         onStatusChange={handleStatusChange}
       />
 
@@ -213,9 +256,26 @@ export default function OrderDetail() {
                       .split("T")[0]
                     : ""
                 }
-                onBlur={(e) => {
-                  // TODO: Implement update
-                  console.log("Update expected delivery date:", e.target.value);
+                onBlur={async (e) => {
+                  const newDate = e.target.value;
+                  if (!newDate) return;
+                  
+                  try {
+                    await updateHeaderMutation.mutateAsync({ 
+                      expectedDeliveryDate: new Date(newDate).toISOString() 
+                    });
+                    toast({
+                      title: "Date Updated",
+                      description: "Expected delivery date has been updated",
+                    });
+                  } catch (error) {
+                    logger.error("Failed to update delivery date:", error);
+                    toast({
+                      title: "Update Failed",
+                      description: "Failed to update delivery date",
+                      variant: "destructive"
+                    });
+                  }
                 }}
               />
             }
@@ -225,10 +285,7 @@ export default function OrderDetail() {
             control={
               <Select
                 defaultValue={order.status}
-                onValueChange={(v) => {
-                  // TODO: Implement update
-                  console.log("Update status:", v);
-                }}
+                onValueChange={(v) => handleStatusChange(v as Order["status"])}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
@@ -251,13 +308,36 @@ export default function OrderDetail() {
         toolbar={
           <>
             <div className="text-sm text-muted-foreground">
-              {mockLines.length} items
+              {lines.length} items
             </div>
             <div className="flex-1" />
             <Button
-              onClick={() => {
-                // TODO: Implement add line
-                console.log("Add line");
+              onClick={async () => {
+                setCreating(true);
+                try {
+                  await upsertLineMutation.mutateAsync({
+                    parentId: order.id,
+                    parentType: "order",
+                    description: "New Item",
+                    qty: 1,
+                    unitMinor: 0,
+                    taxRatePct: 25,
+                    discountPct: 0,
+                  });
+                  toast({
+                    title: "Line Added",
+                    description: "New line item has been added",
+                  });
+                } catch (error) {
+                  logger.error("Failed to add line:", error);
+                  toast({
+                    title: "Failed to Add Line",
+                    description: "Could not add line item. Please try again.",
+                    variant: "destructive"
+                  });
+                } finally {
+                  setCreating(false);
+                }
               }}
               disabled={creating}
             >
@@ -273,17 +353,46 @@ export default function OrderDetail() {
       >
         <LineItemsTable
           currency={order.currency}
-          lines={mockLines}
-          onPatch={(lineId, patch) => {
-            // TODO: Implement update
-            console.log("Update line:", lineId, patch);
+          lines={lines}
+          onPatch={async (lineId, patch) => {
+            try {
+              await upsertLineMutation.mutateAsync({
+                id: lineId,
+                ...patch,
+              });
+              toast({
+                title: "Line Updated",
+                description: "Line item has been updated",
+              });
+            } catch (error) {
+              logger.error("Failed to update line:", error);
+              toast({
+                title: "Update Failed",
+                description: "Could not update line item",
+                variant: "destructive"
+              });
+            }
           }}
-          onDelete={(lineId) => {
-            // TODO: Implement delete
-            console.log("Delete line:", lineId);
+          onDelete={async (lineId) => {
+            if (!window.confirm("Delete this line item?")) return;
+            
+            try {
+              await deleteLineMutation.mutateAsync(lineId);
+              toast({
+                title: "Line Deleted",
+                description: "Line item has been deleted",
+              });
+            } catch (error) {
+              logger.error("Failed to delete line:", error);
+              toast({
+                title: "Delete Failed",
+                description: "Could not delete line item",
+                variant: "destructive"
+              });
+            }
           }}
         />
-        {mockLines.length === 0 && (
+        {lines.length === 0 && (
           <div className="p-4 text-center text-muted-foreground">
             No lines yet
           </div>

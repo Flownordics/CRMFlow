@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { logger } from '@/lib/logger';
 
 const PreferencesSchema = z.object({
     locale: z.enum(["en", "da"]),
@@ -49,7 +50,7 @@ export function PreferencesForm() {
     }, [userSettings, form]);
 
     const onSubmit = async (data: PreferencesData) => {
-        console.log("Form data:", data);
+        logger.debug("Form data:", data);
         try {
             const result = await updateUserSettings.mutateAsync({
                 locale: data.locale,
@@ -57,10 +58,10 @@ export function PreferencesForm() {
                 calendar_show_google: data.calendar_show_google,
                 calendar_default_sync: data.calendar_default_sync,
             });
-            console.log("Update result:", result);
+            logger.debug("Update result:", result);
             toast.success("Preferences updated successfully");
         } catch (error) {
-            console.error("Failed to update preferences:", error);
+            logger.error("Failed to update preferences:", error);
             toast.error("Failed to update preferences");
         }
     };

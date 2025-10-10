@@ -28,6 +28,7 @@ import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 
 import { OpenPdfButton } from "@/components/common/OpenPdfButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { logger } from '@/lib/logger';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -159,7 +160,7 @@ export default function OrderEditor() {
         try {
             await logPdfGenerated("order", order!.id);
         } catch (error) {
-            console.warn("Failed to log PDF generation:", error);
+            logger.warn("Failed to log PDF generation:", error);
         }
     };
 
@@ -180,7 +181,7 @@ export default function OrderEditor() {
             // Update order status to invoiced
             updateHeader.mutate({ status: "invoiced" });
         } catch (error) {
-            console.warn("Failed to convert order to invoice:", error);
+            logger.warn("Failed to convert order to invoice:", error);
             const { toastBus } = await import("@/lib/toastBus");
             toastBus.emit({
                 title: "Invoice Creation Failed",
@@ -223,7 +224,7 @@ export default function OrderEditor() {
                                         variant: "success"
                                     });
                                 } catch (error) {
-                                    console.error("Failed to create invoice:", error);
+                                    logger.error("Failed to create invoice:", error);
                                     const { toastBus } = await import("@/lib/toastBus");
                                     toastBus.emit({
                                         title: "Error",

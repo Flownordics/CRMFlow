@@ -11,6 +11,7 @@ import { z } from "zod";
 import { useUpdateWorkspaceSettings } from "@/hooks/useSettings";
 import { type WorkspaceSettings } from "@/services/settings";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 const BrandingNumberingSchema = z.object({
     org_name: z.string().min(1, "Organization name is required"),
@@ -63,7 +64,7 @@ export function BrandingNumberingForm({ settings }: BrandingNumberingFormProps) 
             });
             toast.success("Settings updated successfully");
         } catch (error) {
-            console.error("Failed to update settings:", error);
+            logger.error("Failed to update settings:", error);
             toast.error("Failed to update settings");
         }
     };

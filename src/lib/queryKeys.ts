@@ -110,4 +110,12 @@ export const qk = {
     comments: (taskId: string) => ["tasks", "comments", taskId] as const,
     activities: (taskId: string) => ["tasks", "activities", taskId] as const,
   },
+
+  // Call Lists
+  callLists: (params?: { mine?: boolean }) => ["callLists", params ?? {}] as const,
+  callList: (id: string) => ["callList", id] as const,
+  callListItems: (callListId: string) => ["callList", callListId, "items"] as const,
+
+  // Activity Logs (company-level)
+  companyActivityLogs: (companyId: string) => ["company", companyId, "activityLogs"] as const,
 };

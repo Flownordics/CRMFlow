@@ -9,6 +9,11 @@ import { Document } from "./documents";
 import { Activity } from "./activity";
 import { USE_MOCKS } from "@/lib/debug";
 import { supabase } from "@/integrations/supabase/client";
+import { handleError } from "@/lib/errorHandler";
+import { validateCompanyCreate, validateCompanyUpdate } from "@/lib/validation";
+import { logger } from "@/lib/logger";
+import { normalizeApiResponse, handleApiError, createMockResponse, handleMockApiCall } from "@/lib/sharedUtils";
+import { executeApiWithRecovery } from "@/lib/errorRecovery";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -57,6 +62,9 @@ export async function fetchCompanies(params: {
     // Standard Supabase REST parameters
     queryParams.append('select', '*');
     queryParams.append('order', 'updated_at.desc');
+    
+    // Filter out soft-deleted records
+    queryParams.append('deleted_at', 'is.null');
 
     // Pagination
     const offset = (page - 1) * limit;
@@ -104,6 +112,9 @@ export async function fetchCompanies(params: {
       website: company.website,
       createdAt: company.created_at,
       updatedAt: company.updated_at,
+      lastActivityAt: company.last_activity_at,
+      activityStatus: company.activity_status,
+      doNotCall: company.do_not_call,
     })) : [];
 
     // Parse the mapped companies array
@@ -120,8 +131,7 @@ export async function fetchCompanies(params: {
       totalPages: Math.ceil(total / limit)
     } as PaginatedResponse<Company>;
   } catch (error) {
-    console.error("Failed to fetch companies:", error);
-    throw new Error("Failed to fetch companies");
+    throw handleError(error, 'fetchCompanies');
   }
 }
 
@@ -132,7 +142,7 @@ export async function fetchCompany(id: string) {
   }
 
   try {
-    const response = await apiClient.get(`/companies?id=eq.${id}&select=*`);
+    const response = await apiClient.get(`/companies?id=eq.${id}&deleted_at=is.null&select=*`);
     const raw = normalizeApiData(response);
 
     if (typeof raw === "string") {
@@ -162,12 +172,14 @@ export async function fetchCompany(id: string) {
       website: company.website,
       createdAt: company.created_at,
       updatedAt: company.updated_at,
+      lastActivityAt: company.last_activity_at,
+      activityStatus: company.activity_status,
+      doNotCall: company.do_not_call,
     };
 
     return companyReadSchema.parse(mappedCompany);
   } catch (error) {
-    console.error(`Failed to fetch company ${id}:`, error);
-    throw new Error("Failed to fetch company");
+    throw handleError(error, `fetchCompany(${id})`);
   }
 }
 
@@ -225,8 +237,7 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
 
     return companyReadSchema.parse(mappedCompany);
   } catch (error) {
-    console.error("Failed to create company:", error);
-    throw new Error("Failed to create company");
+    throw handleError(error, 'createCompany');
   }
 }
 
@@ -282,7 +293,7 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
 
     return companyReadSchema.parse(mappedCompany);
   } catch (error) {
-    console.error("Failed to update company:", error);
+    logger.error("Failed to update company", { error, companyId: id }, 'CompanyUpdate');
     throw new Error("Failed to update company");
   }
 }
@@ -299,7 +310,7 @@ export async function searchCompanies(query: string) {
     if (!term) {
       // Return all companies when no search term
       const response = await apiClient.get(
-        `/companies?select=id,name,email,website&limit=100&order=name.asc`
+        `/companies?select=id,name,email,website,do_not_call&deleted_at=is.null&limit=100&order=name.asc`
       );
       const raw = normalizeApiData(response);
 
@@ -318,7 +329,7 @@ export async function searchCompanies(query: string) {
     );
 
     const response = await apiClient.get(
-      `/companies?or=(${orParam})&select=id,name,email,website&limit=20`
+      `/companies?or=(${orParam})&deleted_at=is.null&select=id,name,email,website,do_not_call&limit=20`
     );
     const raw = normalizeApiData(response);
 
@@ -329,7 +340,7 @@ export async function searchCompanies(query: string) {
     const filteredCompanies = z.array(companyReadSchema).parse(raw);
     return filteredCompanies.slice(0, 20); // Limit to 20 results
   } catch (error) {
-    console.error("Failed to search companies:", error);
+    logger.error("Failed to search companies", { error, query }, 'CompanySearch');
     throw new Error("Failed to search companies");
   }
 }
@@ -378,7 +389,7 @@ async function fetchCompanyPeopleData(companyId: string): Promise<Person[]> {
 
     return z.array(personReadSchema).parse(mappedPeople);
   } catch (error) {
-    console.error("Failed to fetch company people:", error);
+    logger.error("Failed to fetch company people", { error, companyId }, 'CompanyPeople');
     return [];
   }
 }
@@ -400,7 +411,7 @@ async function fetchCompanyDealsData(companyId: string): Promise<Deal[]> {
 
     return z.array(Deal).parse(raw);
   } catch (error) {
-    console.error("Failed to fetch company deals:", error);
+    logger.error("Failed to fetch company deals", { error, companyId }, 'CompanyDeals');
     return [];
   }
 }
@@ -422,7 +433,7 @@ async function fetchCompanyDocumentsData(companyId: string): Promise<Document[]>
 
     return z.array(Document).parse(raw);
   } catch (error) {
-    console.error("Failed to fetch company documents:", error);
+    logger.error("Failed to fetch company documents", { error, companyId }, 'CompanyDocuments');
     return [];
   }
 }
@@ -460,7 +471,7 @@ async function fetchCompanyActivitiesData(companyId: string): Promise<Activity[]
 
     return z.array(Activity).parse(raw);
   } catch (error) {
-    console.error("Failed to fetch company activities:", error);
+    logger.error("Failed to fetch company activities", { error, companyId }, 'CompanyActivities');
     return [];
   }
 }
@@ -537,5 +548,96 @@ export function useUpdateCompany(id: string) {
       qc.invalidateQueries({ queryKey: qk.company(id) });
       qc.invalidateQueries({ queryKey: qk.companies() });
     }
+  });
+}
+
+// Soft delete a company
+export async function deleteCompany(id: string) {
+  if (USE_MOCKS) {
+    const { data } = await api.delete(`/companies/${id}`);
+    return data;
+  }
+
+  try {
+    // Soft delete by setting deleted_at timestamp
+    const response = await apiClient.patch(`/companies?id=eq.${id}`, {
+      deleted_at: new Date().toISOString()
+    });
+    return response.data;
+  } catch (error) {
+    logger.error("Failed to delete company", { error, companyId: id }, 'CompanyDelete');
+    throw new Error("Failed to delete company");
+  }
+}
+
+// Restore a soft-deleted company
+export async function restoreCompany(id: string) {
+  try {
+    const response = await apiClient.patch(`/companies?id=eq.${id}`, {
+      deleted_at: null
+    });
+    return response.data;
+  } catch (error) {
+    logger.error("Failed to restore company", { error, companyId: id }, 'CompanyRestore');
+    throw new Error("Failed to restore company");
+  }
+}
+
+// Fetch deleted companies
+export async function fetchDeletedCompanies(limit: number = 50) {
+  try {
+    const response = await apiClient.get(
+      `/companies?deleted_at=not.is.null&select=*&order=deleted_at.desc&limit=${limit}`
+    );
+    const raw = normalizeApiData(response);
+
+    if (typeof raw === "string") {
+      throw new Error("[companies] Non-JSON response.");
+    }
+
+    const companies = Array.isArray(raw) ? raw.map(company => ({
+      id: company.id,
+      name: company.name,
+      email: company.email,
+      invoiceEmail: company.invoice_email,
+      domain: company.domain,
+      deletedAt: company.deleted_at,
+      createdAt: company.created_at,
+      updatedAt: company.updated_at,
+    })) : [];
+
+    return z.array(companyReadSchema.extend({ deletedAt: z.string().optional() })).parse(companies);
+  } catch (error) {
+    logger.error("Failed to fetch deleted companies", { error }, 'DeletedCompanies');
+    throw new Error("Failed to fetch deleted companies");
+  }
+}
+
+export function useDeleteCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteCompany,
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: qk.companies() });
+      qc.invalidateQueries({ queryKey: qk.company(id) });
+    }
+  });
+}
+
+export function useRestoreCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: restoreCompany,
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: qk.companies() });
+      qc.invalidateQueries({ queryKey: qk.company(id) });
+    }
+  });
+}
+
+export function useDeletedCompanies() {
+  return useQuery({
+    queryKey: ['deleted-companies'],
+    queryFn: () => fetchDeletedCompanies(50)
   });
 }

@@ -88,6 +88,31 @@ export function useDashboardData() {
 
     const isLoading = companiesLoading || dealsLoading || invoicesLoading || quotesLoading || ordersLoading || peopleLoading;
 
+    // Helper function to calculate change from previous period
+    const calculateChange = (data: any[] | undefined): number => {
+        if (!data || data.length === 0) return 0;
+        
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+        
+        // Count items in last 30 days
+        const lastPeriod = data.filter(item => {
+            const createdAt = new Date(item.created_at);
+            return createdAt >= thirtyDaysAgo && createdAt <= now;
+        }).length;
+        
+        // Count items in previous 30 days (30-60 days ago)
+        const previousPeriod = data.filter(item => {
+            const createdAt = new Date(item.created_at);
+            return createdAt >= sixtyDaysAgo && createdAt < thirtyDaysAgo;
+        }).length;
+        
+        // Calculate percentage change
+        if (previousPeriod === 0) return lastPeriod > 0 ? 100 : 0;
+        return Math.round(((lastPeriod - previousPeriod) / previousPeriod) * 100);
+    };
+
     // Calculate metrics
     const metrics: DashboardMetrics = {
         totalRevenue: 0,
@@ -95,15 +120,15 @@ export function useDashboardData() {
         activeDeals: 0,
         activeDealsChange: 0,
         totalCompanies: companies?.data?.length || 0,
-        totalCompaniesChange: 0, // TODO: Calculate change from previous period
+        totalCompaniesChange: calculateChange(companies?.data),
         totalContacts: people?.data?.length || 0,
-        totalContactsChange: 0, // TODO: Calculate change from previous period
+        totalContactsChange: calculateChange(people?.data),
         totalQuotes: quotes?.data?.length || 0,
-        totalQuotesChange: 0, // TODO: Calculate change from previous period
+        totalQuotesChange: calculateChange(quotes?.data),
         totalOrders: orders?.data?.length || 0,
-        totalOrdersChange: 0, // TODO: Calculate change from previous period
+        totalOrdersChange: calculateChange(orders?.data),
         totalInvoices: invoices?.data?.length || 0,
-        totalInvoicesChange: 0, // TODO: Calculate change from previous period
+        totalInvoicesChange: calculateChange(invoices?.data),
     };
 
     // Calculate revenue from paid invoices

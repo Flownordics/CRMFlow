@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { useUpdateDocumentRelations } from "@/services/documents";
 import { cn } from "@/lib/utils";
+import { logger } from '@/lib/logger';
 
 interface RelateDocumentModalProps {
     open: boolean;
@@ -39,7 +40,7 @@ export function RelateDocumentModal({ open, onOpenChange, documentId }: RelateDo
             await updateMutation.mutateAsync({ id: documentId, relations });
             onOpenChange(false);
         } catch (error) {
-            console.error("Failed to update document relations:", error);
+            logger.error("Failed to update document relations:", error);
         }
     };
 

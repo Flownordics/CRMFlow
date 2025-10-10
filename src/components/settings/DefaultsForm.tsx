@@ -9,6 +9,7 @@ import { DefaultsFormSchema, type DefaultsFormData } from "@/lib/schemas/setting
 import { useUpdateWorkspaceSettings } from "@/hooks/useSettings";
 import { type WorkspaceSettings } from "@/services/settings";
 import { useState } from "react";
+import { logger } from '@/lib/logger';
 
 interface DefaultsFormProps {
     settings: WorkspaceSettings | null;
@@ -32,7 +33,7 @@ export function DefaultsForm({ settings }: DefaultsFormProps) {
             setIsEditing(false);
             form.reset(data);
         } catch (error) {
-            console.error("Failed to update default settings:", error);
+            logger.error("Failed to update default settings:", error);
         }
     };
 

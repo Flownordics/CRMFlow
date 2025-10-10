@@ -23,6 +23,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, e
 import { filterEventsByKind, getEventsForToday, getEventsForThisWeek, nativeEventToMerged, googleEventToMerged, mergeEvents } from "@/lib/calendar-utils";
 import { useI18n } from "@/lib/i18n";
 import { toastBus } from "@/lib/toastBus";
+import { logger } from '@/lib/logger';
 
 type CalendarView = 'list' | 'month' | 'week' | 'day';
 
@@ -128,7 +129,7 @@ export default function CalendarView() {
         variant: "success"
       });
     } catch (error) {
-      console.error('Failed to create event:', error);
+      logger.error('Failed to create event:', error);
       toastBus.emit({
         title: "Error",
         description: 'Failed to create event',
@@ -185,7 +186,7 @@ export default function CalendarView() {
 
   const handleEventClick = (event: MergedEvent) => {
     // Handle event click - could open event details or navigate
-    console.log('Event clicked:', event);
+    logger.debug('Event clicked:', event);
   };
 
   // Handle type filtering

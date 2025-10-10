@@ -120,7 +120,8 @@ describe('Calendar Utils', () => {
 
             const result = googleEventToMerged(eventWithoutId);
 
-            expect(result.id).toMatch(/^google-\d+-\d+$/);
+            // Allow decimals in the random part since Math.random() includes decimal points
+            expect(result.id).toMatch(/^google-\d+-[\d.]+$/);
         });
     });
 
@@ -190,7 +191,7 @@ describe('Calendar Utils', () => {
     });
 
     describe('getEventsForToday', () => {
-        const today = new Date('2024-01-15T12:00:00Z');
+        const referenceDate = new Date('2024-01-15T12:00:00Z');
         const events = [
             { ...nativeEventToMerged(mockNativeEvent), start_at: '2024-01-15T10:00:00Z' },
             { ...googleEventToMerged(mockGoogleEvent), start_at: '2024-01-14T14:00:00Z' },
@@ -198,19 +199,19 @@ describe('Calendar Utils', () => {
         ];
 
         it('should return events for today', () => {
-            const result = getEventsForToday(events);
+            const result = getEventsForToday(events, referenceDate);
             expect(result).toHaveLength(1);
             expect(result[0].start_at).toBe('2024-01-15T10:00:00Z');
         });
 
         it('should handle empty events array', () => {
-            const result = getEventsForToday([]);
+            const result = getEventsForToday([], referenceDate);
             expect(result).toEqual([]);
         });
     });
 
     describe('getEventsForThisWeek', () => {
-        const today = new Date('2024-01-15T12:00:00Z'); // Monday
+        const referenceDate = new Date('2024-01-15T12:00:00Z'); // Monday
         const events = [
             { ...nativeEventToMerged(mockNativeEvent), start_at: '2024-01-15T10:00:00Z' }, // Monday
             { ...googleEventToMerged(mockGoogleEvent), start_at: '2024-01-16T14:00:00Z' }, // Tuesday
@@ -219,7 +220,7 @@ describe('Calendar Utils', () => {
         ];
 
         it('should return events for this week', () => {
-            const result = getEventsForThisWeek(events);
+            const result = getEventsForThisWeek(events, referenceDate);
             expect(result).toHaveLength(2);
             expect(result.every(e =>
                 new Date(e.start_at) >= new Date('2024-01-14T00:00:00Z') &&
@@ -228,7 +229,7 @@ describe('Calendar Utils', () => {
         });
 
         it('should handle empty events array', () => {
-            const result = getEventsForThisWeek([]);
+            const result = getEventsForThisWeek([], referenceDate);
             expect(result).toEqual([]);
         });
     });

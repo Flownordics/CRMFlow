@@ -15,6 +15,7 @@ import {
 import { useUploadDocument } from "@/services/documents";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/utils";
+import { logger } from '@/lib/logger';
 
 interface UploadDocumentModalProps {
     open: boolean;
@@ -79,7 +80,7 @@ export function UploadDocumentModal({ open, onOpenChange }: UploadDocumentModalP
 
                 setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
             } catch (error) {
-                console.error(`Failed to upload ${file.name}:`, error);
+                logger.error(`Failed to upload ${file.name}:`, error);
                 setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // Error state
             }
         }

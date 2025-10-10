@@ -7,6 +7,7 @@ import { useStageProbabilities, useUpdateStageProbability } from "@/hooks/useSet
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { logger } from '@/lib/logger';
 
 export function StageProbabilitiesForm() {
     const { data: stageProbabilities, isLoading, error } = useStageProbabilities();
@@ -40,7 +41,7 @@ export function StageProbabilitiesForm() {
                 delete debounceRefs.current[stageId];
             }, 300); // 300ms debounce
         } catch (error) {
-            console.error("Failed to update stage probability:", error);
+            logger.error("Failed to update stage probability:", error);
         }
     }, [updateProbability]);
 

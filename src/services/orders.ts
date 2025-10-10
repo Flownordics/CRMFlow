@@ -2,6 +2,7 @@ import { apiClient, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
+import { logger } from '@/lib/logger';
 
 // Adapter functions for DB ↔ UI conversion (similar to quotes)
 const lineDbToUi = (l: any) => ({
@@ -144,7 +145,7 @@ export async function fetchOrders(params: {
     const { page = 1, limit = 20, q = "", company_id } = params;
 
     try {
-        console.log("[fetchOrders] Starting with params:", params);
+        logger.debug("[fetchOrders] Starting with params:", params);
 
         const queryParams = new URLSearchParams();
         const offset = (page - 1) * limit;
@@ -154,12 +155,12 @@ export async function fetchOrders(params: {
         if (q) queryParams.append('search', q);
 
         const url = `/orders?${queryParams.toString()}`;
-        console.log("[fetchOrders] Fetching from URL:", url);
+        logger.debug("[fetchOrders] Fetching from URL:", url);
 
         const response = await apiClient.get(url);
         const raw = response.data;
 
-        console.log("[fetchOrders] Raw response:", {
+        logger.debug("[fetchOrders] Raw response:", {
             status: response.status,
             dataLength: Array.isArray(raw) ? raw.length : 'not array',
             data: raw
@@ -197,7 +198,7 @@ export async function fetchOrders(params: {
                         order.lines = [];
                     }
                 } catch (error) {
-                    console.warn(`[fetchOrders] Failed to fetch lines for order ${order.id}:`, error);
+                    logger.warn(`[fetchOrders] Failed to fetch lines for order ${order.id}:`, error);
                     order.lines = [];
                 }
 
@@ -205,7 +206,7 @@ export async function fetchOrders(params: {
             })
         );
 
-        console.log("[fetchOrders] Final result:", {
+        logger.debug("[fetchOrders] Final result:", {
             ordersCount: ordersWithLines.length,
             total,
             orders: ordersWithLines
@@ -216,66 +217,56 @@ export async function fetchOrders(params: {
             total
         };
     } catch (error) {
-        console.error("[fetchOrders] Failed to fetch orders:", error);
+        logger.error("[fetchOrders] Failed to fetch orders:", error);
         throw new Error("Failed to fetch orders");
     }
 }
 
 export async function fetchOrder(id: string): Promise<OrderUI> {
     try {
-        console.log(`[fetchOrder] Fetching order with ID: ${id}`);
-
         // Fetch the order first
-        const response = await apiClient.get(`/orders?id=eq.${id}`);
-
-        console.log("[fetchOrder] API Response:", {
-            status: response.status,
-            data: response.data,
-            dataLength: response.data?.length,
-            isArray: Array.isArray(response.data)
-        });
+        const response = await apiClient.get(`/orders?id=eq.${id}&deleted_at=is.null`);
 
         if (response.data && Array.isArray(response.data) && response.data.length > 0) {
             const order = response.data[0];
 
-            console.log("[fetchOrder] Raw order data:", order);
+            // Process order data
 
             // Fetch line items for this order
             try {
-                console.log("[fetchOrder] Fetching line items for order:", order.id);
+                // Fetch line items for this order
                 const lineItemsUrl = `/line_items?parent_type=eq.order&parent_id=eq.${order.id}&order=position.asc`;
                 const linesResponse = await apiClient.get(lineItemsUrl);
 
                 if (linesResponse.data && Array.isArray(linesResponse.data)) {
-                    console.log("[fetchOrder] Lines fetched:", linesResponse.data);
+                    // Process line items
                     order.lines = linesResponse.data;
                 } else {
-                    console.log("[fetchOrder] No line items found");
+                    // No line items found
                     order.lines = [];
                 }
             } catch (linesError: any) {
-                console.log("[fetchOrder] Failed to fetch line items:", linesError.message);
+                // Failed to fetch line items, using empty array
                 order.lines = [];
             }
 
-            console.log("[fetchOrder] Order after processing lines:", order);
+            // Return processed order
 
             try {
                 // Convert DB format to UI format using adapter (similar to quotes)
                 const uiOrder = orderDbToUi(order);
-                console.log("[fetchOrder] Successfully converted to UI format:", uiOrder);
+                // Successfully converted to UI format
                 return uiOrder as OrderUI;
             } catch (parseError: any) {
-                console.error("[fetchOrder] Conversion error:", parseError);
-                console.error("[fetchOrder] Order that failed to convert:", order);
+                // Conversion error occurred
                 throw new Error(`Failed to convert order: ${parseError.message}`);
             }
         }
 
-        console.log("[fetchOrder] No order found in response");
+        // No order found in response
         throw new Error(`Order with ID ${id} not found`);
     } catch (error: any) {
-        console.error("[fetchOrder] Failed to fetch order:", error.message);
+        // Failed to fetch order
         throw new Error(`Failed to fetch order: ${error.message}`);
     }
 }
@@ -296,7 +287,7 @@ export async function createOrder(payload: {
     lines: any[];
 }): Promise<Order> {
     try {
-        console.log("[createOrder] Starting with payload:", payload);
+        logger.debug("[createOrder] Starting with payload:", payload);
 
         // Extract lines from payload since orders table doesn't have lines column
         const { lines, ...orderPayload } = payload;
@@ -309,7 +300,7 @@ export async function createOrder(payload: {
         // Create the order first
         const response = await apiClient.post("/orders", orderPayload);
 
-        console.log("[createOrder] POST /orders response:", {
+        logger.debug("[createOrder] POST /orders response:", {
             status: response.status,
             data: response.data,
             headers: response.headers,
@@ -334,12 +325,12 @@ export async function createOrder(payload: {
                 }
             } else {
                 // No data and no location header - try to find the created order by quote_id
-                console.log("[createOrder] No data or location header, searching for created order by quote_id");
+                logger.debug("[createOrder] No data or location header, searching for created order by quote_id");
                 if (orderPayload.quote_id) {
                     const searchResponse = await apiClient.get(`/orders?quote_id=eq.${orderPayload.quote_id}&order=created_at.desc&limit=1`);
                     if (searchResponse.data && Array.isArray(searchResponse.data) && searchResponse.data.length > 0) {
                         order = orderDbToUi(searchResponse.data[0]);
-                        console.log("[createOrder] Found created order by quote_id:", order.id);
+                        logger.debug("[createOrder] Found created order by quote_id:", order.id);
                     } else {
                         throw new Error("Order creation succeeded but could not find created order");
                     }
@@ -354,7 +345,7 @@ export async function createOrder(payload: {
 
         // Create line items separately if lines are provided
         if (lines && lines.length > 0) {
-            console.log(`[createOrder] Creating ${lines.length} line items for order ${order.id}`);
+            logger.debug(`[createOrder] Creating ${lines.length} line items for order ${order.id}`);
             for (const line of lines) {
                 const linePayload = {
                     parent_type: 'order',
@@ -367,24 +358,24 @@ export async function createOrder(payload: {
                     sku: line.sku || null,
                     position: lines.indexOf(line), // Add position for ordering
                 };
-                console.log("[createOrder] Creating line item:", linePayload);
+                logger.debug("[createOrder] Creating line item:", linePayload);
 
                 try {
                     const lineResponse = await apiClient.post(`/line_items`, linePayload);
-                    console.log("[createOrder] Line item created:", lineResponse.data);
+                    logger.debug("[createOrder] Line item created:", lineResponse.data);
                 } catch (lineError) {
-                    console.error("[createOrder] Failed to create line item:", lineError);
+                    logger.error("[createOrder] Failed to create line item:", lineError);
                     throw lineError;
                 }
             }
         } else {
-            console.log("[createOrder] No lines to create");
+            logger.debug("[createOrder] No lines to create");
         }
 
         // Return the order with the lines we just created
         return order;
     } catch (error) {
-        console.error("Failed to create order:", error);
+        logger.error("Failed to create order:", error);
         throw new Error("Failed to create order");
     }
 }
@@ -407,7 +398,7 @@ export async function updateOrderHeader(
 
     if (!orderData) {
         // If no data returned (204 response), fetch the updated order
-        console.log("[updateOrderHeader] No data in response, fetching updated order");
+        logger.debug("[updateOrderHeader] No data in response, fetching updated order");
         return await fetchOrder(id);
     }
 
@@ -489,9 +480,9 @@ export function useUpdateOrderHeader(id: string) {
             qc.invalidateQueries({ queryKey: qk.orders() });
 
             // Check if status changed to 'invoiced' and trigger invoice conversion
-            console.log("[useUpdateOrderHeader] Status update successful, patch:", patch);
+            logger.debug("[useUpdateOrderHeader] Status update successful, patch:", patch);
             if (patch.status === "invoiced") {
-                console.log("[useUpdateOrderHeader] Status is 'invoiced', triggering invoice conversion for order:", id);
+                logger.debug("[useUpdateOrderHeader] Status is 'invoiced', triggering invoice conversion for order:", id);
                 try {
                     // Import the conversion function dynamically to avoid circular dependencies
                     const { ensureInvoiceForOrder } = await import("./conversions");
@@ -508,7 +499,7 @@ export function useUpdateOrderHeader(id: string) {
                     // Invalidate invoices queries to refresh the invoices list
                     qc.invalidateQueries({ queryKey: qk.invoices() });
                 } catch (e) {
-                    console.warn("[order→invoice] conversion failed", e);
+                    logger.warn("[order→invoice] conversion failed", e);
 
                     // Show error toast but don't rollback the status change
                     const { toastBus } = await import("@/lib/toastBus");
@@ -554,7 +545,7 @@ export async function searchOrders(query: string): Promise<Array<{ id: string; l
             subtitle: order.company_name ? `(${order.company_name})` : undefined
         }));
     } catch (error) {
-        console.error("Failed to search orders:", error);
+        logger.error("Failed to search orders:", error);
         return [];
     }
 }

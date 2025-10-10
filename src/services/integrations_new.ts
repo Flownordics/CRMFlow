@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { logger } from '@/lib/logger';
 
 // Types
 export interface WorkspaceIntegration {
@@ -74,7 +75,7 @@ export async function getWorkspaceIntegrations(kind?: 'gmail' | 'calendar'): Pro
 
         return data || [];
     } catch (error) {
-        console.error('Failed to get workspace integrations:', error);
+        logger.error('Failed to get workspace integrations:', error);
         throw error;
     }
 }
@@ -122,7 +123,7 @@ export async function upsertWorkspaceIntegration(
 
         return data;
     } catch (error) {
-        console.error('Failed to upsert workspace integration:', error);
+        logger.error('Failed to upsert workspace integration:', error);
         throw error;
     }
 }
@@ -147,7 +148,7 @@ export async function getUserIntegrations(): Promise<UserIntegration[]> {
 
         return data || [];
     } catch (error) {
-        console.error('Failed to get user integrations:', error);
+        logger.error('Failed to get user integrations:', error);
         throw error;
     }
 }
@@ -168,7 +169,7 @@ export async function getIntegrationStatus(kind: 'gmail' | 'calendar'): Promise<
             lastSyncedAt: integration.last_synced_at
         };
     } catch (error) {
-        console.error(`Failed to get ${kind} integration status:`, error);
+        logger.error(`Failed to get ${kind} integration status:`, error);
         return { connected: false };
     }
 }
@@ -191,7 +192,7 @@ export async function deleteUserIntegration(kind: 'gmail' | 'calendar'): Promise
             throw error;
         }
     } catch (error) {
-        console.error(`Failed to delete ${kind} integration:`, error);
+        logger.error(`Failed to delete ${kind} integration:`, error);
         throw error;
     }
 }
@@ -262,7 +263,7 @@ export async function getGmailStatus(): Promise<{ connected: boolean; email?: st
             email: gmailIntegration.email || ""
         };
     } catch (error) {
-        console.warn("[integrations] gmail status err:", error);
+        logger.warn("[integrations] gmail status err:", error);
         return { connected: false };
     }
 }
@@ -272,7 +273,7 @@ export async function getGmailEmail(): Promise<string | null> {
         const integrations = await getUserIntegrations();
         return integrations.find(i => i.kind === 'gmail')?.email || null;
     } catch (error) {
-        console.error("[integrations] Failed to get Gmail email:", error);
+        logger.error("[integrations] Failed to get Gmail email:", error);
         return null;
     }
 }
@@ -338,7 +339,7 @@ export async function refreshGoogleTokenIfNeeded(kind: 'gmail' | 'calendar', opt
 
         return false;
     } catch (error) {
-        console.error("[integrations] Failed to refresh Google token:", error);
+        logger.error("[integrations] Failed to refresh Google token:", error);
         throw error;
     }
 }

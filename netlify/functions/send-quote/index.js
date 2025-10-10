@@ -57,12 +57,7 @@ export const handler = async (event, context) => {
         const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
         const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
 
-        console.log('Environment check:', {
-            SUPABASE_URL: !!supabaseUrl,
-            SUPABASE_SERVICE_KEY: !!supabaseServiceKey,
-            VITE_SUPABASE_URL: !!process.env.VITE_SUPABASE_URL,
-            SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY
-        });
+        // Environment variables validated silently
 
         if (!supabaseUrl || !supabaseServiceKey) {
             return {
@@ -295,7 +290,7 @@ export const handler = async (event, context) => {
 
         // Generate PDF quote first using Netlify function
         console.log('Generating PDF quote for quote ID:', quoteIdValue);
-        console.log('PDF generator URL: https://crmflow-app.netlify.app/.netlify/functions/quote-pdfgen');
+        console.log('PDF generator URL: https://crmflow-app.netlify.app/.netlify/functions/pdf-html');
 
         let pdfBase64 = null;
         let pdfFilename = `quote-${quoteIdValue}.pdf`;
@@ -309,8 +304,8 @@ export const handler = async (event, context) => {
             };
             console.log('PDF request body:', JSON.stringify(pdfRequestBody));
 
-            // Use Netlify Function for PDF generation (deployed and working)
-            const netlifyFunctionUrl = 'https://crmflow-app.netlify.app/.netlify/functions/quote-pdfgen';
+            // Use Netlify Function for PDF generation (HTML-to-PDF with Puppeteer)
+            const netlifyFunctionUrl = 'https://crmflow-app.netlify.app/.netlify/functions/pdf-html';
             console.log('PDF generator URL:', netlifyFunctionUrl);
 
             const pdfResponse = await fetch(netlifyFunctionUrl, {

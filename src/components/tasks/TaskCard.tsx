@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Task, getTaskStatusColor, getTaskPriorityColor, formatTaskDueDate } from "@/services/tasks";
 import { useUpdateTask, useDeleteTask } from "@/services/tasks";
+import { logger } from '@/lib/logger';
 
 interface TaskCardProps {
   task: Task;
@@ -42,7 +43,7 @@ export function TaskCard({ task, onEdit, onView }: TaskCardProps) {
         completed_at: newStatus === 'completed' ? new Date().toISOString() : undefined,
       });
     } catch (error) {
-      console.error('Failed to update task status:', error);
+      logger.error('Failed to update task status:', error);
     }
   };
 
@@ -51,7 +52,7 @@ export function TaskCard({ task, onEdit, onView }: TaskCardProps) {
       try {
         await deleteTask.mutateAsync(task.id);
       } catch (error) {
-        console.error('Failed to delete task:', error);
+        logger.error('Failed to delete task:', error);
       }
     }
   };

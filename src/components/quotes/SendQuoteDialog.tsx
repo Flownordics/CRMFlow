@@ -20,6 +20,7 @@ import { isGmailAvailable } from "@/services/email";
 import { toastBus } from "@/lib/toastBus";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Send, CheckCircle, Download, Copy, Mail } from "lucide-react";
+import { logger } from '@/lib/logger';
 
 interface SendQuoteDialogProps {
     quoteId: string;
@@ -115,7 +116,7 @@ Your Sales Team`);
                 try {
                     await logEmailSent(quoteId, quote.deal_id, to.trim(), 'manual');
                 } catch (activityError) {
-                    console.warn('Failed to log email activity:', activityError);
+                    logger.warn('Failed to log email activity:', activityError);
                 }
             }
 

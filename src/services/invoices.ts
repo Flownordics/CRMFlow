@@ -7,6 +7,7 @@ import { logActivity } from "./activity";
 import { toMinor } from "@/lib/money";
 import { supabase } from "@/integrations/supabase/client";
 import { toastBus } from "@/lib/toastBus";
+import { logger } from '@/lib/logger';
 
 // Schemas
 export const Invoice = z.object({
@@ -134,13 +135,13 @@ export async function fetchInvoices(params: {
             total
         };
     } catch (error) {
-        console.error("Failed to fetch invoices:", error);
+        logger.error("Failed to fetch invoices:", error);
         throw new Error("Failed to fetch invoices");
     }
 }
 
 export async function fetchInvoice(id: string): Promise<Invoice> {
-    const response = await apiClient.get(`/invoices?id=eq.${id}&select=*`);
+    const response = await apiClient.get(`/invoices?id=eq.${id}&deleted_at=is.null&select=*`);
     const raw = normalizeApiData(response);
 
     if (typeof raw === "string") {
@@ -209,7 +210,7 @@ export async function addPayment(invoiceId: string, payload: PaymentPayload): Pr
 
         return updatedInvoice;
     } catch (error) {
-        console.error("Failed to add payment:", error);
+        logger.error("Failed to add payment:", error);
         throw new Error("Failed to add payment");
     }
 }
@@ -267,7 +268,7 @@ export function useUpdateInvoice() {
                 try {
                     await triggerDealStageAutomation('invoice_paid', updatedInvoice.deal_id, updatedInvoice);
                 } catch (e) {
-                    console.warn("[useUpdateInvoice] Deal stage automation failed:", e);
+                    logger.warn("[useUpdateInvoice] Deal stage automation failed:", e);
                 }
             }
         },
@@ -354,18 +355,52 @@ export async function updateInvoice(id: string, payload: Partial<{
 
         return Invoice.parse(invoiceData);
     } catch (error) {
-        console.error("Failed to update invoice:", error);
+        logger.error("Failed to update invoice:", error);
         throw new Error("Failed to update invoice");
     }
 }
 
-// Delete invoice
+// Soft delete invoice
 export async function deleteInvoice(id: string): Promise<void> {
     try {
-        await apiClient.delete(`/invoices?id=eq.${id}`);
+        // Soft delete by setting deleted_at timestamp
+        await apiClient.patch(`/invoices?id=eq.${id}`, {
+            deleted_at: new Date().toISOString()
+        });
     } catch (error) {
-        console.error("Failed to delete invoice:", error);
+        logger.error("Failed to delete invoice:", error);
         throw new Error("Failed to delete invoice");
+    }
+}
+
+// Restore soft-deleted invoice
+export async function restoreInvoice(id: string): Promise<void> {
+    try {
+        await apiClient.patch(`/invoices?id=eq.${id}`, {
+            deleted_at: null
+        });
+    } catch (error) {
+        logger.error("Failed to restore invoice:", error);
+        throw new Error("Failed to restore invoice");
+    }
+}
+
+// Fetch deleted invoices
+export async function fetchDeletedInvoices(limit: number = 50) {
+    try {
+        const response = await apiClient.get(
+            `/invoices?deleted_at=not.is.null&select=*&order=deleted_at.desc&limit=${limit}`
+        );
+        const raw = normalizeApiData(response);
+
+        if (typeof raw === "string") {
+            throw new Error("[invoices] Non-JSON response.");
+        }
+
+        return z.array(Invoice).parse(raw);
+    } catch (error) {
+        logger.error("Failed to fetch deleted invoices", { error }, 'DeletedInvoices');
+        throw new Error("Failed to fetch deleted invoices");
     }
 }
 
@@ -374,7 +409,7 @@ export async function sendInvoice(id: string): Promise<Invoice> {
     try {
         return await updateInvoice(id, { status: 'sent' });
     } catch (error) {
-        console.error("Failed to send invoice:", error);
+        logger.error("Failed to send invoice:", error);
         throw new Error("Failed to send invoice");
     }
 }
@@ -399,7 +434,7 @@ export async function sendInvoiceEmail(request: InvoiceEmailRequest): Promise<{ 
             .eq('kind', 'gmail')
             .single();
 
-        console.log('Gmail integration check:', {
+        logger.debug('Gmail integration check:', {
             integrationError,
             integration: integration ? {
                 id: integration.id,
@@ -465,11 +500,11 @@ export async function sendInvoiceEmail(request: InvoiceEmailRequest): Promise<{ 
         }
 
     } catch (error) {
-        console.error('Failed to send invoice email:', error);
+        logger.error('Failed to send invoice email:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
         // Don't show toast here - let the component handle it
-        console.error('Invoice email error details:', {
+        logger.error('Invoice email error details:', {
             error: errorMessage,
             stack: error instanceof Error ? error.stack : undefined,
             request: request // Use original request instead of validatedRequest
@@ -527,7 +562,7 @@ export async function createInvoice(payload: {
     lines: any[];
 }): Promise<Invoice> {
     try {
-        console.log("[createInvoice] Starting with payload:", payload);
+        logger.debug("[createInvoice] Starting with payload:", payload);
 
         // Extract lines from payload since invoices table doesn't have lines column
         const { lines, ...invoicePayload } = payload;
@@ -540,7 +575,7 @@ export async function createInvoice(payload: {
         // Create the invoice first
         const response = await apiClient.post("/invoices", invoicePayload);
 
-        console.log("[createInvoice] POST /invoices response:", {
+        logger.debug("[createInvoice] POST /invoices response:", {
             status: response.status,
             data: response.data,
             headers: response.headers,
@@ -570,12 +605,12 @@ export async function createInvoice(payload: {
                 }
             } else {
                 // No data and no location header - try to find the created invoice by order_id
-                console.log("[createInvoice] No data or location header, searching for created invoice by order_id");
+                logger.debug("[createInvoice] No data or location header, searching for created invoice by order_id");
                 if (invoicePayload.order_id) {
                     const searchResponse = await apiClient.get(`/invoices?order_id=eq.${invoicePayload.order_id}&order=created_at.desc&limit=1`);
                     if (searchResponse.data && Array.isArray(searchResponse.data) && searchResponse.data.length > 0) {
                         invoice = searchResponse.data[0];
-                        console.log("[createInvoice] Found created invoice by order_id:", invoice.id);
+                        logger.debug("[createInvoice] Found created invoice by order_id:", invoice.id);
                     } else {
                         throw new Error("Invoice creation succeeded but could not find created invoice");
                     }
@@ -590,7 +625,7 @@ export async function createInvoice(payload: {
 
         // Create line items separately if lines are provided
         if (lines && lines.length > 0) {
-            console.log(`[createInvoice] Creating ${lines.length} line items for invoice ${invoice.id}`);
+            logger.debug(`[createInvoice] Creating ${lines.length} line items for invoice ${invoice.id}`);
             for (const line of lines) {
                 const linePayload = {
                     parent_type: 'invoice',
@@ -603,24 +638,97 @@ export async function createInvoice(payload: {
                     sku: line.sku || null,
                     position: lines.indexOf(line), // Add position for ordering
                 };
-                console.log("[createInvoice] Creating line item:", linePayload);
+                logger.debug("[createInvoice] Creating line item:", linePayload);
 
                 try {
                     const lineResponse = await apiClient.post(`/line_items`, linePayload);
-                    console.log("[createInvoice] Line item created:", lineResponse.data);
+                    logger.debug("[createInvoice] Line item created:", lineResponse.data);
                 } catch (lineError) {
-                    console.error("[createInvoice] Failed to create line item:", lineError);
+                    logger.error("[createInvoice] Failed to create line item:", lineError);
                     throw lineError;
                 }
             }
         } else {
-            console.log("[createInvoice] No lines to create");
+            logger.debug("[createInvoice] No lines to create");
         }
 
         // Return the invoice with the lines we just created
         return invoice;
     } catch (error) {
-        console.error("Failed to create invoice:", error);
+        logger.error("Failed to create invoice:", error);
         throw new Error("Failed to create invoice");
     }
+}
+
+// ===== LINE ITEM OPERATIONS =====
+
+/**
+ * Upsert (create or update) a line item for an invoice
+ */
+export async function upsertInvoiceLine(
+    invoiceId: string,
+    line: Partial<InvoiceLine> & { id?: string },
+) {
+    const linePayload: any = {
+        parent_type: 'invoice',
+        parent_id: invoiceId,
+        description: line.description,
+        qty: line.qty,
+        unit_minor: line.unit_minor,
+        tax_rate_pct: line.tax_rate_pct ?? 25,
+        discount_pct: line.discount_pct ?? 0,
+        sku: line.sku || null,
+    };
+
+    if (line.id) {
+        // Update existing line
+        const response = await apiClient.patch(`/line_items?id=eq.${line.id}`, linePayload);
+        return normalizeApiData(response);
+    } else {
+        // Create new line
+        const response = await apiClient.post('/line_items', {
+            ...linePayload,
+            position: 0, // Will be updated by backend
+        });
+        return normalizeApiData(response);
+    }
+}
+
+/**
+ * Delete a line item from an invoice
+ */
+export async function deleteInvoiceLine(lineId: string) {
+    const response = await apiClient.delete(`/line_items?id=eq.${lineId}`);
+    return normalizeApiData(response);
+}
+
+/**
+ * React Query hook for upserting invoice line items
+ */
+export function useUpsertInvoiceLine(invoiceId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (line: Partial<InvoiceLine> & { id?: string }) =>
+            upsertInvoiceLine(invoiceId, line),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: qk.invoice(invoiceId) });
+            queryClient.invalidateQueries({ queryKey: qk.invoices() });
+        },
+    });
+}
+
+/**
+ * React Query hook for deleting invoice line items
+ */
+export function useDeleteInvoiceLine(invoiceId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (lineId: string) => deleteInvoiceLine(lineId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: qk.invoice(invoiceId) });
+            queryClient.invalidateQueries({ queryKey: qk.invoices() });
+        },
+    });
 }

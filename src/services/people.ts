@@ -4,6 +4,7 @@ import { qk } from "@/lib/queryKeys";
 import { z } from "zod";
 import { Person, PersonCreate, personReadSchema, type Person as PersonCamelCase } from "@/lib/schemas/person";
 import { USE_MOCKS } from "@/lib/debug";
+import { logger } from '@/lib/logger';
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -52,6 +53,9 @@ export async function fetchPeople(params: {
         // Standard Supabase REST parameters
         queryParams.append('select', '*');
         queryParams.append('order', 'updated_at.desc');
+        
+        // Filter out soft-deleted records
+        queryParams.append('deleted_at', 'is.null');
 
         // Pagination
         const offset = (page - 1) * limit;
@@ -97,7 +101,7 @@ export async function fetchPeople(params: {
             totalPages: Math.ceil(total / limit)
         } as PaginatedResponse<z.infer<typeof Person>>;
     } catch (error) {
-        console.error("Failed to fetch people:", error);
+        logger.error("Failed to fetch people:", error);
         throw new Error("Failed to fetch people");
     }
 }
@@ -139,7 +143,7 @@ export async function fetchPersonById(id: string) {
 
         return personReadSchema.parse(raw);
     } catch (error) {
-        console.error(`Failed to fetch person ${id}:`, error);
+        logger.error(`Failed to fetch person ${id}:`, error);
         throw new Error("Failed to fetch person");
     }
 }
@@ -162,7 +166,7 @@ export async function fetchPersonDeals(id: string) {
 
         return Array.isArray(raw) ? raw : [];
     } catch (error) {
-        console.error(`Failed to fetch person deals ${id}:`, error);
+        logger.error(`Failed to fetch person deals ${id}:`, error);
         throw new Error("Failed to fetch person deals");
     }
 }
@@ -185,7 +189,7 @@ export async function fetchPersonDocuments(id: string) {
 
         return Array.isArray(raw) ? raw : [];
     } catch (error) {
-        console.error(`Failed to fetch person documents ${id}:`, error);
+        logger.error(`Failed to fetch person documents ${id}:`, error);
         throw new Error("Failed to fetch person documents");
     }
 }
@@ -220,7 +224,7 @@ export async function fetchPersonActivities(id: string) {
 
         return allActivities;
     } catch (error) {
-        console.error(`Failed to fetch person activities ${id}:`, error);
+        logger.error(`Failed to fetch person activities ${id}:`, error);
         throw new Error("Failed to fetch person activities");
     }
 }
@@ -232,7 +236,7 @@ export async function fetchPerson(id: string) {
     }
 
     try {
-        const response = await apiClient.get(`/people?id=eq.${id}&select=*`);
+        const response = await apiClient.get(`/people?id=eq.${id}&deleted_at=is.null&select=*`);
         const raw = normalizeApiData(response);
 
         if (typeof raw === "string") {
@@ -249,7 +253,7 @@ export async function fetchPerson(id: string) {
 
         return Person.parse(raw);
     } catch (error) {
-        console.error(`Failed to fetch person ${id}:`, error);
+        logger.error(`Failed to fetch person ${id}:`, error);
         throw new Error("Failed to fetch person");
     }
 }
@@ -289,7 +293,7 @@ export async function createPerson(payload: z.infer<typeof PersonCreate>) {
 
         return Person.parse(createdPerson);
     } catch (error) {
-        console.error("Failed to create person:", error);
+        logger.error("Failed to create person:", error);
         throw new Error("Failed to create person");
     }
 }
@@ -321,11 +325,12 @@ export async function updatePerson(id: string, patch: Partial<Person>) {
 
         return Person.parse(raw);
     } catch (error) {
-        console.error(`Failed to update person ${id}:`, error);
+        logger.error(`Failed to update person ${id}:`, error);
         throw new Error("Failed to update person");
     }
 }
 
+// Soft delete a person
 export async function deletePerson(id: string) {
     if (USE_MOCKS) {
         const { data } = await api.delete(`/people/${id}`);
@@ -333,11 +338,46 @@ export async function deletePerson(id: string) {
     }
 
     try {
-        const response = await apiClient.delete(`/people?id=eq.${id}`);
+        // Soft delete by setting deleted_at timestamp
+        const response = await apiClient.patch(`/people?id=eq.${id}`, {
+            deleted_at: new Date().toISOString()
+        });
         return response.data;
     } catch (error) {
-        console.error(`Failed to delete person ${id}:`, error);
+        logger.error(`Failed to delete person ${id}:`, error);
         throw new Error("Failed to delete person");
+    }
+}
+
+// Restore a soft-deleted person
+export async function restorePerson(id: string) {
+    try {
+        const response = await apiClient.patch(`/people?id=eq.${id}`, {
+            deleted_at: null
+        });
+        return response.data;
+    } catch (error) {
+        logger.error(`Failed to restore person ${id}:`, error);
+        throw new Error("Failed to restore person");
+    }
+}
+
+// Fetch deleted people
+export async function fetchDeletedPeople(limit: number = 50) {
+    try {
+        const response = await apiClient.get(
+            `/people?deleted_at=not.is.null&select=*&order=deleted_at.desc&limit=${limit}`
+        );
+        const raw = normalizeApiData(response);
+
+        if (typeof raw === "string") {
+            throw new Error("[people] Non-JSON response.");
+        }
+
+        return z.array(Person).parse(raw);
+    } catch (error) {
+        logger.error("Failed to fetch deleted people", { error }, 'DeletedPeople');
+        throw new Error("Failed to fetch deleted people");
     }
 }
 
@@ -353,6 +393,7 @@ export async function searchPeople(q: string, companyId?: string) {
         const queryParams = new URLSearchParams();
         queryParams.append('select', 'id,first_name,last_name,title');
         queryParams.append('limit', '100');
+        queryParams.append('deleted_at', 'is.null');
 
         // Add company filter if provided
         if (companyId) {
@@ -393,7 +434,7 @@ export async function searchPeople(q: string, companyId?: string) {
             title: person.title
         })) as Array<{ id: string; firstName: string; lastName: string; title?: string }>;
     } catch (error) {
-        console.error("Failed to search people:", error);
+        logger.error("Failed to search people:", error);
         throw new Error("Failed to search people");
     }
 }
@@ -486,5 +527,24 @@ export function useDeletePerson() {
             qc.invalidateQueries({ queryKey: qk.personDocuments(id) });
             qc.invalidateQueries({ queryKey: qk.personActivities(id) });
         }
+    });
+}
+
+export function useRestorePerson() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: restorePerson,
+        onSuccess: (_, id) => {
+            qc.invalidateQueries({ queryKey: qk.people() });
+            qc.invalidateQueries({ queryKey: qk.companies() });
+            qc.invalidateQueries({ queryKey: qk.person(id) });
+        }
+    });
+}
+
+export function useDeletedPeople() {
+    return useQuery({
+        queryKey: ['deleted-people'],
+        queryFn: () => fetchDeletedPeople(50)
     });
 }

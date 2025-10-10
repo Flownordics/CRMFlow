@@ -104,6 +104,7 @@ create table if not exists public.companies (
   country text,
   industry text,
   website text,
+  do_not_call boolean not null default false,
   created_by uuid, -- auth.users.id (nullable if no RLS)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -115,6 +116,7 @@ for each row execute procedure set_updated_at();
 create index if not exists idx_companies_name on public.companies (lower(name));
 create index if not exists idx_companies_domain on public.companies (lower(domain));
 create index if not exists idx_companies_country on public.companies (country);
+create index if not exists idx_companies_do_not_call on public.companies (do_not_call);
 create index if not exists idx_companies_updated_at on public.companies (updated_at desc);
 
 create table if not exists public.people (

@@ -12,6 +12,7 @@ import { type WorkspaceSettings } from "@/services/settings";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 interface BrandingFormProps {
     settings: WorkspaceSettings | null;
@@ -46,7 +47,7 @@ export function BrandingForm({ settings }: BrandingFormProps) {
             setIsEditing(false);
             form.reset(data);
         } catch (error) {
-            console.error("Failed to update branding settings:", error);
+            logger.error("Failed to update branding settings:", error);
         }
     };
 
@@ -118,7 +119,7 @@ export function BrandingForm({ settings }: BrandingFormProps) {
                 toast.error("Failed to send test email");
             }
         } catch (error) {
-            console.error("Error sending test email:", error);
+            logger.error("Error sending test email:", error);
             toast.error("Failed to send test email");
         } finally {
             setIsSendingTest(false);

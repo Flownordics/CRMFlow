@@ -21,6 +21,7 @@ import { useDealsBoardData } from "@/hooks/useDealsBoardData";
 import { isIdempotent, markIdempotent, clearIdempotent, generateAutomationKey } from "@/services/idempotency";
 import { logActivity } from "@/services/activity";
 import { useRef } from "react";
+import { logger } from '@/lib/logger';
 
 interface LineItem {
   unitMinor: number;
@@ -64,7 +65,7 @@ export default function DealsBoard() {
   });
 
   // Debug logging
-  console.log("[DealsBoard] Data loaded:", {
+  logger.debug("[DealsBoard] Data loaded:", {
     dealsCount: deals?.length || 0,
     stagesCount: stages?.length || 0,
     stages: stages?.map(s => ({ id: s.id, name: s.name })),
@@ -126,7 +127,7 @@ export default function DealsBoard() {
 
   // Handle stage changes and trigger automation
   const handleStageChange = ({ deal, fromStageId, toStageId, toStageName }: { deal: DealData; fromStageId: string; toStageId: string; toStageName: string }) => {
-    console.log("[DealsBoard] handleStageChange called:", {
+    logger.debug("[DealsBoard] handleStageChange called:", {
       dealId: deal.id,
       dealTitle: deal.title,
       fromStageId,
@@ -141,25 +142,25 @@ export default function DealsBoard() {
     if (lastAutomationRef.current &&
       lastAutomationRef.current.id === deal.id &&
       now - lastAutomationRef.current.at < 1000) {
-      console.log("[DealsBoard] Idempotency guard triggered, skipping");
+      logger.debug("[DealsBoard] Idempotency guard triggered, skipping");
       return;
     }
 
     const name = (toStageName ?? '').toLowerCase();
-    console.log("[DealsBoard] Stage name check:", { name, toStageName });
+    logger.debug("[DealsBoard] Stage name check:", { name, toStageName });
 
     // Check for automation triggers
     const isProposal = ["proposal", "tilbud", "quote", "quotation", "offer"].includes(name);
     const isWon = ["won", "vundet", "closed won", "closed", "sold", "completed"].includes(name);
 
-    console.log("[DealsBoard] Automation check:", { isProposal, isWon, name });
+    logger.debug("[DealsBoard] Automation check:", { isProposal, isWon, name });
 
     if (isProposal || isWon) {
-      console.log("[DealsBoard] Automation trigger detected!");
+      logger.debug("[DealsBoard] Automation trigger detected!");
 
       // Check if deal has a company (required for documents)
       if (!deal.companyId) {
-        console.log("[DealsBoard] No company ID, showing error");
+        logger.debug("[DealsBoard] No company ID, showing error");
         toastBus.emit({
           variant: "destructive",
           title: t("missing_company"),
@@ -174,7 +175,7 @@ export default function DealsBoard() {
 
       // Check if this automation was already triggered recently
       if (isIdempotent(automationKey, 2 * 60 * 1000)) { // 2 minutes
-        console.log(`[DealsBoard] Automation ${automationType} for deal ${deal.id} already triggered recently, skipping`);
+        logger.debug(`[DealsBoard] Automation ${automationType} for deal ${deal.id} already triggered recently, skipping`);
         return;
       }
 
@@ -182,7 +183,7 @@ export default function DealsBoard() {
       markIdempotent(automationKey, 2 * 60 * 1000);
       lastAutomationRef.current = { id: deal.id, at: now };
 
-      console.log("[DealsBoard] Setting automation state:", { type: automationType, dealId: deal.id });
+      logger.debug("[DealsBoard] Setting automation state:", { type: automationType, dealId: deal.id });
 
       // Set automation state
       if (isProposal) {
@@ -191,7 +192,7 @@ export default function DealsBoard() {
         setAutomation({ type: 'order', deal });
       }
     } else {
-      console.log("[DealsBoard] No automation trigger for stage:", name);
+      logger.debug("[DealsBoard] No automation trigger for stage:", name);
     }
   };
 
@@ -250,14 +251,14 @@ export default function DealsBoard() {
       if (m[d.stage_id]) {
         m[d.stage_id].push(dealData);
       } else {
-        console.warn(`Deal ${d.id} has invalid stage_id: ${d.stage_id}. This deal belongs to a different pipeline and will not be displayed.`);
+        logger.warn(`Deal ${d.id} has invalid stage_id: ${d.stage_id}. This deal belongs to a different pipeline and will not be displayed.`);
         skippedDeals.push({ id: d.id, stage_id: d.stage_id, title: d.title });
         // Optionally, we could add it to a special "Other Pipeline" section
         // For now, we'll just skip it to maintain the current behavior
       }
     }
 
-    console.log("[DealsBoard] Map created:", {
+    logger.debug("[DealsBoard] Map created:", {
       stageKeys: Object.keys(m),
       stageCounts: Object.fromEntries(
         Object.entries(m).map(([stageId, deals]) => [stageId, deals.length])
@@ -266,7 +267,7 @@ export default function DealsBoard() {
     });
 
     if (skippedDeals.length > 0) {
-      console.warn(`[DealsBoard] Skipped ${skippedDeals.length} deals from other pipelines:`, skippedDeals);
+      logger.warn(`[DealsBoard] Skipped ${skippedDeals.length} deals from other pipelines:`, skippedDeals);
     }
 
     return m;
@@ -355,7 +356,7 @@ export default function DealsBoard() {
       {/* Automation Modals */}
       {automation && (
         <>
-          {console.log("[DealsBoard] Rendering automation modal:", automation)}
+          {logger.debug("[DealsBoard] Rendering automation modal:", automation)}
           {automation.type === 'quote' && (
             <CreateQuoteModal
               open={true}

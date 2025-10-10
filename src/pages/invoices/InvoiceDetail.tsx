@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useState } from "react";
-import { useInvoice } from "@/services/invoices";
+import { useInvoice, useUpdateInvoice, useUpsertInvoiceLine, useDeleteInvoiceLine } from "@/services/invoices";
 import { formatMoneyMinor } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,24 +24,22 @@ import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 import { AddPaymentModal } from "@/components/invoices/AddPaymentModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OpenPdfButton } from "@/components/common/OpenPdfButton";
+import { useToast } from "@/hooks/use-toast";
+import { logger } from '@/lib/logger';
 
 export default function InvoiceDetail() {
   const { id = "" } = useParams();
+  const { toast } = useToast();
   const { data: invoice, isLoading, error } = useInvoice(id);
   const [creating, setCreating] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
-  // Mock line items - TODO: Replace with actual data
-  const mockLines = [
-    {
-      id: "1",
-      description: "Product A",
-      qty: 2,
-      unitMinor: 7500, // $75.00
-      taxRatePct: 25,
-      discountPct: 0,
-    },
-  ];
+  // Mutations
+  const updateInvoiceMutation = useUpdateInvoice();
+  const upsertLineMutation = useUpsertInvoiceLine(id);
+  const deleteLineMutation = useDeleteInvoiceLine(id);
+
+  const lines = invoice?.lines || [];
 
 
 
@@ -181,9 +179,27 @@ export default function InvoiceDetail() {
                     ? new Date(invoice.due_date).toISOString().split("T")[0]
                     : ""
                 }
-                onBlur={(e) => {
-                  // TODO: Implement update
-                  console.log("Update due date:", e.target.value);
+                onBlur={async (e) => {
+                  const newDate = e.target.value;
+                  if (!newDate) return;
+                  
+                  try {
+                    await updateInvoiceMutation.mutateAsync({
+                      id: invoice.id,
+                      payload: { due_date: newDate }
+                    });
+                    toast({
+                      title: "Date Updated",
+                      description: "Due date has been updated",
+                    });
+                  } catch (error) {
+                    logger.error("Failed to update due date:", error);
+                    toast({
+                      title: "Update Failed",
+                      description: "Failed to update due date",
+                      variant: "destructive"
+                    });
+                  }
                 }}
               />
             }
@@ -193,9 +209,24 @@ export default function InvoiceDetail() {
             control={
               <Select
                 defaultValue={invoice.status}
-                onValueChange={(v) => {
-                  // TODO: Implement update
-                  console.log("Update status:", v);
+                onValueChange={async (v) => {
+                  try {
+                    await updateInvoiceMutation.mutateAsync({
+                      id: invoice.id,
+                      payload: { status: v as Invoice["status"] }
+                    });
+                    toast({
+                      title: "Status Updated",
+                      description: `Invoice status changed to ${v}`,
+                    });
+                  } catch (error) {
+                    logger.error("Failed to update invoice status:", error);
+                    toast({
+                      title: "Update Failed",
+                      description: "Failed to update invoice status",
+                      variant: "destructive"
+                    });
+                  }
                 }}
               >
                 <SelectTrigger>
@@ -231,13 +262,34 @@ export default function InvoiceDetail() {
         toolbar={
           <>
             <div className="text-sm text-muted-foreground">
-              {mockLines.length} items
+              {lines.length} items
             </div>
             <div className="flex-1" />
             <Button
-              onClick={() => {
-                // TODO: Implement add line
-                console.log("Add line");
+              onClick={async () => {
+                setCreating(true);
+                try {
+                  await upsertLineMutation.mutateAsync({
+                    description: "New Item",
+                    qty: 1,
+                    unit_minor: 0,
+                    tax_rate_pct: 25,
+                    discount_pct: 0,
+                  });
+                  toast({
+                    title: "Line Added",
+                    description: "New line item has been added",
+                  });
+                } catch (error) {
+                  logger.error("Failed to add line:", error);
+                  toast({
+                    title: "Failed to Add Line",
+                    description: "Could not add line item. Please try again.",
+                    variant: "destructive"
+                  });
+                } finally {
+                  setCreating(false);
+                }
               }}
               disabled={creating}
             >
@@ -253,17 +305,46 @@ export default function InvoiceDetail() {
       >
         <LineItemsTable
           currency={invoice.currency}
-          lines={mockLines}
-          onPatch={(lineId, patch) => {
-            // TODO: Implement update
-            console.log("Update line:", lineId, patch);
+          lines={lines}
+          onPatch={async (lineId, patch) => {
+            try {
+              await upsertLineMutation.mutateAsync({
+                id: lineId,
+                ...patch,
+              });
+              toast({
+                title: "Line Updated",
+                description: "Line item has been updated",
+              });
+            } catch (error) {
+              logger.error("Failed to update line:", error);
+              toast({
+                title: "Update Failed",
+                description: "Could not update line item",
+                variant: "destructive"
+              });
+            }
           }}
-          onDelete={(lineId) => {
-            // TODO: Implement delete
-            console.log("Delete line:", lineId);
+          onDelete={async (lineId) => {
+            if (!window.confirm("Delete this line item?")) return;
+            
+            try {
+              await deleteLineMutation.mutateAsync(lineId);
+              toast({
+                title: "Line Deleted",
+                description: "Line item has been deleted",
+              });
+            } catch (error) {
+              logger.error("Failed to delete line:", error);
+              toast({
+                title: "Delete Failed",
+                description: "Could not delete line item",
+                variant: "destructive"
+              });
+            }
           }}
         />
-        {mockLines.length === 0 && (
+        {lines.length === 0 && (
           <div className="p-4 text-center text-muted-foreground">
             No lines yet
           </div>

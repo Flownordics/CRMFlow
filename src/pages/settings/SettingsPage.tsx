@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkspaceIntegrationsForm } from '@/components/settings/WorkspaceIntegrationsForm';
 import { ConnectedAccounts } from '@/components/settings/ConnectedAccounts';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export function SettingsPage() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -19,13 +20,13 @@ export function SettingsPage() {
         .single();
 
       if (error) {
-        console.error('Failed to get workspace ID:', error);
+        logger.error('Failed to get workspace ID:', error);
         return;
       }
 
       setWorkspaceId(workspaceSettings.id);
     } catch (error) {
-      console.error('Error getting workspace ID:', error);
+      logger.error('Error getting workspace ID:', error);
     } finally {
       setLoading(false);
     }

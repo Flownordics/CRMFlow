@@ -16,6 +16,7 @@ import { FormRow } from "@/components/forms/FormRow";
 import { useI18n } from "@/lib/i18n";
 import { Mail, Building2 } from "lucide-react";
 import { Company, companyUpdateSchema } from "@/lib/schemas/company";
+import { logger } from '@/lib/logger';
 
 interface EditCompanyModalProps {
   open: boolean;
@@ -74,7 +75,7 @@ export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyMod
 
       onOpenChange(false);
     } catch (error) {
-      console.error("Failed to update company:", error);
+      logger.error("Failed to update company:", error);
       toastBus.emit({
         title: t("common.error"),
         description: t("companies.updateError"),

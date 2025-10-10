@@ -4,6 +4,7 @@ import { qk } from "@/lib/queryKeys";
 import { z } from "zod";
 import { USE_MOCKS } from "@/lib/debug";
 import { toastBus } from "@/lib/toastBus";
+import { logger } from '@/lib/logger';
 
 // Document schema matching the database
 export const Document = z.object({
@@ -104,7 +105,7 @@ export async function listDocuments(params: {
 
         return z.array(Document).parse(raw);
     } catch (error) {
-        console.error("Failed to fetch documents:", error);
+        logger.error("Failed to fetch documents:", error);
         throw new Error("Failed to fetch documents");
     }
 }
@@ -129,7 +130,7 @@ export async function getPresignedUpload({ fileName, mimeType }: { fileName: str
             path: response.data.path,
         };
     } catch (error) {
-        console.error("Failed to get presigned upload URL:", error);
+        logger.error("Failed to get presigned upload URL:", error);
         throw new Error("Failed to get upload URL");
     }
 }
@@ -193,7 +194,7 @@ export async function uploadDocument(file: File, meta: {
         const response = await apiClient.post("/documents", documentData);
         return Document.parse(response.data || response);
     } catch (error) {
-        console.error("Failed to upload document:", error);
+        logger.error("Failed to upload document:", error);
         throw new Error("Failed to upload document");
     }
 }
@@ -220,7 +221,7 @@ export async function getDownloadUrl(id: string) {
             filename: raw.filename,
         };
     } catch (error) {
-        console.error("Failed to get download URL:", error);
+        logger.error("Failed to get download URL:", error);
         throw new Error("Failed to get download URL");
     }
 }
@@ -235,7 +236,7 @@ export async function deleteDocument(id: string) {
         await apiClient.delete(`/documents?id=eq.${id}`);
         return true;
     } catch (error) {
-        console.error("Failed to delete document:", error);
+        logger.error("Failed to delete document:", error);
         throw new Error("Failed to delete document");
     }
 }
@@ -286,7 +287,7 @@ export async function updateDocumentRelations(id: string, relations: {
 
         return Document.parse(documentData);
     } catch (error) {
-        console.error("Failed to update document relations:", error);
+        logger.error("Failed to update document relations:", error);
         throw new Error("Failed to update document relations");
     }
 }

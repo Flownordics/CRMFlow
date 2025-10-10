@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 // ===== SCHEMAS =====
 
@@ -52,7 +53,7 @@ export async function listStages(pipelineId?: string): Promise<Stage[]> {
 
         return z.array(Stage).parse(data);
     } catch (error) {
-        console.error("Failed to fetch stages:", error);
+        logger.error("Failed to fetch stages:", error);
         throw error;
     }
 }
@@ -73,7 +74,7 @@ export async function listStageProbabilities(): Promise<StageProbability[]> {
 
         return z.array(StageProbability).parse(data);
     } catch (error) {
-        console.error("Failed to fetch stage probabilities:", error);
+        logger.error("Failed to fetch stage probabilities:", error);
         throw error;
     }
 }
@@ -98,7 +99,7 @@ export async function upsertStageProbability({ stageId, probability }: { stageId
 
         return StageProbabilityUpsert.parse(data);
     } catch (error) {
-        console.error("Failed to upsert stage probability:", error);
+        logger.error("Failed to upsert stage probability:", error);
         throw error;
     }
 }

@@ -19,6 +19,7 @@ import { toastBus } from "@/lib/toastBus";
 import { useI18n } from "@/lib/i18n";
 import { Invoice } from "@/services/invoices";
 import { Mail, AlertCircle, CheckCircle } from "lucide-react";
+import { logger } from '@/lib/logger';
 
 interface SendInvoiceDialogProps {
     invoice: Invoice;
@@ -106,7 +107,7 @@ Best regards`);
                 setError(result.error || 'Failed to send email');
             }
         } catch (error: any) {
-            console.error('Failed to send invoice email:', error);
+            logger.error('Failed to send invoice email:', error);
 
             if (error.name === 'EmailNotConnectedError') {
                 setError('EMAIL_NOT_CONNECTED');
@@ -208,7 +209,7 @@ Best regards`);
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                        console.log('Invoice Email Error Details:', {
+                                        logger.debug('Invoice Email Error Details:', {
                                             error,
                                             invoice: invoice.id,
                                             to: to.trim(),

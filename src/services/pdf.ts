@@ -1,6 +1,7 @@
 import { generatePDF as generatePDFFromService, getPdfUrl } from "@/services/PDFService";
 import { logActivity } from "@/services/activity";
 import { toastBus } from "@/lib/toastBus";
+import { logger } from '@/lib/logger';
 
 // PDF types
 export type PDFType = 'quote' | 'order' | 'invoice';
@@ -18,12 +19,12 @@ export async function generateQuotePdf(quoteId: string): Promise<{ url: string }
                 meta: { entity: { type: 'quote', id: quoteId } }
             });
         } catch (activityError) {
-            console.warn('Failed to log PDF generation activity:', activityError);
+            logger.warn('Failed to log PDF generation activity:', activityError);
         }
 
         return { url: 'success' }; // The service handles opening the PDF
     } catch (error) {
-        console.error('Failed to generate quote PDF:', error);
+        logger.error('Failed to generate quote PDF:', error);
         throw error;
     }
 }
@@ -41,12 +42,12 @@ export async function generateOrderPdf(orderId: string): Promise<{ url: string }
                 meta: { entity: { type: 'order', id: orderId } }
             });
         } catch (activityError) {
-            console.warn('Failed to log PDF generation activity:', activityError);
+            logger.warn('Failed to log PDF generation activity:', activityError);
         }
 
         return { url: 'success' }; // The service handles opening the PDF
     } catch (error) {
-        console.error('Failed to generate order PDF:', error);
+        logger.error('Failed to generate order PDF:', error);
         throw error;
     }
 }
@@ -64,12 +65,12 @@ export async function generateInvoicePdf(invoiceId: string): Promise<{ url: stri
                 meta: { entity: { type: 'invoice', id: invoiceId } }
             });
         } catch (activityError) {
-            console.warn('Failed to log PDF generation activity:', activityError);
+            logger.warn('Failed to log PDF generation activity:', activityError);
         }
 
         return { url: 'success' }; // The service handles opening the PDF
     } catch (error) {
-        console.error('Failed to generate invoice PDF:', error);
+        logger.error('Failed to generate invoice PDF:', error);
         throw error;
     }
 }
@@ -90,7 +91,7 @@ export function openPdf(url: string, filename?: string): void {
             document.body.removeChild(link);
         }
     } catch (error) {
-        console.error('Failed to open PDF:', error);
+        logger.error('Failed to open PDF:', error);
         throw error;
     }
 }
@@ -101,7 +102,7 @@ export async function getQuotePdfUrl(quoteId: string): Promise<string> {
         const pdfResponse = await getPdfUrl('quote', quoteId);
         return pdfResponse.url;
     } catch (error) {
-        console.error('Failed to get quote PDF URL:', error);
+        logger.error('Failed to get quote PDF URL:', error);
         throw error;
     }
 }
@@ -112,7 +113,7 @@ export async function getOrderPdfUrl(orderId: string): Promise<string> {
         const pdfResponse = await getPdfUrl('order', orderId);
         return pdfResponse.url;
     } catch (error) {
-        console.error('Failed to get order PDF URL:', error);
+        logger.error('Failed to get order PDF URL:', error);
         throw error;
     }
 }
@@ -123,7 +124,7 @@ export async function getInvoicePdfUrl(invoiceId: string): Promise<string> {
         const pdfResponse = await getPdfUrl('invoice', invoiceId);
         return pdfResponse.url;
     } catch (error) {
-        console.error('Failed to get invoice PDF URL:', error);
+        logger.error('Failed to get invoice PDF URL:', error);
         throw error;
     }
 }

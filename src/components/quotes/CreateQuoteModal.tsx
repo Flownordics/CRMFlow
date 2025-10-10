@@ -31,6 +31,7 @@ import { PersonModal } from "@/components/people/PersonModal";
 import { useCreateCompany } from "@/services/companies";
 import { useCreatePerson } from "@/services/people";
 import { CalendarIcon, Plus, Trash2, FileText, Percent } from "lucide-react";
+import { logger } from '@/lib/logger';
 
 interface CreateQuoteModalProps {
     open: boolean;
@@ -181,7 +182,7 @@ export function CreateQuoteModal({
         if (open) {
             if (defaultQuote) {
                 // Prefill with existing quote data
-                console.log("[CreateQuoteModal] Prefilling with existing quote:", defaultQuote);
+                logger.debug("[CreateQuoteModal] Prefilling with existing quote:", defaultQuote);
                 form.reset({
                     companyId: defaultQuote.company_id,
                     contactId: defaultQuote.contact_id || "",
@@ -274,7 +275,7 @@ export function CreateQuoteModal({
                     });
                 }
             } catch (error) {
-                console.error("Failed to log activity:", error);
+                logger.error("Failed to log activity:", error);
             }
 
             // Call onSuccess callback if provided (for automation)
@@ -287,7 +288,7 @@ export function CreateQuoteModal({
                 navigate(`/quotes/${quote.id}`);
             }
         } catch (error) {
-            console.error("Failed to create quote:", error);
+            logger.error("Failed to create quote:", error);
             toastBus.emit({
                 title: "Failed to create quote",
                 description: "Please try again",

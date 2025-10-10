@@ -25,6 +25,10 @@ export const companyReadSchema = z.object({
   website: websiteValidator.nullable().optional(),
   createdAt: z.string().optional().nullable(),
   updatedAt: z.string().optional().nullable(),
+  // Activity tracking fields
+  lastActivityAt: z.string().nullable().optional(),
+  activityStatus: z.enum(['green', 'yellow', 'red']).nullable().optional(),
+  doNotCall: z.boolean().optional().default(false),
 });
 
 export const companyCreateSchema = z.object({
@@ -38,6 +42,7 @@ export const companyCreateSchema = z.object({
   country: z.string().optional().nullable(),
   industry: z.string().optional().nullable(),
   website: websiteValidator.optional().nullable().or(z.literal("")),
+  doNotCall: z.boolean().optional(),
 });
 
 export const companyUpdateSchema = companyCreateSchema.partial();

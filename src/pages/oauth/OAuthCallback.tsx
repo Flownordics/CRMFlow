@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toastBus } from "@/lib/toastBus";
+import { logger } from '@/lib/logger';
 
 export default function OAuthCallback() {
     const [params] = useSearchParams();
@@ -37,9 +38,9 @@ export default function OAuthCallback() {
                 });
 
                 if (exchangeError) {
-                    console.error('Exchange error details:', exchangeError);
-                    console.error('Exchange error context:', exchangeError.context);
-                    console.error('Exchange error message:', exchangeError.message);
+                    logger.error('Exchange error details:', exchangeError);
+                    logger.error('Exchange error context:', exchangeError.context);
+                    logger.error('Exchange error message:', exchangeError.message);
 
                     // Try to get more details from the error response
                     let errorMessage = exchangeError.message || 'Failed to exchange OAuth code';
@@ -50,7 +51,7 @@ export default function OAuthCallback() {
                             if (exchangeError.context.body instanceof ReadableStream) {
                                 const response = new Response(exchangeError.context.body);
                                 const text = await response.text();
-                                console.log('Error response text:', text);
+                                logger.debug('Error response text:', text);
                                 const errorBody = JSON.parse(text);
                                 errorMessage = errorBody.error || errorMessage;
                             } else {
@@ -58,7 +59,7 @@ export default function OAuthCallback() {
                                 errorMessage = errorBody.error || errorMessage;
                             }
                         } catch (e) {
-                            console.log('Could not parse error body:', e);
+                            logger.debug('Could not parse error body:', e);
                         }
                     }
 
@@ -66,7 +67,7 @@ export default function OAuthCallback() {
                 }
 
                 if (!data?.success) {
-                    console.error('Exchange response:', data);
+                    logger.error('Exchange response:', data);
                     throw new Error(data?.error || 'OAuth exchange failed');
                 }
 
@@ -80,7 +81,7 @@ export default function OAuthCallback() {
                 navigate("/settings?tab=integrations", { replace: true });
 
             } catch (error) {
-                console.error('OAuth callback error:', error);
+                logger.error('OAuth callback error:', error);
 
                 // Show error message
                 toastBus.emit({

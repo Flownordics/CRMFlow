@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { getWorkspaceIntegrations, upsertWorkspaceIntegration, WorkspaceIntegration } from '@/services/integrations';
+import { logger } from '@/lib/logger';
 
 interface WorkspaceIntegrationsFormProps {
   workspaceId: string;
@@ -62,7 +63,7 @@ export function WorkspaceIntegrationsForm({ workspaceId }: WorkspaceIntegrations
         });
       }
     } catch (error) {
-      console.error('Failed to load integrations:', error);
+      logger.error('Failed to load integrations:', error);
       toast({
         title: 'Error',
         description: 'Failed to load workspace integrations',
@@ -97,7 +98,7 @@ export function WorkspaceIntegrationsForm({ workspaceId }: WorkspaceIntegrations
       // Reload integrations to get updated data
       await loadIntegrations();
     } catch (error) {
-      console.error('Failed to save integration:', error);
+      logger.error('Failed to save integration:', error);
       toast({
         title: 'Error',
         description: 'Failed to save integration',

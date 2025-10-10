@@ -3,6 +3,7 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "./dealStageAutomation";
+import { logger } from '@/lib/logger';
 
 // Adapter functions for DB ↔ UI conversion
 const lineDbToUi = (l: any) => ({
@@ -119,6 +120,9 @@ export async function fetchQuotes(params: {
     const offset = (page - 1) * limit;
     queryParams.append('offset', offset.toString());
     queryParams.append('limit', limit.toString());
+    
+    // Filter out soft-deleted records
+    queryParams.append('deleted_at', 'is.null');
 
     // Supabase uses 'search' for text search, not 'q'
     if (q) queryParams.append('search', q);
@@ -167,7 +171,7 @@ export async function fetchQuotes(params: {
       total
     };
   } catch (error) {
-    console.error("Failed to fetch quotes:", error);
+    logger.error("Failed to fetch quotes:", error);
     throw new Error("Failed to fetch quotes");
   }
 }
@@ -175,7 +179,7 @@ export async function fetchQuotes(params: {
 // Get counts for all quote statuses (excluding accepted quotes since they become orders)
 export async function fetchQuoteStatusCounts(): Promise<Record<string, number>> {
   try {
-    const response = await apiClient.get('/quotes?select=status');
+    const response = await apiClient.get('/quotes?select=status&deleted_at=is.null');
     const raw = response.data;
 
     if (typeof raw === "string") {
@@ -205,7 +209,7 @@ export async function fetchQuoteStatusCounts(): Promise<Record<string, number>> 
 
     return counts;
   } catch (error) {
-    console.error("Failed to fetch quote status counts:", error);
+    logger.error("Failed to fetch quote status counts:", error);
     return {
       draft: 0,
       sent: 0,
@@ -217,59 +221,49 @@ export async function fetchQuoteStatusCounts(): Promise<Record<string, number>> 
 
 export async function fetchQuote(id: string): Promise<QuoteUI> {
   try {
-    console.log(`[fetchQuote] Fetching quote with ID: ${id}`);
-
     // Fetch the quote first
-    const response = await apiClient.get(`/quotes?id=eq.${id}`);
-
-    console.log("[fetchQuote] API Response:", {
-      status: response.status,
-      data: response.data,
-      dataLength: response.data?.length,
-      isArray: Array.isArray(response.data)
-    });
+    const response = await apiClient.get(`/quotes?id=eq.${id}&deleted_at=is.null`);
 
     if (response.data && Array.isArray(response.data) && response.data.length > 0) {
       const quote = response.data[0];
 
-      console.log("[fetchQuote] Raw quote data:", quote);
+      // Process quote data
 
       // Fetch line items for this quote
       try {
-        console.log("[fetchQuote] Fetching line items for quote:", quote.id);
+        // Fetch line items for this quote
         const lineItemsUrl = `/line_items?parent_type=eq.quote&parent_id=eq.${quote.id}&order=position.asc`;
         const linesResponse = await apiClient.get(lineItemsUrl);
 
         if (linesResponse.data && Array.isArray(linesResponse.data)) {
-          console.log("[fetchQuote] Lines fetched:", linesResponse.data);
+          // Process line items
           quote.lines = linesResponse.data;
         } else {
-          console.log("[fetchQuote] No line items found");
+          // No line items found
           quote.lines = [];
         }
       } catch (linesError: any) {
-        console.log("[fetchQuote] Failed to fetch line items:", linesError.message);
+        // Failed to fetch line items, using empty array
         quote.lines = [];
       }
 
-      console.log("[fetchQuote] Quote after processing lines:", quote);
+      // Return processed quote
 
       try {
         // Convert DB format to UI format using adapter
         const uiQuote = quoteDbToUi(quote);
-        console.log("[fetchQuote] Successfully converted to UI format:", uiQuote);
+        // Successfully converted to UI format
         return uiQuote as QuoteUI;
       } catch (parseError: any) {
-        console.error("[fetchQuote] Conversion error:", parseError);
-        console.error("[fetchQuote] Quote that failed to convert:", quote);
+        // Conversion error occurred
         throw new Error(`Failed to convert quote: ${parseError.message}`);
       }
     }
 
-    console.log("[fetchQuote] No quote found in response");
+    // No quote found in response
     throw new Error(`Quote with ID ${id} not found`);
   } catch (error: any) {
-    console.error("[fetchQuote] Failed to fetch quote:", error.message);
+    // Failed to fetch quote
     throw new Error(`Failed to fetch quote: ${error.message}`);
   }
 }
@@ -292,7 +286,7 @@ export async function updateQuoteHeader(
 
   if (!quoteData) {
     // If no data returned (204 response), fetch the updated quote
-    console.log("[updateQuoteHeader] No data in response, fetching updated quote");
+    logger.debug("[updateQuoteHeader] No data in response, fetching updated quote");
     return await fetchQuote(id);
   }
 
@@ -375,7 +369,7 @@ export async function createQuote(payload: {
     discount_pct: number;
   }>;
 }): Promise<QuoteUI> {
-  console.log("[createQuote] Starting createQuote with payload:", {
+  logger.debug("[createQuote] Starting createQuote with payload:", {
     ...payload,
     linesCount: payload.lines?.length || 0,
     lines: payload.lines?.map(l => ({ description: l.description, qty: l.qty, unit_minor: l.unit_minor }))
@@ -389,21 +383,10 @@ export async function createQuote(payload: {
       delete quotePayload.number;
     }
 
-    console.log("[createQuote] Sending payload:", quotePayload);
-
     // Create the quote first (without line items)
     const response = await apiClient.post("/quotes", quotePayload);
 
-    console.log("[createQuote] API Response:", {
-      status: response.status,
-      statusText: response.statusText,
-      data: response.data,
-      headers: response.headers,
-      location: response.headers?.location,
-      hasData: !!response.data,
-      hasLocation: !!response.headers?.location,
-      payloadSent: quotePayload
-    });
+    // Process API response
 
     let quote: Quote | undefined;
 
@@ -423,45 +406,45 @@ export async function createQuote(payload: {
         }
       } else {
         // Supabase returns 201 with empty body - we need to find the created quote
-        console.log("[createQuote] 201 response with no data, attempting to find created quote...");
+        logger.debug("[createQuote] 201 response with no data, attempting to find created quote...");
 
         // Try to find the quote by deal_id and recent timestamp
         if (quotePayload.deal_id) {
           try {
-            console.log("[createQuote] Searching for quote by deal_id:", quotePayload.deal_id);
+            logger.debug("[createQuote] Searching for quote by deal_id:", quotePayload.deal_id);
 
             // Get the most recent quote for this deal
-            const searchResponse = await apiClient.get(`/quotes?deal_id=eq.${quotePayload.deal_id}&order=created_at.desc&limit=1`);
+            const searchResponse = await apiClient.get(`/quotes?deal_id=eq.${quotePayload.deal_id}&deleted_at=is.null&order=created_at.desc&limit=1`);
 
             if (searchResponse.data && searchResponse.data.length > 0) {
               const foundQuote = searchResponse.data[0];
-              console.log("[createQuote] Found created quote:", foundQuote.id);
+              logger.debug("[createQuote] Found created quote:", foundQuote.id);
               quote = Quote.parse(foundQuote);
             } else {
-              console.log("[createQuote] No quote found for deal_id:", quotePayload.deal_id);
+              logger.debug("[createQuote] No quote found for deal_id:", quotePayload.deal_id);
             }
           } catch (searchError) {
-            console.log("[createQuote] Error searching for quote:", searchError);
+            logger.debug("[createQuote] Error searching for quote:", searchError);
           }
         }
 
         // If still no quote, try to find by company_id and recent timestamp
         if (!quote && quotePayload.company_id) {
           try {
-            console.log("[createQuote] Searching for quote by company_id:", quotePayload.company_id);
+            logger.debug("[createQuote] Searching for quote by company_id:", quotePayload.company_id);
 
             // Get the most recent quote for this company
-            const searchResponse = await apiClient.get(`/quotes?company_id=eq.${quotePayload.company_id}&order=created_at.desc&limit=1`);
+            const searchResponse = await apiClient.get(`/quotes?company_id=eq.${quotePayload.company_id}&deleted_at=is.null&order=created_at.desc&limit=1`);
 
             if (searchResponse.data && searchResponse.data.length > 0) {
               const foundQuote = searchResponse.data[0];
-              console.log("[createQuote] Found created quote:", foundQuote.id);
+              logger.debug("[createQuote] Found created quote:", foundQuote.id);
               quote = Quote.parse(foundQuote);
             } else {
-              console.log("[createQuote] No quote found for company_id:", quotePayload.company_id);
+              logger.debug("[createQuote] No quote found for company_id:", quotePayload.company_id);
             }
           } catch (searchError) {
-            console.log("[createQuote] Error searching for quote:", searchError);
+            logger.debug("[createQuote] Error searching for quote:", searchError);
           }
         }
 
@@ -482,7 +465,7 @@ export async function createQuote(payload: {
 
     // Always create line items if we have them (all quotes are now real)
     if (lines && lines.length > 0) {
-      console.log("[createQuote] Creating line items for quote:", quote.id);
+      logger.debug("[createQuote] Creating line items for quote:", quote.id);
 
       for (const line of lines) {
         try {
@@ -497,11 +480,11 @@ export async function createQuote(payload: {
             position: lines.indexOf(line), // Add position for ordering
           };
 
-          console.log("[createQuote] Creating line item:", linePayload);
+          logger.debug("[createQuote] Creating line item:", linePayload);
           await apiClient.post(`/line_items`, linePayload);
-          console.log("[createQuote] Line item created successfully");
+          logger.debug("[createQuote] Line item created successfully");
         } catch (lineError: any) {
-          console.error("[createQuote] Failed to create line item:", lineError);
+          logger.error("[createQuote] Failed to create line item:", lineError);
           // Continue with other lines even if one fails
         }
       }
@@ -514,7 +497,7 @@ export async function createQuote(payload: {
     // Return the quote without lines if it's temporary or no lines
     return quoteDbToUi(quote) as QuoteUI;
   } catch (error) {
-    console.error("Failed to create quote:", error);
+    logger.error("Failed to create quote:", error);
     throw new Error("Failed to create quote");
   }
 }
@@ -561,7 +544,7 @@ export function useUpdateQuoteHeader(id: string) {
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
 
       // Check if status changed to 'accepted' and trigger order conversion
-      console.log("[useUpdateQuoteHeader] Status update successful, patch:", patch);
+      logger.debug("[useUpdateQuoteHeader] Status update successful, patch:", patch);
 
       // Trigger deal stage automation for quote status changes (only for declined)
       // Note: quote acceptance is handled by the order conversion flow below
@@ -569,12 +552,12 @@ export function useUpdateQuoteHeader(id: string) {
         try {
           await triggerDealStageAutomation('quote_declined', updatedQuote.deal_id, updatedQuote);
         } catch (e) {
-          console.warn("[useUpdateQuoteHeader] Deal stage automation failed:", e);
+          logger.warn("[useUpdateQuoteHeader] Deal stage automation failed:", e);
         }
       }
 
       if (patch.status === "accepted") {
-        console.log("[useUpdateQuoteHeader] Status is 'accepted', triggering order conversion for quote:", id);
+        logger.debug("[useUpdateQuoteHeader] Status is 'accepted', triggering order conversion for quote:", id);
         try {
           // Import the conversion function dynamically to avoid circular dependencies
           const { ensureOrderForQuote } = await import("./conversions");
@@ -601,7 +584,7 @@ export function useUpdateQuoteHeader(id: string) {
             qc.invalidateQueries({ queryKey: qk.deal(updatedQuote.deal_id) });
           }
         } catch (e) {
-          console.warn("[quote→order] conversion failed", e);
+          logger.warn("[quote→order] conversion failed", e);
 
           // Show error toast but don't rollback the status change
           const { toastBus } = await import("@/lib/toastBus");
@@ -672,7 +655,7 @@ export async function searchQuotes(query: string): Promise<Array<{ id: string; l
       subtitle: quote.company_name ? `(${quote.company_name})` : undefined
     }));
   } catch (error) {
-    console.error("Failed to search quotes:", error);
+    logger.error("Failed to search quotes:", error);
     return [];
   }
 }

@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { useTasks, useUpcomingTasks, useOverdueTasks, Task, TaskFilters } from "@/services/tasks";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { TaskForm } from "@/components/tasks/TaskForm";
+import { logger } from '@/lib/logger';
 
 export default function Tasks() {
     const [selectedTask, setSelectedTask] = useState<Task | undefined>();
@@ -59,7 +60,7 @@ export default function Tasks() {
 
     const handleViewTask = (task: Task) => {
         // TODO: Implement task detail view
-        console.log('View task:', task);
+        logger.debug('View task:', task);
     };
 
     const handleStatusFilter = (status: string) => {

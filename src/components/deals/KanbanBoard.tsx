@@ -29,6 +29,7 @@ import { DropPlaceholder } from "./DropPlaceholder";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n";
 import { getStageTheme, stageTokenBg, stageTokenText, stageTokenRing } from "./stageTheme";
+import { logger } from '@/lib/logger';
 
 interface DealData {
     id: string;
@@ -59,7 +60,7 @@ export function KanbanBoard({
     onOpenEdit?: (deal: DealData) => void;
 }) {
     // Debug logging for props
-    console.log("[KanbanBoard] Props received:", {
+    logger.debug("[KanbanBoard] Props received:", {
         stagesCount: stages?.length || 0,
         stages: stages?.map(s => ({ id: s.id, name: s.name })),
         dealsByStageKeys: Object.keys(dealsByStage),
@@ -128,7 +129,7 @@ export function KanbanBoard({
             const targetStageId = getStageIdByDealId(targetDealId);
 
             if (!targetStageId) {
-                console.error("[KanbanBoard] Could not determine target stage for deal:", targetDealId);
+                logger.error("[KanbanBoard] Could not determine target stage for deal:", targetDealId);
                 setActiveDeal(null);
                 return;
             }
@@ -141,7 +142,7 @@ export function KanbanBoard({
         // Additional validation: ensure the target stage is in our columns
         const isValidTargetStage = columns.some(col => col.id === toStageId);
         if (!isValidTargetStage) {
-            console.error("[KanbanBoard] Invalid target stage - not in columns:", {
+            logger.error("[KanbanBoard] Invalid target stage - not in columns:", {
                 toStageId,
                 columnIds: columns.map(c => c.id),
                 columnNames: columns.map(c => c.name)
@@ -150,7 +151,7 @@ export function KanbanBoard({
             return;
         }
 
-        console.log("[KanbanBoard] Drag end:", {
+        logger.debug("[KanbanBoard] Drag end:", {
             dealId,
             toStageId,
             fromStageId,
@@ -178,7 +179,7 @@ export function KanbanBoard({
 
         // Validate that the target stage exists in our available stages
         if (!dealsByStage[toStageId]) {
-            console.error("[KanbanBoard] Target stage not found:", {
+            logger.error("[KanbanBoard] Target stage not found:", {
                 toStageId,
                 availableStages: Object.keys(dealsByStage),
                 columns: columns.map(c => c.id),
@@ -203,7 +204,7 @@ export function KanbanBoard({
                     }
                 },
                 onError: (error) => {
-                    console.error("[KanbanBoard] Move mutation failed:", error);
+                    logger.error("[KanbanBoard] Move mutation failed:", error);
                     toastBus.emit({
                         title: "Unable to move deal",
                         description: "Try again"

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { logger } from '@/lib/logger';
 
 // Email log schema
 export const EmailLog = z.object({
@@ -66,13 +67,13 @@ export async function listEmailLogs(params: ListEmailLogsParams = {}): Promise<E
         const { data, error } = await query;
 
         if (error) {
-            console.error('Error fetching email logs:', error);
+            logger.error('Error fetching email logs:', error);
             throw new Error(`Failed to fetch email logs: ${error.message}`);
         }
 
         return EmailLogsResponse.parse(data || []);
     } catch (error) {
-        console.error('Error in listEmailLogs:', error);
+        logger.error('Error in listEmailLogs:', error);
         throw error;
     }
 }

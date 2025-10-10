@@ -5,9 +5,12 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { AccountingKpis } from "@/components/accounting/AccountingKpis";
 import { OverdueInvoicesCard } from "@/components/accounting/OverdueInvoicesCard";
 import { RecentInvoicesCard } from "@/components/accounting/RecentInvoicesCard";
+import { useWorkspaceSettings } from "@/hooks/useSettings";
 
 export default function AccountingPage() {
-  const currency = "DKK"; // TODO: hent fra workspace_settings hvis muligt
+  // Get currency from workspace settings
+  const { data: settings } = useWorkspaceSettings();
+  const currency = settings?.default_currency || "DKK";
   
   const summaryQ = useQuery({ 
     queryKey: qk.accounting(), 

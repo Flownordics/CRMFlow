@@ -15,6 +15,8 @@ import { CompaniesKpiHeader } from "@/components/companies/CompaniesKpiHeader";
 import { CompanyCard } from "@/components/companies/CompanyCard";
 import { cn } from "@/lib/utils";
 import { getIndustryTheme, industryTokenText } from "@/components/companies/industryTheme";
+import { ActivityStatusBadge } from "@/components/companies/ActivityStatusBadge";
+import { ActivityStatus } from "@/lib/schemas/callList";
 
 export default function CompaniesList() {
     const [q, setQ] = useState("");
@@ -22,6 +24,7 @@ export default function CompaniesList() {
     const [limit] = useState(20);
     const [industry, setIndustry] = useState<string>("all");
     const [country, setCountry] = useState<string>("all");
+    const [activityStatus, setActivityStatus] = useState<string>("all");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState<Company | undefined>();
     const [viewMode, setViewMode] = useState<"table" | "grid">("table");
@@ -85,6 +88,16 @@ export default function CompaniesList() {
     };
 
     const columns = [
+        {
+            header: "Status",
+            accessorKey: "activityStatus",
+            cell: (r: any) => (
+                <ActivityStatusBadge
+                    status={r.activityStatus as ActivityStatus}
+                    lastActivityAt={r.lastActivityAt}
+                />
+            ),
+        },
         {
             header: "Company",
             accessorKey: "name",
@@ -224,6 +237,33 @@ export default function CompaniesList() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
+                    <Select value={activityStatus} onValueChange={setActivityStatus}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Aktivitetsstatus" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Alle statusser</SelectItem>
+                            <SelectItem value="green">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                                    Grøn (≤3 mdr)
+                                </div>
+                            </SelectItem>
+                            <SelectItem value="yellow">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                                    Gul (3-6 mdr)
+                                </div>
+                            </SelectItem>
+                            <SelectItem value="red">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                                    Rød ({'>'}6 mdr)
+                                </div>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+
                     <Select value={industry} onValueChange={setIndustry}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Industry" />

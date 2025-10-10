@@ -1,6 +1,7 @@
 import { SearchSelect, SearchSelectOption } from "./SearchSelect";
 import { searchPeople } from "@/services/people";
 import { useEffect, useState } from "react";
+import { logger } from '@/lib/logger';
 
 interface PersonSelectProps {
   companyId?: string;
@@ -35,7 +36,7 @@ export function PersonSelect({
           }));
           setAllContacts(contacts);
         } catch (error) {
-          console.error("Failed to load contacts:", error);
+          logger.error("Failed to load contacts:", error);
           setAllContacts([]);
         }
       } else {
@@ -65,7 +66,7 @@ export function PersonSelect({
         subtitle: (person as any).title || undefined
       }));
     } catch (error) {
-      console.error("Failed to search people:", error);
+      logger.error("Failed to search people:", error);
       return [];
     }
   };

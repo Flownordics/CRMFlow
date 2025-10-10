@@ -11,6 +11,7 @@ import { createOrder, fetchOrder } from "./orders";
 import { fetchQuote } from "./quotes";
 import { createInvoice } from "./invoices";
 import { triggerDealStageAutomation } from "./dealStageAutomation";
+import { logger } from '@/lib/logger';
 
 // Conversion response schemas
 export const QuoteResponse = z.object({
@@ -41,13 +42,13 @@ export async function ensureOrderForQuote(quoteId: string): Promise<{ id: string
     // 1) Check if order already exists for this quote
     const { data: existing } = await apiClient.get(`/orders?quote_id=eq.${quoteId}&select=id&limit=1`);
     if (Array.isArray(existing) && existing.length > 0) {
-      console.log(`[ensureOrderForQuote] Order already exists for quote ${quoteId}:`, existing[0].id);
+      logger.debug(`[ensureOrderForQuote] Order already exists for quote ${quoteId}:`, existing[0].id);
       return { id: existing[0].id };
     }
 
     // 2) Fetch quote with lines
     const quote = await fetchQuote(quoteId);
-    console.log(`[ensureOrderForQuote] Fetched quote ${quoteId}:`, quote);
+    logger.debug(`[ensureOrderForQuote] Fetched quote ${quoteId}:`, quote);
 
     // 3) Build order payload (only fields that exist in orders table)
     const orderPayload = {
@@ -72,11 +73,11 @@ export async function ensureOrderForQuote(quoteId: string): Promise<{ id: string
       })),
     };
 
-    console.log(`[ensureOrderForQuote] Creating order with payload:`, orderPayload);
+    logger.debug(`[ensureOrderForQuote] Creating order with payload:`, orderPayload);
 
     // 4) Create order
     const order = await createOrder(orderPayload);
-    console.log(`[ensureOrderForQuote] Order created:`, order.id);
+    logger.debug(`[ensureOrderForQuote] Order created:`, order.id);
 
     // 5) Log activity (best effort)
     try {
@@ -86,7 +87,7 @@ export async function ensureOrderForQuote(quoteId: string): Promise<{ id: string
         meta: { quoteId: quote.id, orderId: order.id }
       });
     } catch (e) {
-      console.warn("[ensureOrderForQuote] Activity logging failed:", e);
+      logger.warn("[ensureOrderForQuote] Activity logging failed:", e);
     }
 
     // 6) Trigger deal stage automation (quote converted to order = Closed Won)
@@ -94,23 +95,23 @@ export async function ensureOrderForQuote(quoteId: string): Promise<{ id: string
       try {
         await triggerDealStageAutomation('order_created', quote.deal_id, order);
       } catch (e) {
-        console.warn("[ensureOrderForQuote] Deal stage automation failed:", e);
+        logger.warn("[ensureOrderForQuote] Deal stage automation failed:", e);
       }
     }
 
     // 7) Delete the converted quote to avoid storage waste and confusion
     try {
-      console.log(`[ensureOrderForQuote] Deleting converted quote: ${quote.id}`);
+      logger.debug(`[ensureOrderForQuote] Deleting converted quote: ${quote.id}`);
       await apiClient.delete(`/quotes?id=eq.${quote.id}`);
-      console.log(`[ensureOrderForQuote] Quote deleted successfully`);
+      logger.debug(`[ensureOrderForQuote] Quote deleted successfully`);
     } catch (e) {
-      console.warn("[ensureOrderForQuote] Failed to delete converted quote:", e);
+      logger.warn("[ensureOrderForQuote] Failed to delete converted quote:", e);
       // Don't throw - order creation was successful, quote deletion is cleanup
     }
 
     return { id: order.id };
   } catch (error) {
-    console.error(`[ensureOrderForQuote] Failed to create order for quote ${quoteId}:`, error);
+    logger.error(`[ensureOrderForQuote] Failed to create order for quote ${quoteId}:`, error);
     throw new Error(`Failed to create order from quote: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -121,13 +122,13 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{ id: stri
     // 1) Check if invoice already exists for this order
     const { data: existing } = await apiClient.get(`/invoices?order_id=eq.${orderId}&select=id&limit=1`);
     if (Array.isArray(existing) && existing.length > 0) {
-      console.log(`[ensureInvoiceForOrder] Invoice already exists for order ${orderId}:`, existing[0].id);
+      logger.debug(`[ensureInvoiceForOrder] Invoice already exists for order ${orderId}:`, existing[0].id);
       return { id: existing[0].id };
     }
 
     // 2) Fetch order with lines
     const order = await fetchOrder(orderId);
-    console.log(`[ensureInvoiceForOrder] Fetched order ${orderId}:`, order);
+    logger.debug(`[ensureInvoiceForOrder] Fetched order ${orderId}:`, order);
 
     // 3) Build invoice payload
     const invoicePayload = {
@@ -152,11 +153,11 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{ id: stri
       })),
     };
 
-    console.log(`[ensureInvoiceForOrder] Creating invoice with payload:`, invoicePayload);
+    logger.debug(`[ensureInvoiceForOrder] Creating invoice with payload:`, invoicePayload);
 
     // 4) Create invoice (assuming we have a createInvoice function similar to createOrder)
     const invoice = await createInvoice(invoicePayload);
-    console.log(`[ensureInvoiceForOrder] Invoice created:`, invoice.id);
+    logger.debug(`[ensureInvoiceForOrder] Invoice created:`, invoice.id);
 
     // 5) Log activity (best effort)
     try {
@@ -166,7 +167,7 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{ id: stri
         meta: { orderId: order.id, invoiceId: invoice.id }
       });
     } catch (e) {
-      console.warn("[ensureInvoiceForOrder] Activity logging failed:", e);
+      logger.warn("[ensureInvoiceForOrder] Activity logging failed:", e);
     }
 
     // 6) Trigger deal stage automation (invoice created = Closed Won)
@@ -174,13 +175,13 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{ id: stri
       try {
         await triggerDealStageAutomation('invoice_created', order.deal_id, invoice);
       } catch (e) {
-        console.warn("[ensureInvoiceForOrder] Deal stage automation failed:", e);
+        logger.warn("[ensureInvoiceForOrder] Deal stage automation failed:", e);
       }
     }
 
     return { id: invoice.id };
   } catch (error) {
-    console.error(`[ensureInvoiceForOrder] Failed to create invoice for order ${orderId}:`, error);
+    logger.error(`[ensureInvoiceForOrder] Failed to create invoice for order ${orderId}:`, error);
     throw new Error(`Failed to create invoice from order: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -209,7 +210,7 @@ export async function createQuoteFromDeal(dealId: string): Promise<QuoteResponse
     const quote = response.data || response;
     return QuoteResponse.parse(quote);
   } catch (error) {
-    console.error(`Failed to create quote from deal ${dealId}:`, error);
+    logger.error(`Failed to create quote from deal ${dealId}:`, error);
     throw new Error("Failed to create quote from deal");
   }
 }
@@ -233,7 +234,7 @@ export async function createOrderFromDeal(dealId: string): Promise<OrderResponse
     const order = response.data || response;
     return OrderResponse.parse(order);
   } catch (error) {
-    console.error(`Failed to create order from deal ${dealId}:`, error);
+    logger.error(`Failed to create order from deal ${dealId}:`, error);
     throw new Error("Failed to create order from deal");
   }
 }
@@ -257,7 +258,7 @@ export async function createInvoiceFromDeal(dealId: string): Promise<InvoiceResp
     const invoice = response.data || response;
     return InvoiceResponse.parse(invoice);
   } catch (error) {
-    console.error(`Failed to create invoice from deal ${dealId}:`, error);
+    logger.error(`Failed to create invoice from deal ${dealId}:`, error);
     throw new Error("Failed to create invoice from deal");
   }
 }
@@ -281,14 +282,14 @@ export function useCreateQuoteFromDeal() {
           meta: { docType: "quote", id: quote.id }
         });
       } catch (error) {
-        console.error("Failed to log activity:", error);
+        logger.error("Failed to log activity:", error);
       }
 
       // Trigger deal stage automation (quote created = move to Proposal if in Prospecting)
       try {
         await triggerDealStageAutomation('quote_created', dealId, quote);
       } catch (error) {
-        console.warn("Deal stage automation failed:", error);
+        logger.warn("Deal stage automation failed:", error);
       }
 
       toastBus.emit({
@@ -325,14 +326,14 @@ export function useCreateOrderFromDeal() {
           meta: { docType: "order", id: order.id }
         });
       } catch (error) {
-        console.error("Failed to log activity:", error);
+        logger.error("Failed to log activity:", error);
       }
 
       // Trigger deal stage automation (order created = Closed Won)
       try {
         await triggerDealStageAutomation('order_created', dealId, order);
       } catch (error) {
-        console.warn("Deal stage automation failed:", error);
+        logger.warn("Deal stage automation failed:", error);
       }
 
       toastBus.emit({
@@ -369,14 +370,14 @@ export function useCreateInvoiceFromDeal() {
           meta: { docType: "invoice", id: invoice.id }
         });
       } catch (error) {
-        console.error("Failed to log activity:", error);
+        logger.error("Failed to log activity:", error);
       }
 
       // Trigger deal stage automation (invoice created = Closed Won)
       try {
         await triggerDealStageAutomation('invoice_created', dealId, invoice);
       } catch (error) {
-        console.warn("Deal stage automation failed:", error);
+        logger.warn("Deal stage automation failed:", error);
       }
 
       toastBus.emit({
@@ -481,7 +482,7 @@ export async function buildPrefillFromDeal(
         basePrefill.companyName = response.data[0].name;
       }
     } catch (error) {
-      console.warn('[Conversions] Failed to fetch company name:', error);
+      logger.warn('[Conversions] Failed to fetch company name:', error);
     }
   }
 
@@ -493,7 +494,7 @@ export async function buildPrefillFromDeal(
         basePrefill.contactName = response.data[0].name;
       }
     } catch (error) {
-      console.warn('[Conversions] Failed to fetch contact name:', error);
+      logger.warn('[Conversions] Failed to fetch contact name:', error);
     }
   }
 

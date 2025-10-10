@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   Menu,
   Home,
+  Phone,
+  Trash2,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,7 @@ const navigationItems = [
   { title: "Companies", url: "/companies", icon: Building2 },
   { title: "People", url: "/people", icon: Users },
   { title: "Deals", url: "/deals", icon: Handshake },
+  { title: "Call Lists", url: "/call-lists", icon: Phone },
   { title: "Quotes", url: "/quotes", icon: FileText },
   { title: "Orders", url: "/orders", icon: ShoppingCart },
   { title: "Invoices", url: "/invoices", icon: Receipt },
@@ -32,6 +35,7 @@ const navigationItems = [
   { title: "Documents", url: "/documents", icon: FolderOpen },
   { title: "Accounting", url: "/accounting", icon: Calculator },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Papirkurv", url: "/trash", icon: Trash2 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

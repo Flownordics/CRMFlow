@@ -1,5 +1,6 @@
 import { USE_MOCKS } from "@/lib/debug";
 import { toastBus } from "@/lib/toastBus";
+import { logger } from '@/lib/logger';
 
 // PDF types
 export type PDFType = 'quote' | 'order' | 'invoice';
@@ -26,8 +27,8 @@ export async function getPdfUrl(type: PDFType, id: string): Promise<PDFResponse>
   }
 
   try {
-    // Call the Netlify Function for PDF generation (new professional version)
-    const response = await fetch('/.netlify/functions/pdfgen', {
+    // Call the Netlify Function for PDF generation (HTML-to-PDF with Puppeteer)
+    const response = await fetch('/.netlify/functions/pdf-html', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -73,7 +74,7 @@ export async function getPdfUrl(type: PDFType, id: string): Promise<PDFResponse>
       blob
     };
   } catch (error) {
-    console.error(`Failed to get PDF for ${type} ${id}:`, error);
+    logger.error(`Failed to get PDF for ${type} ${id}:`, error);
     throw new Error(`Failed to get PDF for ${type}: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -108,7 +109,7 @@ export async function generatePDF(type: PDFType, id: string): Promise<void> {
     });
 
   } catch (error) {
-    console.error(`Failed to generate PDF for ${type} ${id}:`, error);
+    logger.error(`Failed to generate PDF for ${type} ${id}:`, error);
 
     toastBus.emit({
       title: "PDF Generation Failed",
@@ -143,7 +144,7 @@ export async function downloadPDF(type: PDFType, id: string): Promise<void> {
     });
 
   } catch (error) {
-    console.error(`Failed to download PDF for ${type} ${id}:`, error);
+    logger.error(`Failed to download PDF for ${type} ${id}:`, error);
 
     toastBus.emit({
       title: "PDF Download Failed",

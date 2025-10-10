@@ -31,6 +31,7 @@ import { EmailLogs } from "@/components/quotes/EmailLogs";
 import { OpenPdfButton } from "@/components/common/OpenPdfButton";
 // Google integration removed - starting fresh
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { logger } from '@/lib/logger';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,7 +110,7 @@ export default function QuoteEditor() {
       // Just mark as no changes
       setHasChanges(false);
     } catch (error) {
-      console.error("Failed to save quote:", error);
+      logger.error("Failed to save quote:", error);
     }
   };
 
@@ -118,7 +119,7 @@ export default function QuoteEditor() {
       await deleteQuote.mutateAsync(id);
       navigate("/quotes");
     } catch (error) {
-      console.error("Failed to delete quote:", error);
+      logger.error("Failed to delete quote:", error);
     }
   };
 
