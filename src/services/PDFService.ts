@@ -38,7 +38,36 @@ export async function getPdfUrl(type: PDFType, id: string): Promise<PDFResponse>
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      
+      // Log detailed error information
+      logger.error('PDF Function Error', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData.error,
+        details: errorData.details,
+        errorType: errorData.errorType,
+        isChromiumError: errorData.isChromiumError,
+        hint: errorData.hint,
+        stack: errorData.stack,
+        type,
+        id
+      });
+      
+      // Build user-friendly error message
+      let errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+      if (errorData.details) {
+        errorMessage += ` - ${errorData.details}`;
+      }
+      if (errorData.hint) {
+        errorMessage += ` (${errorData.hint})`;
+      }
+      
+      // Special handling for 502 Bad Gateway (likely timeout or crash)
+      if (response.status === 502) {
+        errorMessage = 'PDF generation timed out or crashed. Please check Netlify function logs for details.';
+      }
+      
+      throw new Error(errorMessage);
     }
 
     // Handle base64 encoded response from Netlify Functions

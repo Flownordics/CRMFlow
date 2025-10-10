@@ -27,9 +27,12 @@ export const handler = async (event) => {
     let browser = null;
 
     try {
+        console.log('PDF generation request started');
         const { type, data } = JSON.parse(event.body || '{}');
+        console.log('Request type:', type, 'ID:', data?.id);
 
         if (!type || !data || !data.id) {
+            console.error('Missing required parameters:', { type, dataId: data?.id });
             return {
                 statusCode: 400,
                 headers: corsHeaders,
@@ -104,19 +107,34 @@ export const handler = async (event) => {
         }
 
         // Launch Puppeteer with Chromium
+        console.log('Starting Chromium initialization...');
+        const executablePath = await chromium.executablePath();
+        console.log('Chromium executable path:', executablePath);
+        
         browser = await puppeteer.launch({
-            args: chromium.args,
+            args: [
+                ...chromium.args,
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--single-process',
+                '--no-zygote',
+            ],
             defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
+            executablePath,
             headless: chromium.headless,
+            ignoreHTTPSErrors: true,
         });
+        console.log('Chromium launched successfully');
 
         const page = await browser.newPage();
+        console.log('New page created');
         
         // Set content and wait for fonts/images to load
         await page.setContent(html, {
-            waitUntil: ['networkidle0', 'domcontentloaded']
+            waitUntil: ['domcontentloaded'], // Changed from networkidle0 to avoid timeout
+            timeout: 20000 // 20 second timeout for content loading
         });
+        console.log('HTML content set successfully');
 
         // Generate PDF
         const pdfBuffer = await page.pdf({
@@ -129,6 +147,7 @@ export const handler = async (event) => {
                 left: '0mm',
             },
         });
+        console.log('PDF generated, size:', pdfBuffer.length, 'bytes');
 
         await browser.close();
         browser = null;
@@ -149,7 +168,12 @@ export const handler = async (event) => {
         };
 
     } catch (error) {
-        console.error('PDF generation error:', error);
+        console.error('PDF generation error:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
         
         // Ensure browser is closed on error
         if (browser) {
@@ -160,13 +184,21 @@ export const handler = async (event) => {
             }
         }
 
+        // Determine if it's a Chromium-specific error
+        const isChromiumError = error.message?.includes('chromium') || 
+                                error.message?.includes('browser') ||
+                                error.message?.includes('executable');
+
         return {
             statusCode: 500,
             headers: corsHeaders,
             body: JSON.stringify({
-                error: 'Internal server error',
+                error: 'PDF generation failed',
                 details: error.message,
-                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                errorType: error.name,
+                isChromiumError,
+                hint: isChromiumError ? 'Check Netlify function logs for Chromium initialization issues' : undefined,
+                stack: error.stack
             }),
         };
     }

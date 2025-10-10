@@ -9,6 +9,17 @@
   # Suppress punycode deprecation warning from dependencies
   environment = { NODE_OPTIONS = "--no-deprecation" }
 
+# Specific configuration for PDF generation function
+[functions."pdf-html"]
+  # Increase memory and timeout for Puppeteer/Chromium
+  timeout = 26  # seconds (max for free tier)
+  # Don't bundle Chromium and puppeteer - they need native binaries
+  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
+  # Include the chromium binary and node_modules
+  included_files = ["pdf-html/node_modules/@sparticuz/chromium/**"]
+  # Disable bundling to preserve native modules
+  node_bundler = "esbuild"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
