@@ -748,6 +748,50 @@ Before moving forward, verify:
 - [ ] Pushed to main
 - [ ] Team informed
 
+### **Production:**
+- [ ] Netlify environment variables configured (URGENT!)
+- [ ] PDF generation tested and working
+
+---
+
+## 🐛 PRODUCTION HOTFIX: PDF Generation Error
+
+**Discovered:** October 10, 2025 (during testing)  
+**Priority:** 🔴 CRITICAL  
+**Status:** ✅ Code fixed, ⏳ Awaiting Netlify config
+
+### **Issue:**
+```
+.netlify/functions/pdf-html:1 Failed to load resource: 500
+Failed to get PDF for quote: Error: Internal server error
+```
+
+### **Root Cause:**
+Phase 1 security improvement removed environment variables from `netlify.toml`, but they were **not yet added to Netlify Dashboard**. PDF function fails without them.
+
+### **What We Fixed:**
+1. ✅ Improved error handling in `PDFService.ts` (clearer error messages)
+2. ✅ Added logging for 500 errors
+3. ✅ Created `PDF_GENERATION_FIX.md` with step-by-step solution
+
+### **What You Need to Do:**
+
+**⚠️ URGENT - Manual Step Required:**
+
+1. Go to: https://app.netlify.com/sites/crmflow-app/settings/env
+2. Add these variables to **ALL contexts** (Production, Development, Branch):
+   ```
+   SUPABASE_URL=https://rgimekaxpmqqlqulhpgt.supabase.co
+   SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnaW1la2F4cG1xcWxxdWxocGd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTgzMDksImV4cCI6MjA3NTY3NDMwOX0.MxbF3CGvW4Q1vU2ySWD1Y8BSU61V3MiTBuDwrEXS20M
+   VITE_SUPABASE_URL=https://rgimekaxpmqqlqulhpgt.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnaW1la2F4cG1xcWxxdWxocGd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTgzMDksImV4cCI6MjA3NTY3NDMwOX0.MxbF3CGvW4Q1vU2ySWD1Y8BSU61V3MiTBuDwrEXS20M
+   ```
+3. Trigger redeploy
+4. Test PDF generation
+
+**Time to fix:** 5 minutes  
+**See:** `PDF_GENERATION_FIX.md` for detailed instructions
+
 ---
 
 ## 🎯 RECOMMENDED NEXT STEP

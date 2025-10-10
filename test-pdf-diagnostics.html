@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Diagnostics Test</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #698BB5;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #5a7a9e;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 600px;
+            overflow: auto;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .step {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 4px solid #698BB5;
+            background: white;
+        }
+        .step.success {
+            border-left-color: #28a745;
+        }
+        .step.error {
+            border-left-color: #dc3545;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .summary-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .summary-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 PDF Diagnostics Test</h1>
+        <p class="subtitle">Test PDF generation pipeline step-by-step</p>
+        
+        <div>
+            <button onclick="runDiagnostics()" id="diagButton">🧪 Run Full Diagnostics</button>
+            <button onclick="testChromium()" id="chromiumButton">🌐 Test Chromium Only</button>
+            <button onclick="testPdfGeneration()" id="pdfButton">📄 Test PDF Generation</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="summary"></div>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const setStatus = (message, type) => {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        };
+
+        const showOutput = (data) => {
+            const outputDiv = document.getElementById('output');
+            
+            if (data.steps && data.steps.length > 0) {
+                let html = '<h3>📋 Test Steps:</h3>';
+                data.steps.forEach((step, i) => {
+                    const statusClass = step.success ? 'success' : 'error';
+                    const icon = step.success ? '✅' : '❌';
+                    html += `
+                        <div class="step ${statusClass}">
+                            <strong>${icon} ${step.name}</strong>
+                            ${step.data ? `<pre>${JSON.stringify(step.data, null, 2)}</pre>` : ''}
+                            ${step.error ? `<pre style="color: red;">${step.error}</pre>` : ''}
+                        </div>
+                    `;
+                });
+                outputDiv.innerHTML = html;
+
+                // Summary
+                const totalSteps = data.steps.length;
+                const successSteps = data.steps.filter(s => s.success).length;
+                const failedSteps = totalSteps - successSteps;
+                
+                document.getElementById('summary').innerHTML = `
+                    <div class="summary">
+                        <div class="summary-card">
+                            <h3>Total Steps</h3>
+                            <div class="value">${totalSteps}</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Successful</h3>
+                            <div class="value" style="color: #28a745;">${successSteps}</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Failed</h3>
+                            <div class="value" style="color: #dc3545;">${failedSteps}</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Overall</h3>
+                            <div class="value" style="color: ${data.success ? '#28a745' : '#dc3545'};">
+                                ${data.success ? '✅ PASS' : '❌ FAIL'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                outputDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+        };
+
+        const disableButtons = () => {
+            document.querySelectorAll('button').forEach(btn => btn.disabled = true);
+        };
+
+        const enableButtons = () => {
+            document.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        };
+
+        async function runDiagnostics() {
+            disableButtons();
+            setStatus('🔄 Running full diagnostics...', 'loading');
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('summary').innerHTML = '';
+
+            try {
+                const response = await fetch('/.netlify/functions/pdf-diagnostics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    setStatus('✅ All diagnostics passed! PDF generation should work.', 'success');
+                } else {
+                    setStatus(`❌ Diagnostics failed: ${data.message}`, 'error');
+                }
+                
+                showOutput(data);
+            } catch (error) {
+                setStatus(`❌ Error running diagnostics: ${error.message}`, 'error');
+                document.getElementById('output').innerHTML = `<pre style="color: red;">${error.stack}</pre>`;
+            } finally {
+                enableButtons();
+            }
+        }
+
+        async function testChromium() {
+            disableButtons();
+            setStatus('🔄 Testing Chromium...', 'loading');
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('summary').innerHTML = '';
+
+            try {
+                const response = await fetch('/.netlify/functions/chromium-test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    setStatus('✅ Chromium test passed!', 'success');
+                } else {
+                    setStatus(`❌ Chromium test failed: ${data.message}`, 'error');
+                }
+                
+                showOutput(data);
+            } catch (error) {
+                setStatus(`❌ Error testing Chromium: ${error.message}`, 'error');
+                document.getElementById('output').innerHTML = `<pre style="color: red;">${error.stack}</pre>`;
+            } finally {
+                enableButtons();
+            }
+        }
+
+        async function testPdfGeneration() {
+            disableButtons();
+            setStatus('🔄 Testing PDF generation with sample quote...', 'loading');
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('summary').innerHTML = '';
+
+            // You'll need to replace this with a real quote ID from your database
+            const testQuoteId = prompt('Enter a Quote ID to test:', '');
+            
+            if (!testQuoteId) {
+                setStatus('❌ No Quote ID provided', 'error');
+                enableButtons();
+                return;
+            }
+
+            try {
+                const response = await fetch('/.netlify/functions/pdf-html', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: 'quote',
+                        data: { id: testQuoteId }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success && data.pdf) {
+                    setStatus('✅ PDF generated successfully!', 'success');
+                    
+                    // Try to decode and open the PDF
+                    try {
+                        const binaryString = atob(data.pdf);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        const blob = new Blob([bytes], { type: 'application/pdf' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        window.open(url, '_blank');
+                        
+                        document.getElementById('output').innerHTML = `
+                            <h3>✅ PDF Details:</h3>
+                            <pre>${JSON.stringify({
+                                filename: data.filename,
+                                size: `${data.size} bytes`,
+                                base64Length: data.pdf.length,
+                                success: true
+                            }, null, 2)}</pre>
+                        `;
+                    } catch (decodeError) {
+                        setStatus(`❌ PDF generated but failed to decode: ${decodeError.message}`, 'error');
+                        document.getElementById('output').innerHTML = `
+                            <h3>❌ Decode Error:</h3>
+                            <pre style="color: red;">${decodeError.stack}</pre>
+                            <h3>Response Data:</h3>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        `;
+                    }
+                } else {
+                    setStatus('❌ PDF generation failed', 'error');
+                    showOutput(data);
+                }
+            } catch (error) {
+                setStatus(`❌ Error generating PDF: ${error.message}`, 'error');
+                document.getElementById('output').innerHTML = `<pre style="color: red;">${error.stack}</pre>`;
+            } finally {
+                enableButtons();
+            }
+        }
+
+        // Auto-run diagnostics on load (optional)
+        // window.addEventListener('load', () => {
+        //     setTimeout(runDiagnostics, 500);
+        // });
+    </script>
+</body>
+</html>
+

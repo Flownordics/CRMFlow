@@ -20,6 +20,20 @@
   # Disable bundling to preserve native modules
   node_bundler = "esbuild"
 
+# Diagnostic function to test Chromium initialization
+[functions."chromium-test"]
+  timeout = 26
+  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
+  included_files = ["chromium-test/node_modules/@sparticuz/chromium/**"]
+  node_bundler = "esbuild"
+
+# Comprehensive PDF diagnostics function
+[functions."pdf-diagnostics"]
+  timeout = 26
+  external_node_modules = ["@sparticuz/chromium", "puppeteer-core"]
+  included_files = ["pdf-diagnostics/node_modules/@sparticuz/chromium/**"]
+  node_bundler = "esbuild"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

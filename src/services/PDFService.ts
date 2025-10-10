@@ -75,16 +75,55 @@ export async function getPdfUrl(type: PDFType, id: string): Promise<PDFResponse>
     logger.debug('PDF response received:', {
       success: responseData.success,
       size: responseData.size,
-      filename: responseData.filename
+      filename: responseData.filename,
+      hasPdfField: !!responseData.pdf,
+      pdfFieldType: typeof responseData.pdf,
+      pdfFieldLength: responseData.pdf?.length
     });
 
     if (!responseData.success || !responseData.pdf) {
+      logger.error('Invalid PDF response structure:', {
+        success: responseData.success,
+        hasPdf: !!responseData.pdf,
+        responseKeys: Object.keys(responseData)
+      });
       throw new Error('Invalid PDF response from server');
     }
 
-    // Decode base64 PDF data
+    // Decode base64 PDF data with better error handling
     const base64Data = responseData.pdf;
-    const binaryString = atob(base64Data);
+    
+    // Validate base64 string before decoding
+    if (typeof base64Data !== 'string') {
+      logger.error('PDF data is not a string:', typeof base64Data);
+      throw new Error('PDF data is not in expected format');
+    }
+    
+    // Check if it looks like base64 (basic validation)
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(base64Data)) {
+      logger.error('PDF data does not look like valid base64:', {
+        length: base64Data.length,
+        firstChars: base64Data.substring(0, 50),
+        lastChars: base64Data.substring(base64Data.length - 50)
+      });
+      throw new Error('PDF data is not valid base64 format');
+    }
+    
+    logger.debug('Decoding base64 data, length:', base64Data.length);
+    
+    let binaryString;
+    try {
+      binaryString = atob(base64Data);
+    } catch (atobError) {
+      logger.error('Failed to decode base64:', {
+        error: atobError,
+        base64Length: base64Data.length,
+        base64Sample: base64Data.substring(0, 100) + '...'
+      });
+      throw new Error(`Failed to decode PDF data: ${atobError instanceof Error ? atobError.message : 'Unknown error'}`);
+    }
+    
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);

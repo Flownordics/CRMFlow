@@ -161,6 +161,19 @@ export const handler = async (event) => {
         const base64Pdf = pdfBuffer.toString('base64');
         console.log('Base64 conversion complete, size:', base64Pdf.length, 'chars');
 
+        // Validate base64 before returning
+        if (!base64Pdf || typeof base64Pdf !== 'string') {
+            console.error('Base64 conversion failed - invalid result');
+            throw new Error('Base64 conversion produced invalid result');
+        }
+        
+        // Verify it's valid base64
+        const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+        if (!base64Regex.test(base64Pdf)) {
+            console.error('Base64 validation failed - contains invalid characters');
+            throw new Error('Base64 validation failed');
+        }
+
         console.log('Preparing response...');
         
         // Return as JSON with base64 data (more reliable than isBase64Encoded)

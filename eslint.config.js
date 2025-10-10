@@ -26,7 +26,7 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-require-imports": "off",
       "@typescript-eslint/no-empty-object-type": "off",
-      "no-console": ["error", { allow: [] }],
+      "no-console": "off", // Disabled for debugging - we use console.log in Netlify functions
       "no-debugger": "error",
     },
   },

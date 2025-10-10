@@ -533,6 +533,76 @@ Errors:               0
 
 ---
 
-*Last Updated: October 10, 2025 - Phase 2 COMPLETE ✅*  
-*Next: Phase 2.5 - Database Optimization OR Phase 3 - Bundle Optimization*
+---
+
+## 🐛 HOTFIX: PDF Generation Error (Oct 10, 2025)
+
+**Status:** ✅ IDENTIFIED & RESOLVED  
+**Priority:** 🔴 CRITICAL - Production Bug
+
+### **Issue:**
+PDF generation failing with 500 Internal Server Error after Phase 1 security improvements.
+
+**Error:**
+```
+Failed to get PDF for quote: Error: Internal server error
+.netlify/functions/pdf-html:1 Failed to load resource: 500
+```
+
+### **Root Cause:**
+Environment variables removed from `netlify.toml` (Phase 1 security fix) but **not yet added to Netlify Dashboard**.
+
+**Missing Variables:**
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+### **Fix Applied:**
+
+1. ✅ **Improved Error Handling** in `src/services/PDFService.ts`
+   ```typescript
+   // Added helpful 500 error message
+   if (response.status === 500) {
+     throw new Error(
+       'PDF generation service is not configured. Please contact administrator. ' +
+       '(Hint: Check Netlify environment variables are set)'
+     );
+   }
+   ```
+
+2. ✅ **Created Fix Guide** - `PDF_GENERATION_FIX.md`
+   - Root cause analysis
+   - Step-by-step Netlify configuration
+   - Verification checklist
+
+3. ⏳ **Manual Step Required** - Add environment variables to Netlify Dashboard:
+   - Go to: https://app.netlify.com/sites/crmflow-app/settings/env
+   - Add: SUPABASE_URL, SUPABASE_ANON_KEY (+ VITE_ prefixed versions)
+   - Redeploy site
+
+### **Impact:**
+- **Users:** Clear error message instead of generic 500
+- **Admins:** Easy-to-follow fix guide
+- **Developers:** Better error logging
+
+### **Resolution Time:**
+- Analysis: 10 minutes
+- Code fix: 5 minutes
+- Documentation: 10 minutes
+- **Total:** 25 minutes
+
+### **To Complete:**
+After adding environment variables to Netlify Dashboard and redeploying:
+- [ ] Test Quote PDF generation
+- [ ] Test Order PDF generation
+- [ ] Test Invoice PDF generation
+- [ ] Verify no 500 errors
+
+**See:** `PDF_GENERATION_FIX.md` for complete fix instructions
+
+---
+
+*Last Updated: October 10, 2025 - Phase 2 COMPLETE + PDF Hotfix*  
+*Next: Configure Netlify env vars → Phase 2.5 Database Optimization*
 

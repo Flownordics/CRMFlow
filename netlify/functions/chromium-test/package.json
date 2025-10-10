@@ -1,0 +1,10 @@
+{
+  "name": "chromium-test",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@sparticuz/chromium": "^131.0.0",
+    "puppeteer-core": "^23.9.0"
+  }
+}
+
