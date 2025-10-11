@@ -49,8 +49,8 @@ export default function CallLists() {
     const handleCreate = async () => {
         if (!newListName.trim()) {
             toast({
-                title: "Fejl",
-                description: "Indtast venligst et navn til ringelisten",
+                title: "Error",
+                description: "Please enter a name for the call list",
                 variant: "destructive",
             });
             return;
@@ -63,8 +63,8 @@ export default function CallLists() {
             });
 
             toast({
-                title: "Ringeliste oprettet",
-                description: `${newListName} er blevet oprettet`,
+                title: "Call List Created",
+                description: `${newListName} has been created`,
             });
 
             setShowCreateDialog(false);
@@ -75,28 +75,28 @@ export default function CallLists() {
             navigate(`/call-lists/${newList.id}`);
         } catch (error) {
             toast({
-                title: "Fejl",
-                description: "Kunne ikke oprette ringeliste",
+                title: "Error",
+                description: "Failed to create call list",
                 variant: "destructive",
             });
         }
     };
 
     const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`Er du sikker på, at du vil slette ringelisten "${name}"?`)) {
+        if (!confirm(`Are you sure you want to delete the call list "${name}"?`)) {
             return;
         }
 
         try {
             await deleteMutation.mutateAsync(id);
             toast({
-                title: "Ringeliste slettet",
-                description: `${name} er blevet slettet`,
+                title: "Call List Deleted",
+                description: `${name} has been deleted`,
             });
         } catch (error) {
             toast({
-                title: "Fejl",
-                description: "Kunne ikke slette ringeliste",
+                title: "Error",
+                description: "Failed to delete call list",
                 variant: "destructive",
             });
         }
@@ -105,21 +105,21 @@ export default function CallLists() {
     const handleAutoGenerate = async () => {
         try {
             const result = await autoGenMutation.mutateAsync({
-                name: `Auto-ringeliste (${new Date().toLocaleDateString('da-DK')})`,
+                name: `Auto Call List (${new Date().toLocaleDateString('en-US')})`,
                 limit: autoGenLimit,
             });
 
             toast({
-                title: "Auto-ringeliste genereret",
-                description: `${result.itemCount} virksomheder tilføjet til ringelisten`,
+                title: "Auto Call List Generated",
+                description: `${result.itemCount} companies added to the call list`,
             });
 
             setShowAutoGenDialog(false);
             navigate(`/call-lists/${result.callListId}`);
         } catch (error) {
             toast({
-                title: "Fejl",
-                description: "Kunne ikke generere auto-ringeliste",
+                title: "Error",
+                description: "Failed to generate auto call list",
                 variant: "destructive",
             });
         }
@@ -129,9 +129,9 @@ export default function CallLists() {
         <div className="container mx-auto py-6 space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold">Ringelister</h1>
+                    <h1 className="text-3xl font-bold">Call Lists</h1>
                     <p className="text-muted-foreground mt-1">
-                        Organiser og administrer dine salgsopkald
+                        Organize and manage your sales calls
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -141,11 +141,11 @@ export default function CallLists() {
                         className="gap-2"
                     >
                         <Zap className="h-4 w-4" />
-                        Auto-ringeliste (20)
+                        Auto Call List (20)
                     </Button>
                     <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
                         <Plus className="h-4 w-4" />
-                        Ny ringeliste
+                        New Call List
                     </Button>
                 </div>
             </div>
@@ -159,19 +159,19 @@ export default function CallLists() {
             ) : callLists && callLists.length > 0 ? (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Mine ringelister</CardTitle>
+                        <CardTitle>My Call Lists</CardTitle>
                         <CardDescription>
-                            Klik på en ringeliste for at starte opkald
+                            Click on a call list to start calling
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Navn</TableHead>
+                                    <TableHead>Name</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead>Oprettet</TableHead>
-                                    <TableHead className="text-right">Handlinger</TableHead>
+                                    <TableHead>Created</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -186,12 +186,12 @@ export default function CallLists() {
                                             {list.isShared && (
                                                 <Badge variant="secondary" className="gap-1">
                                                     <Share2 className="h-3 w-3" />
-                                                    Delt
+                                                    Shared
                                                 </Badge>
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            {new Date(list.createdAt).toLocaleDateString('da-DK')}
+                                            {new Date(list.createdAt).toLocaleDateString('en-US')}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -221,10 +221,10 @@ export default function CallLists() {
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
                         <p className="text-muted-foreground mb-4">
-                            Du har ingen ringelister endnu
+                            You don't have any call lists yet
                         </p>
                         <Button onClick={() => setShowCreateDialog(true)}>
-                            Opret din første ringeliste
+                            Create your first call list
                         </Button>
                     </CardContent>
                 </Card>
@@ -234,23 +234,23 @@ export default function CallLists() {
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Opret ny ringeliste</DialogTitle>
+                        <DialogTitle>Create New Call List</DialogTitle>
                         <DialogDescription>
-                            Giv din ringeliste et navn og vælg om den skal deles med teamet
+                            Give your call list a name and choose whether to share it with your team
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div>
-                            <Label htmlFor="name">Navn</Label>
+                            <Label htmlFor="name">Name</Label>
                             <Input
                                 id="name"
                                 value={newListName}
                                 onChange={(e) => setNewListName(e.target.value)}
-                                placeholder="f.eks. Dagens opkald"
+                                placeholder="e.g. Today's Calls"
                             />
                         </div>
                         <div className="flex items-center justify-between">
-                            <Label htmlFor="shared">Del med team</Label>
+                            <Label htmlFor="shared">Share with team</Label>
                             <Switch
                                 id="shared"
                                 checked={newListShared}
@@ -260,10 +260,10 @@ export default function CallLists() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                            Annuller
+                            Cancel
                         </Button>
                         <Button onClick={handleCreate} disabled={createMutation.isPending}>
-                            {createMutation.isPending ? "Opretter..." : "Opret"}
+                            {createMutation.isPending ? "Creating..." : "Create"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -273,15 +273,15 @@ export default function CallLists() {
             <Dialog open={showAutoGenDialog} onOpenChange={setShowAutoGenDialog}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Generer auto-ringeliste</DialogTitle>
+                        <DialogTitle>Generate Auto Call List</DialogTitle>
                         <DialogDescription>
-                            Systemet vil automatisk vælge virksomheder baseret på aktivitetsstatus.
-                            Prioriteret: Rød (inaktive) → Gul → Grøn
+                            The system will automatically select companies based on activity status.
+                            Priority: Red (inactive) → Yellow → Green
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div>
-                            <Label htmlFor="limit">Antal virksomheder</Label>
+                            <Label htmlFor="limit">Number of companies</Label>
                             <Input
                                 id="limit"
                                 type="number"
@@ -292,20 +292,20 @@ export default function CallLists() {
                             />
                         </div>
                         <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
-                            <p className="font-medium">Kriterier:</p>
+                            <p className="font-medium">Criteria:</p>
                             <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                                <li>Udelukker virksomheder uden telefonnummer</li>
-                                <li>Udelukker virksomheder markeret "Ring ikke"</li>
-                                <li>Prioriterer virksomheder med ældst sidste aktivitet først</li>
+                                <li>Excludes companies without phone number</li>
+                                <li>Excludes companies marked "Do not call"</li>
+                                <li>Prioritizes companies with oldest last activity first</li>
                             </ul>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowAutoGenDialog(false)}>
-                            Annuller
+                            Cancel
                         </Button>
                         <Button onClick={handleAutoGenerate} disabled={autoGenMutation.isPending}>
-                            {autoGenMutation.isPending ? "Genererer..." : "Generer"}
+                            {autoGenMutation.isPending ? "Generating..." : "Generate"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

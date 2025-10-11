@@ -100,13 +100,13 @@ export function getActivityStatusColor(status: ActivityStatus | null | undefined
 export function getActivityStatusLabel(status: ActivityStatus | null | undefined): string {
     switch (status) {
         case 'green':
-            return 'Aktiv (≤3 mdr)';
+            return 'Active (≤3 mo)';
         case 'yellow':
-            return 'Inaktiv (3-6 mdr)';
+            return 'Inactive (3-6 mo)';
         case 'red':
-            return 'Meget inaktiv (>6 mdr)';
+            return 'Very inactive (>6 mo)';
         default:
-            return 'Ingen aktivitet';
+            return 'No activity';
     }
 }
 

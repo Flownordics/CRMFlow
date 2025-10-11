@@ -15,7 +15,7 @@ export function ActivityStatusBadge({ status, lastActivityAt, showLabel = false 
     const daysSince = getDaysSinceActivity(lastActivityAt);
 
     const tooltipContent = daysSince !== null
-        ? `${label} - ${daysSince} dage siden sidste aktivitet`
+        ? `${label} - ${daysSince} days since last activity`
         : label;
 
     return (

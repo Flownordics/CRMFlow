@@ -35,7 +35,8 @@ export default function CompaniesList() {
         limit,
         q,
         industry: industry === "all" ? undefined : industry,
-        country: country === "all" ? undefined : country
+        country: country === "all" ? undefined : country,
+        activityStatus: activityStatus === "all" ? undefined : activityStatus
     });
 
     if (isLoading) {
@@ -239,26 +240,26 @@ export default function CompaniesList() {
                 <div className="flex flex-wrap items-center gap-4">
                     <Select value={activityStatus} onValueChange={setActivityStatus}>
                         <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Aktivitetsstatus" />
+                            <SelectValue placeholder="Activity Status" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Alle statusser</SelectItem>
+                            <SelectItem value="all">All statuses</SelectItem>
                             <SelectItem value="green">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-green-500" />
-                                    Grøn (≤3 mdr)
+                                    Green (≤3 mo)
                                 </div>
                             </SelectItem>
                             <SelectItem value="yellow">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                                    Gul (3-6 mdr)
+                                    Yellow (3-6 mo)
                                 </div>
                             </SelectItem>
                             <SelectItem value="red">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-red-500" />
-                                    Rød ({'>'}6 mdr)
+                                    Red ({'>'}6 mo)
                                 </div>
                             </SelectItem>
                         </SelectContent>

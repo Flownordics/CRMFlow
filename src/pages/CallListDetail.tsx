@@ -81,8 +81,8 @@ export default function CallListDetail() {
     const handleLogActivity = async () => {
         if (!callOutcome) {
             toast({
-                title: "Vælg udfald",
-                description: "Vælg venligst udfaldet af opkaldet",
+                title: "Select Outcome",
+                description: "Please select the outcome of the call",
                 variant: "destructive",
             });
             return;
@@ -106,8 +106,8 @@ export default function CallListDetail() {
             });
 
             toast({
-                title: "Aktivitet logget",
-                description: `Opkald til ${company.name} er blevet logget`,
+                title: "Activity Logged",
+                description: `Call to ${company.name} has been logged`,
             });
 
             // Clear form and move to next
@@ -122,8 +122,8 @@ export default function CallListDetail() {
             }, 500);
         } catch (error) {
             toast({
-                title: "Fejl",
-                description: "Kunne ikke logge aktivitet",
+                title: "Error",
+                description: "Failed to log activity",
                 variant: "destructive",
             });
         }
@@ -138,15 +138,15 @@ export default function CallListDetail() {
             });
 
             toast({
-                title: "Sprunget over",
-                description: "Virksomheden blev sprunget over",
+                title: "Skipped",
+                description: "Company was skipped",
             });
 
             handleNext();
         } catch (error) {
             toast({
-                title: "Fejl",
-                description: "Kunne ikke springe over",
+                title: "Error",
+                description: "Failed to skip",
                 variant: "destructive",
             });
         }
@@ -156,13 +156,13 @@ export default function CallListDetail() {
         try {
             await exportCallListToCsv(id!);
             toast({
-                title: "Eksporteret",
-                description: "Ringelisten er blevet eksporteret til CSV",
+                title: "Exported",
+                description: "Call list has been exported to CSV",
             });
         } catch (error) {
             toast({
-                title: "Fejl",
-                description: "Kunne ikke eksportere ringeliste",
+                title: "Error",
+                description: "Failed to export call list",
                 variant: "destructive",
             });
         }
@@ -171,21 +171,21 @@ export default function CallListDetail() {
     const handleDelete = async () => {
         if (!callList) return;
 
-        if (!confirm(`Er du sikker på, at du vil slette ringelisten "${callList.name}"?`)) {
+        if (!confirm(`Are you sure you want to delete the call list "${callList.name}"?`)) {
             return;
         }
 
         try {
             await deleteMutation.mutateAsync(id!);
             toast({
-                title: "Ringeliste slettet",
-                description: `${callList.name} er blevet slettet`,
+                title: "Call List Deleted",
+                description: `${callList.name} has been deleted`,
             });
             navigate("/call-lists");
         } catch (error) {
             toast({
-                title: "Fejl",
-                description: "Kunne ikke slette ringeliste",
+                title: "Error",
+                description: "Failed to delete call list",
                 variant: "destructive",
             });
         }
@@ -205,15 +205,15 @@ export default function CallListDetail() {
             <div className="container mx-auto py-6">
                 <Button variant="ghost" onClick={() => navigate("/call-lists")} className="mb-4">
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Tilbage
+                    Back
                 </Button>
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
                         <p className="text-muted-foreground mb-4">
-                            Denne ringeliste er tom
+                            This call list is empty
                         </p>
                         <Button onClick={() => navigate("/call-lists")}>
-                            Tilbage til oversigt
+                            Back to overview
                         </Button>
                     </CardContent>
                 </Card>
@@ -232,21 +232,21 @@ export default function CallListDetail() {
                         className="mb-2"
                     >
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Tilbage
+                        Back
                     </Button>
                     <h1 className="text-3xl font-bold">{callList.name}</h1>
                     <p className="text-muted-foreground mt-1">
-                        {completedCount} af {totalCount} gennemført
+                        {completedCount} of {totalCount} completed
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={handleExport}>
                         <Download className="mr-2 h-4 w-4" />
-                        Eksporter
+                        Export
                     </Button>
                     <Button variant="destructive" onClick={handleDelete}>
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Slet liste
+                        Delete List
                     </Button>
                 </div>
             </div>
@@ -256,7 +256,7 @@ export default function CallListDetail() {
                 <CardContent className="pt-6">
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span>Fremskridt</span>
+                            <span>Progress</span>
                             <span>{Math.round(progress)}%</span>
                         </div>
                         <Progress value={progress} />
@@ -273,7 +273,7 @@ export default function CallListDetail() {
                             <div className="flex-1">
                                 <CardTitle className="text-2xl">{company?.name}</CardTitle>
                                 <CardDescription>
-                                    Position {currentIndex + 1} af {totalCount}
+                                    Position {currentIndex + 1} of {totalCount}
                                 </CardDescription>
                             </div>
                             <ActivityStatusBadge
@@ -309,7 +309,7 @@ export default function CallListDetail() {
 
                         {currentItem.notes && (
                             <div className="p-3 bg-muted rounded-lg">
-                                <p className="text-sm font-medium mb-1">Noter:</p>
+                                <p className="text-sm font-medium mb-1">Notes:</p>
                                 <p className="text-sm text-muted-foreground">{currentItem.notes}</p>
                             </div>
                         )}
@@ -323,7 +323,7 @@ export default function CallListDetail() {
                                 className="flex-1"
                             >
                                 <ChevronLeft className="mr-2 h-4 w-4" />
-                                Forrige
+                                Previous
                             </Button>
                             <Button
                                 variant="outline"
@@ -331,7 +331,7 @@ export default function CallListDetail() {
                                 disabled={currentIndex === items.length - 1}
                                 className="flex-1"
                             >
-                                Næste
+                                Next
                                 <ChevronRight className="ml-2 h-4 w-4" />
                             </Button>
                         </div>
@@ -341,47 +341,47 @@ export default function CallListDetail() {
                 {/* Call Logging */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Log aktivitet</CardTitle>
+                        <CardTitle>Log Activity</CardTitle>
                         <CardDescription>
-                            Registrer udfaldet af dit opkald
+                            Record the outcome of your call
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="outcome">Udfald</Label>
+                            <Label htmlFor="outcome">Outcome</Label>
                             <Select value={callOutcome} onValueChange={setCallOutcome}>
                                 <SelectTrigger id="outcome">
-                                    <SelectValue placeholder="Vælg udfald" />
+                                    <SelectValue placeholder="Select outcome" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="completed">
                                         <div className="flex items-center gap-2">
                                             <CheckCircle className="h-4 w-4 text-green-600" />
-                                            Gennemført - Samtale afholdt
+                                            Completed - Call held
                                         </div>
                                     </SelectItem>
                                     <SelectItem value="voicemail">
                                         <div className="flex items-center gap-2">
                                             <Mail className="h-4 w-4 text-blue-600" />
-                                            Voicemail efterladt
+                                            Voicemail left
                                         </div>
                                     </SelectItem>
                                     <SelectItem value="no_answer">
                                         <div className="flex items-center gap-2">
                                             <XCircle className="h-4 w-4 text-orange-600" />
-                                            Intet svar
+                                            No answer
                                         </div>
                                     </SelectItem>
                                     <SelectItem value="scheduled_followup">
                                         <div className="flex items-center gap-2">
                                             <Clock className="h-4 w-4 text-purple-600" />
-                                            Aftalt opfølgning
+                                            Follow-up scheduled
                                         </div>
                                     </SelectItem>
                                     <SelectItem value="not_interested">
                                         <div className="flex items-center gap-2">
                                             <XCircle className="h-4 w-4 text-red-600" />
-                                            Ikke interesseret
+                                            Not interested
                                         </div>
                                     </SelectItem>
                                 </SelectContent>
@@ -389,10 +389,10 @@ export default function CallListDetail() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="notes">Noter (valgfrit)</Label>
+                            <Label htmlFor="notes">Notes (optional)</Label>
                             <Textarea
                                 id="notes"
-                                placeholder="Tilføj noter om samtalen..."
+                                placeholder="Add notes about the call..."
                                 value={callNotes}
                                 onChange={(e) => setCallNotes(e.target.value)}
                                 rows={4}
@@ -406,14 +406,14 @@ export default function CallListDetail() {
                                 className="flex-1"
                             >
                                 <CheckCircle className="mr-2 h-4 w-4" />
-                                {logActivityMutation.isPending ? "Logger..." : "Log aktivitet"}
+                                {logActivityMutation.isPending ? "Logging..." : "Log Activity"}
                             </Button>
                             <Button
                                 variant="outline"
                                 onClick={handleSkip}
                                 disabled={updateItemMutation.isPending}
                             >
-                                Spring over
+                                Skip
                             </Button>
                         </div>
                     </CardContent>
@@ -423,7 +423,7 @@ export default function CallListDetail() {
             {/* All Items List */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Alle virksomheder i listen</CardTitle>
+                    <CardTitle>All companies in the list</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-2">
@@ -452,17 +452,17 @@ export default function CallListDetail() {
                                     {item.status === 'completed' && (
                                         <Badge variant="default" className="bg-green-600">
                                             <CheckCircle className="h-3 w-3 mr-1" />
-                                            Gennemført
+                                            Completed
                                         </Badge>
                                     )}
                                     {item.status === 'skipped' && (
                                         <Badge variant="secondary">
-                                            Spring over
+                                            Skipped
                                         </Badge>
                                     )}
                                     {item.status === 'pending' && (
                                         <Badge variant="outline">
-                                            Afventer
+                                            Pending
                                         </Badge>
                                     )}
                                 </div>

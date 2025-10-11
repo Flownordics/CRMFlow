@@ -38,12 +38,20 @@ export async function fetchCompanies(params: {
   q?: string;
   industry?: string;
   country?: string;
+  activityStatus?: string;
 } = {}) {
-  const { page = 1, limit = 20, q = "", industry, country } = params;
+  const { page = 1, limit = 20, q = "", industry, country, activityStatus } = params;
 
   if (USE_MOCKS) {
     const { data } = await api.get("/companies", {
-      params: { page, limit, q, industry, country }
+      params: { 
+        page, 
+        limit, 
+        q, 
+        ...(industry && { industry }),
+        ...(country && { country }),
+        ...(activityStatus && { activityStatus })
+      }
     });
     const companies = z.array(companyReadSchema).parse(data);
     return {
@@ -85,6 +93,11 @@ export async function fetchCompanies(params: {
     // Country filter
     if (country) {
       queryParams.append('country', `eq.${country}`);
+    }
+
+    // Activity status filter
+    if (activityStatus) {
+      queryParams.append('activity_status', `eq.${activityStatus}`);
     }
 
     const url = `/companies?${queryParams.toString()}`;
@@ -323,7 +336,6 @@ export async function searchCompanies(query: string) {
     }
 
     // Properly encode the OR query for PostgREST
-    const encodedTerm = encodeURIComponent(term);
     const orParam = encodeURIComponent(
       `name.ilike.*%${term}%*,email.ilike.*%${term}%*,website.ilike.*%${term}%*`
     );
@@ -482,6 +494,7 @@ export function useCompanies(params: {
   q?: string;
   industry?: string;
   country?: string;
+  activityStatus?: string;
 } = {}) {
   return useQuery({
     queryKey: qk.companies(params),
