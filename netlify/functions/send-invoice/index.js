@@ -352,7 +352,9 @@ ${message || ''}
         let mimeMessage;
 
         if (pdfBase64) {
-            // With PDF attachment
+            // With PDF attachment - Chunk base64 data into 76-character lines for proper MIME formatting
+            const pdfBase64Chunked = pdfBase64.match(/.{1,76}/g)?.join('\r\n') || pdfBase64;
+            
             const attachmentBoundary = 'attachment_' + Math.random().toString(36).substring(2);
             mimeMessage = [
                 `MIME-Version: 1.0`,
@@ -380,10 +382,12 @@ ${message || ''}
                 `Content-Disposition: attachment; filename="${pdfFilename}"`,
                 `Content-Transfer-Encoding: base64`,
                 ``,
-                pdfBase64,
+                pdfBase64Chunked,
                 ``,
                 `--${boundary}--`,
             ].join('\r\n');
+            
+            console.log('MIME message created with PDF attachment, total size:', mimeMessage.length, 'bytes');
         } else {
             // Without PDF attachment
             const attachmentBoundary = 'attachment_' + Math.random().toString(36).substring(2);
