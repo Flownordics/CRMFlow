@@ -129,9 +129,8 @@ Deno.serve(async (req) => {
 
     // Save user integration (will be encrypted automatically)
     console.log('[google-oauth-callback] Saving user integration (tokens will be encrypted)...');
-    await upsertUserIntegration(supabaseAdmin, {
+    const integrationData: any = {
       user_id,
-      workspace_id,
       provider: 'google',
       kind,
       email,
@@ -140,7 +139,23 @@ Deno.serve(async (req) => {
       expires_at: expiresAt,
       scopes: scope.split(' '),
       last_synced_at: new Date().toISOString(),
+    };
+    
+    // Add workspace_id only if it exists (column may not exist in all setups)
+    if (workspace_id) {
+      integrationData.workspace_id = workspace_id;
+    }
+    
+    console.log('[google-oauth-callback] Integration data prepared:', {
+      user_id,
+      kind,
+      email,
+      hasWorkspaceId: !!workspace_id,
+      hasAccessToken: !!access_token,
+      hasRefreshToken: !!refresh_token
     });
+    
+    await upsertUserIntegration(supabaseAdmin, integrationData);
     
     console.log('[google-oauth-callback] Integration saved successfully. Redirecting to app...');
 
