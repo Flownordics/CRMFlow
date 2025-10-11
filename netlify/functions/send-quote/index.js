@@ -150,40 +150,27 @@ export const handler = async (event, context) => {
             };
         }
 
-        // Get workspace Google OAuth credentials
-        console.log('Looking for workspace Google OAuth credentials for workspace:', integration.workspace_id);
-        const { data: workspaceCredentials, error: workspaceError } = await supabase
-            .from('workspace_integrations')
-            .select('client_id, client_secret')
-            .eq('workspace_id', integration.workspace_id)
-            .eq('provider', 'google')
-            .eq('kind', 'gmail')
-            .single();
+        // Use centralized Google OAuth credentials from environment variables
+        console.log('Using centralized Google OAuth credentials from environment');
+        const workspaceCredentials = {
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET
+        };
 
-        console.log('Workspace credentials query result:', {
-            workspaceCredentials,
-            workspaceError,
-            hasClientId: !!workspaceCredentials?.client_id,
-            hasClientSecret: !!workspaceCredentials?.client_secret
+        console.log('Centralized credentials check:', {
+            hasClientId: !!workspaceCredentials.client_id,
+            hasClientSecret: !!workspaceCredentials.client_secret
         });
 
-        if (workspaceError) {
-            console.error('Workspace credentials query error:', workspaceError);
+        if (!workspaceCredentials.client_id || !workspaceCredentials.client_secret) {
+            console.error('Missing Google OAuth credentials in Netlify environment');
             return {
-                statusCode: 400,
+                statusCode: 500,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    error: 'Workspace Google OAuth credentials not found',
-                    details: workspaceError.message
+                    error: 'Google OAuth credentials not configured',
+                    details: 'Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Netlify environment variables'
                 })
-            };
-        }
-
-        if (!workspaceCredentials) {
-            return {
-                statusCode: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: 'Workspace Google OAuth credentials not configured' })
             };
         }
 
