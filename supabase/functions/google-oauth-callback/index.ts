@@ -144,8 +144,10 @@ Deno.serve(async (req) => {
     
     console.log('[google-oauth-callback] Integration saved successfully. Redirecting to app...');
 
-    // Redirect to completion page
-    const target = `${appUrl.replace(/\/+$/, '')}/oauth/complete?connected=true&provider=google&kind=${encodeURIComponent(kind)}`;
+    // Redirect to completion page with email info
+    const target = `${appUrl.replace(/\/+$/, '')}/oauth/complete?connected=true&provider=google&kind=${encodeURIComponent(kind)}&email=${encodeURIComponent(email)}`;
+    
+    console.log('[google-oauth-callback] Redirecting to:', target);
 
     return new Response(null, {
       status: 302,
