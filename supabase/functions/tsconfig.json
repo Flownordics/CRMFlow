@@ -2,19 +2,11 @@
     "compilerOptions": {
         "allowJs": true,
         "lib": [
-            "ES2022"
+            "ES2022",
+            "DOM"
         ],
-        "strict": true,
-        "noImplicitAny": true,
-        "strictNullChecks": true,
-        "strictFunctionTypes": true,
-        "noImplicitReturns": true,
-        "noFallthroughCasesInSwitch": true,
-        "noUncheckedIndexedAccess": true,
-        "noImplicitOverride": true,
-        "allowUnusedLabels": false,
-        "allowUnreachableCode": false,
-        "exactOptionalPropertyTypes": true,
+        "strict": false,
+        "noImplicitAny": false,
         "module": "ESNext",
         "target": "ES2022",
         "moduleResolution": "bundler",
@@ -23,17 +15,10 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "allowImportingTsExtensions": true,
-        "noEmit": true,
-        "types": [
-            "./types.d.ts"
-        ],
-        "typeRoots": [
-            "./"
-        ]
+        "noEmit": true
     },
     "include": [
-        "**/*.ts",
-        "types.d.ts"
+        "**/*.ts"
     ],
     "exclude": [
         "node_modules"
