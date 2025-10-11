@@ -1,3 +1,5 @@
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
 import { corsHeaders, okJson, errorJson, getUserIntegrationWithDecryption, upsertUserIntegration, getCentralizedOAuthCreds, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
 
 Deno.serve(async (req) => {
