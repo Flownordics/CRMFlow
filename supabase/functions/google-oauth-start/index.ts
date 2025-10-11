@@ -95,11 +95,19 @@ Deno.serve(async (req) => {
       client_id: credentials.client_id,
       redirect_uri: credentials.redirect_uri,
       scope: scopes,
-      access_type: 'offline',
+      access_type: 'offline', // CRITICAL: Requests refresh_token
       include_granted_scopes: 'true',
-      prompt: 'select_account',
+      prompt: 'consent', // CRITICAL: Forces consent screen to get refresh_token
       response_type: 'code',
       state,
+    });
+    
+    console.log('[google-oauth-start] OAuth params:', {
+      client_id: credentials.client_id.substring(0, 20) + '...',
+      redirect_uri: credentials.redirect_uri,
+      access_type: 'offline',
+      prompt: 'consent',
+      scopes: scopes
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;

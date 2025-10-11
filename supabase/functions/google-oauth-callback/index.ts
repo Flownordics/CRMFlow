@@ -88,6 +88,13 @@ Deno.serve(async (req) => {
     const tokenData = await tokenResponse.json();
     const { access_token, refresh_token, expires_in, scope } = tokenData;
     console.log('[google-oauth-callback] Token data:', { hasAccessToken: !!access_token, hasRefreshToken: !!refresh_token, expiresIn: expires_in });
+    
+    // CRITICAL: Check for refresh_token
+    if (!refresh_token) {
+      console.error('[google-oauth-callback] CRITICAL: No refresh_token received! This will cause token refresh to fail.');
+      console.error('[google-oauth-callback] User must reconnect with prompt=consent to get refresh_token');
+      // Continue anyway - user can reconnect later
+    }
 
     // Get user email
     console.log('[google-oauth-callback] Fetching user email...');
