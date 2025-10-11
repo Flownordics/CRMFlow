@@ -3,6 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { logger } from '@/lib/logger';
 
 // Types
+/**
+ * @deprecated WorkspaceIntegration is deprecated. The app now uses centralized OAuth credentials
+ * configured via environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI).
+ * Individual users connect their own Google accounts via the centralized OAuth app.
+ */
 export interface WorkspaceIntegration {
   id: string;
   workspace_id: string;
@@ -38,94 +43,31 @@ export interface IntegrationStatus {
   lastSyncedAt?: string;
 }
 
-// Workspace Integration Functions
+// Workspace Integration Functions (DEPRECATED)
+/**
+ * @deprecated This function is deprecated. The app now uses centralized OAuth credentials.
+ * Users should connect via the ConnectedAccounts component in Settings.
+ * @returns Empty array - workspace integrations are no longer used
+ */
 export async function getWorkspaceIntegrations(kind?: 'gmail' | 'calendar'): Promise<WorkspaceIntegration[]> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    // Get workspace ID from workspace_settings (single-tenant)
-    const { data: workspaceSettings } = await supabase
-      .from('workspace_settings')
-      .select('id')
-      .limit(1)
-      .single();
-
-    if (!workspaceSettings) {
-      throw new Error("Workspace not configured");
-    }
-
-    let query = supabase
-      .from('workspace_integrations')
-      .select('*')
-      .eq('workspace_id', workspaceSettings.id)
-      .eq('provider', 'google');
-
-    if (kind) {
-      query = query.eq('kind', kind);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw error;
-    }
-
-    return (data || []) as WorkspaceIntegration[];
-  } catch (error) {
-    logger.error('Failed to get workspace integrations:', error);
-    throw error;
-  }
+  // Deprecated: Return empty array without querying database
+  // The workspace_integrations table no longer exists with centralized OAuth
+  logger.warn('[DEPRECATED] getWorkspaceIntegrations() called - returning empty array. Use centralized OAuth instead.');
+  return [];
 }
 
+/**
+ * @deprecated This function is deprecated. OAuth credentials are now centralized and configured
+ * via environment variables: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
+ * @throws Error always - this operation is no longer supported
+ */
 export async function upsertWorkspaceIntegration(
   kind: 'gmail' | 'calendar',
   credentials: { client_id: string; client_secret: string; redirect_uri: string }
 ): Promise<WorkspaceIntegration> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    // Get workspace ID from workspace_settings (single-tenant)
-    const { data: workspaceSettings } = await supabase
-      .from('workspace_settings')
-      .select('id')
-      .limit(1)
-      .single();
-
-    if (!workspaceSettings) {
-      throw new Error("Workspace not configured");
-    }
-
-    const { data, error } = await supabase
-      .from('workspace_integrations')
-      .upsert({
-        workspace_id: workspaceSettings.id,
-        provider: 'google',
-        kind: kind,
-        client_id: credentials.client_id,
-        client_secret: credentials.client_secret,
-        redirect_uri: credentials.redirect_uri,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'workspace_id,provider,kind'
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return data as WorkspaceIntegration;
-  } catch (error) {
-    logger.error('Failed to upsert workspace integration:', error);
-    throw error;
-  }
+  // Deprecated: This operation is no longer supported with centralized OAuth
+  logger.error('[DEPRECATED] upsertWorkspaceIntegration() called - this is no longer supported. Configure OAuth credentials in Supabase environment variables instead.');
+  throw new Error('Workspace integrations are deprecated. Configure centralized OAuth credentials in Supabase Dashboard → Settings → Edge Functions → Environment Variables.');
 }
 
 // User Integration Functions
@@ -271,6 +213,9 @@ export async function deleteUserIntegration(kind: 'gmail' | 'calendar'): Promise
 }
 
 // React Query Hooks
+/**
+ * @deprecated This hook is deprecated. Use useUserIntegrations() instead.
+ */
 export function useWorkspaceIntegrations(kind?: 'gmail' | 'calendar') {
   return useQuery({
     queryKey: ['workspace-integrations', kind],
@@ -295,6 +240,9 @@ export function useIntegrationStatus(kind: 'gmail' | 'calendar') {
   });
 }
 
+/**
+ * @deprecated This hook is deprecated. OAuth credentials are now centralized.
+ */
 export function useUpsertWorkspaceIntegration() {
   const queryClient = useQueryClient();
 

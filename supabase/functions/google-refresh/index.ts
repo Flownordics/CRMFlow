@@ -1,4 +1,4 @@
-import { corsHeaders, okJson, errorJson, getUserIntegration, upsertUserIntegration, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
+import { corsHeaders, okJson, errorJson, getUserIntegrationWithDecryption, upsertUserIntegration, getCentralizedOAuthCreds, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -30,8 +30,8 @@ Deno.serve(async (req) => {
       return errorJson(400, 'Missing userId parameter', getEnvVar('APP_URL'));
     }
 
-    // Get user integration
-    const integration = await getUserIntegration(supabaseAdmin, userId, kind);
+    // Get user integration with decrypted tokens
+    const integration = await getUserIntegrationWithDecryption(supabaseAdmin, userId, kind);
     if (!integration || !integration.refresh_token) {
       return errorJson(400, 'No integration found or missing refresh token', getEnvVar('APP_URL'));
     }
@@ -49,18 +49,8 @@ Deno.serve(async (req) => {
       }, getEnvVar('APP_URL'));
     }
 
-    // Get workspace credentials for the redirect URI (same as OAuth flow)
-    const { data: workspaceCreds } = await supabaseAdmin
-      .from('workspace_integrations')
-      .select('client_id, client_secret, redirect_uri')
-      .eq('workspace_id', integration.workspace_id)
-      .eq('provider', 'google')
-      .eq('kind', kind)
-      .single();
-
-    if (!workspaceCreds) {
-      return errorJson(500, 'Workspace credentials not found', getEnvVar('APP_URL'));
-    }
+    // Get centralized OAuth credentials from environment variables
+    const credentials = getCentralizedOAuthCreds();
 
     // Refresh token using Google's OAuth2 endpoint
     const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -69,11 +59,11 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: workspaceCreds.client_id,
-        client_secret: workspaceCreds.client_secret,
+        client_id: credentials.client_id,
+        client_secret: credentials.client_secret,
         refresh_token: integration.refresh_token,
         grant_type: 'refresh_token',
-        redirect_uri: workspaceCreds.redirect_uri,
+        redirect_uri: credentials.redirect_uri,
       }),
     });
 

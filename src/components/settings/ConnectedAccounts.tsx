@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getUserIntegrations, disconnectIntegration, startGoogleConnect } from '@/services/integrations';
 import { UserIntegration } from '@/services/integrations';
 import { logger } from '@/lib/logger';
+import { ReconnectGoogleBanner } from './ReconnectGoogleBanner';
 
 export function ConnectedAccounts() {
   const [loading, setLoading] = useState(true);
@@ -117,10 +118,15 @@ export function ConnectedAccounts() {
   const calendarStatus = getIntegrationStatus('calendar');
 
   return (
-    <Card>
+    <>
+      <ReconnectGoogleBanner />
+      <Card>
       <CardHeader>
         <CardTitle>Connected Accounts</CardTitle>
-        <CardDescription>Manage your Google integrations</CardDescription>
+        <CardDescription>
+          Connect your Google account to enable Gmail and Calendar features. 
+          Emails will be sent from your own Gmail address, and calendar events will sync to your calendar.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Gmail Integration */}
@@ -244,5 +250,6 @@ export function ConnectedAccounts() {
         )}
       </CardContent>
     </Card>
+    </>
   );
 }

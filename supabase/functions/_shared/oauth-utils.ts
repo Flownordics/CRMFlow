@@ -113,25 +113,109 @@ function simpleChecksum(str: string): string {
   return Math.abs(hash).toString(36);
 }
 
-// Database helpers
+// Encryption utilities for token storage
+export async function encryptToken(plaintext: string): Promise<string> {
+  const encryptionKey = getEnvVar('ENCRYPTION_KEY');
+  
+  // For Deno, we use the Web Crypto API
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plaintext);
+  
+  // Derive a key from the encryption key
+  const keyData = encoder.encode(encryptionKey);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData.slice(0, 32), // Use first 32 bytes for AES-256
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+  
+  // Generate random IV
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  
+  // Encrypt
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  );
+  
+  // Combine IV and encrypted data, then base64 encode
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encrypted), iv.length);
+  
+  return btoa(String.fromCharCode(...combined));
+}
+
+export async function decryptToken(ciphertext: string): Promise<string> {
+  const encryptionKey = getEnvVar('ENCRYPTION_KEY');
+  
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  
+  // Decode from base64
+  const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+  
+  // Extract IV and encrypted data
+  const iv = combined.slice(0, 12);
+  const encrypted = combined.slice(12);
+  
+  // Derive key
+  const keyData = encoder.encode(encryptionKey);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData.slice(0, 32),
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
+  
+  // Decrypt
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encrypted
+  );
+  
+  return decoder.decode(decrypted);
+}
+
+// Database helpers - Centralized OAuth Credentials
+export function getCentralizedOAuthCreds(): WorkspaceCredentials {
+  return {
+    client_id: getEnvVar('GOOGLE_CLIENT_ID'),
+    client_secret: getEnvVar('GOOGLE_CLIENT_SECRET'),
+    redirect_uri: getEnvVar('GOOGLE_REDIRECT_URI'),
+  };
+}
+
+// Legacy: Get workspace credentials (deprecated, but kept for migration period)
 export async function getWorkspaceCreds(
   supabaseAdmin: any,
   workspace_id: string,
   kind: 'gmail' | 'calendar'
 ): Promise<WorkspaceCredentials> {
-  const { data, error } = await supabaseAdmin
-    .from('workspace_integrations')
-    .select('client_id, client_secret, redirect_uri')
-    .eq('workspace_id', workspace_id)
-    .eq('provider', 'google')
-    .eq('kind', kind)
-    .single();
+  // Try centralized credentials first
+  try {
+    return getCentralizedOAuthCreds();
+  } catch {
+    // Fallback to workspace credentials if centralized not configured
+    const { data, error } = await supabaseAdmin
+      .from('workspace_integrations')
+      .select('client_id, client_secret, redirect_uri')
+      .eq('workspace_id', workspace_id)
+      .eq('provider', 'google')
+      .eq('kind', kind)
+      .single();
 
-  if (error || !data) {
-    throw new Error(`No workspace credentials found for ${kind}`);
+    if (error || !data) {
+      throw new Error(`No OAuth credentials configured for ${kind}. Please configure centralized Google OAuth credentials.`);
+    }
+
+    return data;
   }
-
-  return data;
 }
 
 export async function getUserIntegration(
@@ -158,9 +242,24 @@ export async function upsertUserIntegration(
   supabaseAdmin: any,
   integration: UserIntegration
 ): Promise<UserIntegration> {
+  // Encrypt tokens before storing if ENCRYPTION_KEY is available
+  let integrationToStore = { ...integration };
+  
+  try {
+    if (integration.access_token) {
+      integrationToStore.access_token = await encryptToken(integration.access_token);
+    }
+    if (integration.refresh_token) {
+      integrationToStore.refresh_token = await encryptToken(integration.refresh_token);
+    }
+  } catch (encryptError) {
+    console.warn('Token encryption failed, storing in plaintext (ENCRYPTION_KEY may not be configured):', encryptError);
+    // If encryption fails, proceed with plaintext (backwards compatible)
+  }
+
   const { data, error } = await supabaseAdmin
     .from('user_integrations')
-    .upsert(integration, { onConflict: 'user_id,provider,kind' })
+    .upsert(integrationToStore, { onConflict: 'user_id,provider,kind' })
     .select()
     .single();
 
@@ -169,6 +268,34 @@ export async function upsertUserIntegration(
   }
 
   return data;
+}
+
+export async function getUserIntegrationWithDecryption(
+  supabaseAdmin: any,
+  user_id: string,
+  kind: 'gmail' | 'calendar'
+): Promise<UserIntegration | null> {
+  const integration = await getUserIntegration(supabaseAdmin, user_id, kind);
+  
+  if (!integration) {
+    return null;
+  }
+
+  // Decrypt tokens if they appear to be encrypted
+  try {
+    if (integration.access_token && integration.access_token.length > 100) {
+      // Likely encrypted (base64 encoded encrypted data is longer)
+      integration.access_token = await decryptToken(integration.access_token);
+    }
+    if (integration.refresh_token && integration.refresh_token.length > 100) {
+      integration.refresh_token = await decryptToken(integration.refresh_token);
+    }
+  } catch (decryptError) {
+    console.warn('Token decryption failed, assuming plaintext:', decryptError);
+    // If decryption fails, assume tokens are in plaintext (backwards compatible)
+  }
+
+  return integration;
 }
 
 // Get environment variables

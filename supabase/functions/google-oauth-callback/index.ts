@@ -1,4 +1,4 @@
-import { corsHeaders, errorJson, verifyState, getWorkspaceCreds, upsertUserIntegration, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
+import { corsHeaders, errorJson, verifyState, getCentralizedOAuthCreds, upsertUserIntegration, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
     // Create Supabase admin client
     const supabaseAdmin = createSupabaseAdmin();
 
-    // Get workspace credentials
-    const credentials = await getWorkspaceCreds(supabaseAdmin, workspace_id, kind);
+    // Get centralized OAuth credentials from environment variables
+    const credentials = getCentralizedOAuthCreds();
 
     // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {

@@ -1,4 +1,4 @@
-import { corsHeaders, okJson, errorJson, getUserIntegration, upsertUserIntegration, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
+import { corsHeaders, okJson, errorJson, getUserIntegrationWithDecryption, upsertUserIntegration, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     }
 
     // Get user's Gmail integration
-    const integration = await getUserIntegration(supabaseAdmin, user.id, 'gmail');
+    const integration = await getUserIntegrationWithDecryption(supabaseAdmin, user.id, 'gmail');
     if (!integration || !integration.access_token) {
       return errorJson(400, 'Gmail integration not found or missing access token');
     }

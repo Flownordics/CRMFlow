@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { WorkspaceIntegrationsForm } from '@/components/settings/WorkspaceIntegrationsForm';
 import { ConnectedAccounts } from '@/components/settings/ConnectedAccounts';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
@@ -81,7 +80,6 @@ export function SettingsPage() {
           </TabsList>
 
           <TabsContent value="integrations" className="space-y-6">
-            <WorkspaceIntegrationsForm workspaceId={workspaceId} />
             <ConnectedAccounts />
           </TabsContent>
 

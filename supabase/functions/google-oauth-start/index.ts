@@ -1,4 +1,4 @@
-import { corsHeaders, okJson, errorJson, signState, getWorkspaceCreds, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
+import { corsHeaders, okJson, errorJson, signState, getCentralizedOAuthCreds, createSupabaseAdmin, getEnvVar } from '../_shared/oauth-utils.ts';
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -51,8 +51,8 @@ Deno.serve(async (req) => {
       return errorJson(500, 'Workspace not configured', getEnvVar('APP_URL'));
     }
 
-    // Get workspace credentials
-    const credentials = await getWorkspaceCreds(supabaseAdmin, workspaceSettings.id, kind);
+    // Get centralized OAuth credentials from environment variables
+    const credentials = getCentralizedOAuthCreds();
 
     // Build OAuth state
     const state = signState({
@@ -68,12 +68,9 @@ Deno.serve(async (req) => {
       ? 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly'
       : 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email';
 
-    // Use frontend callback URL instead of Edge Function
-    const frontendRedirectUri = `${getEnvVar('APP_URL')}/oauth/callback`;
-
     const params = new URLSearchParams({
       client_id: credentials.client_id,
-      redirect_uri: frontendRedirectUri,
+      redirect_uri: credentials.redirect_uri,
       scope: scopes,
       access_type: 'offline',
       include_granted_scopes: 'true',
