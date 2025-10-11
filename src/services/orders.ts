@@ -3,6 +3,8 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { logger } from '@/lib/logger';
+import { supabase } from "@/integrations/supabase/client";
+import { logActivity } from "./activity";
 
 // Adapter functions for DB ↔ UI conversion (similar to quotes)
 const lineDbToUi = (l: any) => ({
@@ -134,6 +136,16 @@ export type OrderLineUI = {
     discountPct: number;
     lineTotalMinor: number;
 };
+
+// Order Email Request Schema
+export const OrderEmailRequest = z.object({
+    orderId: z.string(),
+    to: z.string().email("Invalid email address"),
+    subject: z.string().min(1, "Subject is required"),
+    message: z.string().optional(),
+});
+
+export type OrderEmailRequest = z.infer<typeof OrderEmailRequest>;
 
 // API
 export async function fetchOrders(params: {
@@ -548,4 +560,116 @@ export async function searchOrders(query: string): Promise<Array<{ id: string; l
         logger.error("Failed to search orders:", error);
         return [];
     }
+}
+
+// Send order email
+export async function sendOrderEmail(request: OrderEmailRequest): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+        // Validate request
+        const validatedRequest = OrderEmailRequest.parse(request);
+
+        // Check if Gmail is connected
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            throw new Error("User not authenticated");
+        }
+
+        const { data: integration, error: integrationError } = await supabase
+            .from('user_integrations')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('provider', 'google')
+            .eq('kind', 'gmail')
+            .single();
+
+        logger.debug('Gmail integration check:', {
+            integrationError,
+            integration: integration ? {
+                id: integration.id,
+                hasAccessToken: !!integration.access_token,
+                expiresAt: integration.expires_at,
+                email: integration.email
+            } : null
+        });
+
+        if (integrationError || !integration?.access_token) {
+            const error = new Error("Gmail not connected");
+            error.name = 'EmailNotConnectedError';
+            throw error;
+        }
+
+        // Send email via Netlify Function
+        const response = await fetch('/.netlify/functions/send-order', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            },
+            body: JSON.stringify({
+                order_id: validatedRequest.orderId,
+                recipient_email: validatedRequest.to,
+                subject: validatedRequest.subject,
+                message: validatedRequest.message,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to send email');
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Log email activity
+            const order = await fetchOrder(validatedRequest.orderId);
+            if (order.deal_id) {
+                await logActivity({
+                    type: 'email_sent',
+                    dealId: order.deal_id,
+                    meta: {
+                        orderId: validatedRequest.orderId,
+                        to: validatedRequest.to,
+                        subject: validatedRequest.subject,
+                        gmailMessageId: result.messageId
+                    }
+                });
+            }
+
+            return {
+                success: true,
+                messageId: result.messageId
+            };
+        } else {
+            throw new Error(result.error || 'Failed to send email');
+        }
+
+    } catch (error) {
+        logger.error('Failed to send order email:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+        logger.error('Order email error details:', {
+            error: errorMessage,
+            stack: error instanceof Error ? error.stack : undefined,
+            request: request
+        });
+
+        return {
+            success: false,
+            error: errorMessage
+        };
+    }
+}
+
+// React Query hook for sending order emails
+export function useSendOrderEmail() {
+    const queryClient = useQueryClient();
+    
+    return useMutation({
+        mutationFn: sendOrderEmail,
+        onSuccess: () => {
+            // Invalidate orders to refresh status
+            queryClient.invalidateQueries({ queryKey: qk.orders() });
+        },
+    });
 }
