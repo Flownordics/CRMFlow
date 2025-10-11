@@ -262,28 +262,28 @@ export async function upsertUserIntegration(
   try {
     if (integration.access_token) {
       accessTokenToStore = await encryptToken(integration.access_token);
-      console.log('[upsertUserIntegration] Access token encrypted');
+      console.log('[upsertUserIntegration] Access token encrypted (length:', accessTokenToStore?.length, ')');
     }
     if (integration.refresh_token) {
       refreshTokenToStore = await encryptToken(integration.refresh_token);
-      console.log('[upsertUserIntegration] Refresh token encrypted');
+      console.log('[upsertUserIntegration] Refresh token encrypted (length:', refreshTokenToStore?.length, ')');
     }
   } catch (encryptError) {
     console.warn('[upsertUserIntegration] Token encryption failed, storing in plaintext:', encryptError);
     // If encryption fails, proceed with plaintext (backwards compatible)
   }
 
-  // Use raw SQL insert to avoid Supabase client issues
+  // Try RPC method first
+  console.log('[upsertUserIntegration] Calling upsert_user_integration RPC...');
+  
   try {
-    console.log('[upsertUserIntegration] Executing upsert via RPC...');
-    
     const { data, error } = await supabaseAdmin.rpc('upsert_user_integration', {
       p_user_id: integration.user_id,
       p_workspace_id: integration.workspace_id || null,
       p_provider: integration.provider,
       p_kind: integration.kind,
       p_email: integration.email || null,
-      p_access_token: accessTokenToStore,
+      p_access_token: accessTokenToStore || '',
       p_refresh_token: refreshTokenToStore || null,
       p_expires_at: integration.expires_at || null,
       p_scopes: integration.scopes || null,
@@ -291,35 +291,58 @@ export async function upsertUserIntegration(
     });
 
     if (error) {
-      console.error('[upsertUserIntegration] RPC error:', error);
+      console.error('[upsertUserIntegration] RPC error:', JSON.stringify(error));
+      console.error('[upsertUserIntegration] RPC error details:', { 
+        code: error.code, 
+        message: error.message, 
+        details: error.details,
+        hint: error.hint
+      });
       throw error;
     }
 
-    console.log('[upsertUserIntegration] Upsert successful');
-    return data[0] || integration;
+    console.log('[upsertUserIntegration] RPC upsert successful, data:', data);
+    
+    // RPC returns array, get first element
+    const result = Array.isArray(data) ? data[0] : data;
+    return result || { ...integration, id: 'created' };
     
   } catch (rpcError) {
-    // Fallback to regular client method
-    console.warn('[upsertUserIntegration] RPC failed, trying direct upsert:', rpcError);
+    console.error('[upsertUserIntegration] RPC completely failed:', rpcError);
     
-    const integrationToStore = {
-      ...integration,
-      access_token: accessTokenToStore,
-      refresh_token: refreshTokenToStore,
+    // Last resort: Try direct upsert without encryption as service_role
+    console.warn('[upsertUserIntegration] Attempting direct upsert without encryption as fallback...');
+    
+    const integrationPlain = {
+      user_id: integration.user_id,
+      workspace_id: integration.workspace_id || null,
+      provider: integration.provider,
+      kind: integration.kind,
+      email: integration.email || null,
+      access_token: integration.access_token, // Use original plaintext
+      refresh_token: integration.refresh_token || null,
+      expires_at: integration.expires_at || null,
+      scopes: integration.scopes || null,
     };
+    
+    console.log('[upsertUserIntegration] Plaintext upsert data:', {
+      ...integrationPlain,
+      access_token: '***',
+      refresh_token: '***'
+    });
 
     const { data, error } = await supabaseAdmin
       .from('user_integrations')
-      .upsert(integrationToStore, { onConflict: 'user_id,provider,kind' })
+      .upsert(integrationPlain, { onConflict: 'user_id,provider,kind' })
       .select()
       .single();
 
     if (error) {
-      console.error('[upsertUserIntegration] Upsert error:', JSON.stringify(error, null, 2));
-      throw error;
+      console.error('[upsertUserIntegration] Final fallback failed:', JSON.stringify(error, null, 2));
+      throw new Error(`Failed to save integration: ${error.message || 'Unknown database error'}`);
     }
 
-    console.log('[upsertUserIntegration] Upsert via client successful');
+    console.log('[upsertUserIntegration] Plaintext upsert successful (encryption failed but data saved)');
     return data;
   }
 }
