@@ -1,6 +1,6 @@
 // Netlify Function - React PDF Generator (ES Module)
 import { createClient } from '@supabase/supabase-js';
-import ReactPDF from '@react-pdf/renderer';
+import { renderToStream, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import React from 'react';
 
 const corsHeaders = {
@@ -27,7 +27,7 @@ const formatDate = (dateStr) => {
 const createQuotePDF = (quote, items) => {
   const currency = quote.currency || 'DKK';
   
-  const styles = ReactPDF.StyleSheet.create({
+  const styles = StyleSheet.create({
     page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica', backgroundColor: '#FFFFFF' },
     header: { marginBottom: 20, paddingBottom: 15, borderBottom: '2px solid #CDBA9A' },
     headerTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
@@ -78,119 +78,119 @@ const createQuotePDF = (quote, items) => {
   ].filter(Boolean).join('  •  ');
 
   return React.createElement(
-    ReactPDF.Document,
+    Document,
     null,
     React.createElement(
-      ReactPDF.Page,
+      Page,
       { size: 'A4', style: styles.page },
       // Header
       React.createElement(
-        ReactPDF.View,
+        View,
         { style: styles.header },
         React.createElement(
-          ReactPDF.View,
+          View,
           { style: styles.headerTop },
-          React.createElement(ReactPDF.Text, { style: styles.companyName }, quote.company?.name || 'VIRKSOMHED'),
-          React.createElement(ReactPDF.Text, { style: styles.documentTitle }, 'TILBUD')
+          React.createElement(Text, { style: styles.companyName }, quote.company?.name || 'VIRKSOMHED'),
+          React.createElement(Text, { style: styles.documentTitle }, 'TILBUD')
         ),
         React.createElement(
-          ReactPDF.View,
+          View,
           { style: styles.metadata },
           React.createElement(
-            ReactPDF.View,
+            View,
             { style: styles.metaColumn },
-            React.createElement(ReactPDF.View, { style: styles.metaItem }, 
-              React.createElement(ReactPDF.Text, { style: styles.metaLabel }, 'DATO'),
-              React.createElement(ReactPDF.Text, { style: styles.metaValue }, formatDate(quote.created_at))
+            React.createElement(View, { style: styles.metaItem }, 
+              React.createElement(Text, { style: styles.metaLabel }, 'DATO'),
+              React.createElement(Text, { style: styles.metaValue }, formatDate(quote.created_at))
             ),
-            React.createElement(ReactPDF.View, { style: styles.metaItem },
-              React.createElement(ReactPDF.Text, { style: styles.metaLabel }, 'TILBUD NR.'),
-              React.createElement(ReactPDF.Text, { style: styles.metaValue }, quote.number || '-')
+            React.createElement(View, { style: styles.metaItem },
+              React.createElement(Text, { style: styles.metaLabel }, 'TILBUD NR.'),
+              React.createElement(Text, { style: styles.metaValue }, quote.number || '-')
             )
           ),
           React.createElement(
-            ReactPDF.View,
+            View,
             { style: styles.metaColumn },
-            React.createElement(ReactPDF.View, { style: styles.metaItem },
-              React.createElement(ReactPDF.Text, { style: styles.metaLabel }, 'GYLDIG TIL'),
-              React.createElement(ReactPDF.Text, { style: styles.metaValue }, formatDate(quote.valid_until))
+            React.createElement(View, { style: styles.metaItem },
+              React.createElement(Text, { style: styles.metaLabel }, 'GYLDIG TIL'),
+              React.createElement(Text, { style: styles.metaValue }, formatDate(quote.valid_until))
             )
           )
         )
       ),
       // Two Columns
       React.createElement(
-        ReactPDF.View,
+        View,
         { style: styles.twoColumns },
         React.createElement(
-          ReactPDF.View,
+          View,
           { style: styles.column },
-          React.createElement(ReactPDF.Text, { style: styles.columnTitle }, 'SOLGT AF'),
-          ...soldByLines.map((line, i) => React.createElement(ReactPDF.Text, { key: i, style: styles.columnText }, line))
+          React.createElement(Text, { style: styles.columnTitle }, 'SOLGT AF'),
+          ...soldByLines.map((line, i) => React.createElement(Text, { key: i, style: styles.columnText }, line))
         ),
         React.createElement(
-          ReactPDF.View,
+          View,
           { style: styles.column },
-          React.createElement(ReactPDF.Text, { style: styles.columnTitle }, 'TILBUD TIL'),
-          ...billToLines.map((line, i) => React.createElement(ReactPDF.Text, { key: i, style: styles.columnText }, line))
+          React.createElement(Text, { style: styles.columnTitle }, 'TILBUD TIL'),
+          ...billToLines.map((line, i) => React.createElement(Text, { key: i, style: styles.columnText }, line))
         )
       ),
       // Table
       React.createElement(
-        ReactPDF.View,
+        View,
         { style: styles.table },
         React.createElement(
-          ReactPDF.View,
+          View,
           { style: styles.tableHeader },
-          React.createElement(ReactPDF.Text, { style: styles.tableCol1 }, 'PRODUKT'),
-          React.createElement(ReactPDF.Text, { style: styles.tableCol2 }, 'ENHEDER'),
-          React.createElement(ReactPDF.Text, { style: styles.tableCol3 }, 'ENHEDSPRIS'),
-          React.createElement(ReactPDF.Text, { style: styles.tableCol4 }, 'TOTAL')
+          React.createElement(Text, { style: styles.tableCol1 }, 'PRODUKT'),
+          React.createElement(Text, { style: styles.tableCol2 }, 'ENHEDER'),
+          React.createElement(Text, { style: styles.tableCol3 }, 'ENHEDSPRIS'),
+          React.createElement(Text, { style: styles.tableCol4 }, 'TOTAL')
         ),
         ...items.map((item, i) => {
           const qty = item.qty || 1;
           const unitPrice = item.unit_minor || 0;
           const total = qty * unitPrice;
           return React.createElement(
-            ReactPDF.View,
+            View,
             { key: i, style: [styles.tableRow, i % 2 === 0 && styles.tableRowEven] },
-            React.createElement(ReactPDF.Text, { style: styles.tableCol1 }, item.description || '—'),
-            React.createElement(ReactPDF.Text, { style: styles.tableCol2 }, String(qty)),
-            React.createElement(ReactPDF.Text, { style: styles.tableCol3 }, formatCurrency(unitPrice, currency)),
-            React.createElement(ReactPDF.Text, { style: styles.tableCol4 }, formatCurrency(total, currency))
+            React.createElement(Text, { style: styles.tableCol1 }, item.description || '—'),
+            React.createElement(Text, { style: styles.tableCol2 }, String(qty)),
+            React.createElement(Text, { style: styles.tableCol3 }, formatCurrency(unitPrice, currency)),
+            React.createElement(Text, { style: styles.tableCol4 }, formatCurrency(total, currency))
           );
         })
       ),
       // Totals
       React.createElement(
-        ReactPDF.View,
+        View,
         { style: styles.totals },
         React.createElement(
-          ReactPDF.View,
+          View,
           { style: styles.totalRow },
-          React.createElement(ReactPDF.Text, null, 'Subtotal'),
-          React.createElement(ReactPDF.Text, null, formatCurrency(quote.subtotal_minor || 0, currency))
+          React.createElement(Text, null, 'Subtotal'),
+          React.createElement(Text, null, formatCurrency(quote.subtotal_minor || 0, currency))
         ),
         React.createElement(
-          ReactPDF.View,
+          View,
           { style: styles.totalRow },
-          React.createElement(ReactPDF.Text, null, 'Moms'),
-          React.createElement(ReactPDF.Text, null, formatCurrency(quote.tax_minor || 0, currency))
+          React.createElement(Text, null, 'Moms'),
+          React.createElement(Text, null, formatCurrency(quote.tax_minor || 0, currency))
         ),
-        React.createElement(ReactPDF.View, { style: styles.totalsDivider }),
+        React.createElement(View, { style: styles.totalsDivider }),
         React.createElement(
-          ReactPDF.View,
+          View,
           { style: [styles.totalRow, styles.totalFinal] },
-          React.createElement(ReactPDF.Text, null, 'Total'),
-          React.createElement(ReactPDF.Text, null, formatCurrency(quote.total_minor || 0, currency))
+          React.createElement(Text, null, 'Total'),
+          React.createElement(Text, null, formatCurrency(quote.total_minor || 0, currency))
         )
       ),
       // Footer
       React.createElement(
-        ReactPDF.View,
+        View,
         { style: styles.footer, fixed: true },
-        React.createElement(ReactPDF.Text, null, companyFooter),
-        React.createElement(ReactPDF.Text, { 
+        React.createElement(Text, null, companyFooter),
+        React.createElement(Text, { 
           render: ({ pageNumber, totalPages }) => `Side ${pageNumber} af ${totalPages}` 
         })
       )
@@ -291,8 +291,16 @@ export const handler = async (event) => {
     console.log('[PDF-React] Generating PDF with @react-pdf/renderer');
     
     const pdfDoc = createQuotePDF(docData, items);
-    const pdfBuffer = await ReactPDF.renderToBuffer(pdfDoc);
-
+    
+    // Convert stream to buffer
+    const stream = await renderToStream(pdfDoc);
+    const chunks = [];
+    
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    
+    const pdfBuffer = Buffer.concat(chunks);
     console.log('[PDF-React] PDF generated, size:', pdfBuffer.length, 'bytes');
 
     // Convert to base64
