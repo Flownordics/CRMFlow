@@ -319,9 +319,11 @@ export const handler = async (event, context) => {
                     })
                 };
             } else {
-                const pdfBuffer = await pdfResponse.arrayBuffer();
-                pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
-                console.log('PDF generated successfully, size:', pdfBuffer.byteLength, 'bytes');
+                // pdf-react returns JSON with base64 PDF already encoded
+                const pdfData = await pdfResponse.json();
+                pdfBase64 = pdfData.pdf; // Already base64 encoded!
+                pdfFilename = pdfData.filename || pdfFilename;
+                console.log('PDF generated successfully, base64 length:', pdfBase64.length, 'chars, filename:', pdfFilename);
             }
         } catch (pdfError) {
             console.error('PDF generation error:', pdfError);
