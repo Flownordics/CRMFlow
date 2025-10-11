@@ -253,32 +253,75 @@ export async function upsertUserIntegration(
   supabaseAdmin: any,
   integration: UserIntegration
 ): Promise<UserIntegration> {
+  console.log('[upsertUserIntegration] Starting upsert for:', { user_id: integration.user_id, kind: integration.kind, email: integration.email });
+  
   // Encrypt tokens before storing if ENCRYPTION_KEY is available
-  let integrationToStore = { ...integration };
+  let accessTokenToStore = integration.access_token;
+  let refreshTokenToStore = integration.refresh_token;
   
   try {
     if (integration.access_token) {
-      integrationToStore.access_token = await encryptToken(integration.access_token);
+      accessTokenToStore = await encryptToken(integration.access_token);
+      console.log('[upsertUserIntegration] Access token encrypted');
     }
     if (integration.refresh_token) {
-      integrationToStore.refresh_token = await encryptToken(integration.refresh_token);
+      refreshTokenToStore = await encryptToken(integration.refresh_token);
+      console.log('[upsertUserIntegration] Refresh token encrypted');
     }
   } catch (encryptError) {
-    console.warn('Token encryption failed, storing in plaintext (ENCRYPTION_KEY may not be configured):', encryptError);
+    console.warn('[upsertUserIntegration] Token encryption failed, storing in plaintext:', encryptError);
     // If encryption fails, proceed with plaintext (backwards compatible)
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('user_integrations')
-    .upsert(integrationToStore, { onConflict: 'user_id,provider,kind' })
-    .select()
-    .single();
+  // Use raw SQL insert to avoid Supabase client issues
+  try {
+    console.log('[upsertUserIntegration] Executing upsert via RPC...');
+    
+    const { data, error } = await supabaseAdmin.rpc('upsert_user_integration', {
+      p_user_id: integration.user_id,
+      p_workspace_id: integration.workspace_id || null,
+      p_provider: integration.provider,
+      p_kind: integration.kind,
+      p_email: integration.email || null,
+      p_access_token: accessTokenToStore,
+      p_refresh_token: refreshTokenToStore || null,
+      p_expires_at: integration.expires_at || null,
+      p_scopes: integration.scopes || null,
+      p_last_synced_at: integration.last_synced_at || new Date().toISOString(),
+    });
 
-  if (error) {
-    throw error;
+    if (error) {
+      console.error('[upsertUserIntegration] RPC error:', error);
+      throw error;
+    }
+
+    console.log('[upsertUserIntegration] Upsert successful');
+    return data[0] || integration;
+    
+  } catch (rpcError) {
+    // Fallback to regular client method
+    console.warn('[upsertUserIntegration] RPC failed, trying direct upsert:', rpcError);
+    
+    const integrationToStore = {
+      ...integration,
+      access_token: accessTokenToStore,
+      refresh_token: refreshTokenToStore,
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('user_integrations')
+      .upsert(integrationToStore, { onConflict: 'user_id,provider,kind' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[upsertUserIntegration] Upsert error:', JSON.stringify(error, null, 2));
+      throw error;
+    }
+
+    console.log('[upsertUserIntegration] Upsert via client successful');
+    return data;
   }
-
-  return data;
 }
 
 export async function getUserIntegrationWithDecryption(
