@@ -31,12 +31,23 @@ export interface UserIntegration {
   updated_at?: string;
 }
 
-// CORS headers
+// CORS headers - Always allow from our frontend
 export function corsHeaders(origin?: string) {
+  const allowedOrigins = [
+    'https://crmflow-app.netlify.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ];
+  
+  // If specific origin provided and it's in allowed list, use it
+  // Otherwise default to wildcard for development
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : '*';
+  
   return {
-    'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, content-type, apikey',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, content-type, apikey, x-requested-with',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Max-Age': '86400', // 24 hours
     'Content-Type': 'application/json',
   };
 }
@@ -298,11 +309,22 @@ export async function getUserIntegrationWithDecryption(
   return integration;
 }
 
-// Get environment variables
+// Get environment variables with better error handling
 export function getEnvVar(name: string): string {
   const value = Deno.env.get(name);
   if (!value) {
+    console.error(`[CRITICAL] Missing environment variable: ${name}`);
     throw new Error(`Missing environment variable: ${name}`);
+  }
+  return value;
+}
+
+// Safe environment variable getter that doesn't throw
+export function getEnvVarSafe(name: string, defaultValue: string = ''): string {
+  const value = Deno.env.get(name);
+  if (!value) {
+    console.warn(`[WARNING] Missing environment variable: ${name}, using default: ${defaultValue || 'empty'}`);
+    return defaultValue;
   }
   return value;
 }
