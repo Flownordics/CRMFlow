@@ -255,23 +255,12 @@ export async function upsertUserIntegration(
 ): Promise<UserIntegration> {
   console.log('[upsertUserIntegration] Starting upsert for:', { user_id: integration.user_id, kind: integration.kind, email: integration.email });
   
-  // Encrypt tokens before storing if ENCRYPTION_KEY is available
-  let accessTokenToStore = integration.access_token;
-  let refreshTokenToStore = integration.refresh_token;
+  // TEMPORARY: Disable encryption until we implement proper Edge Function proxy for all Calendar/Gmail operations
+  // Storing tokens in plaintext for now since frontend needs to access them
+  const accessTokenToStore = integration.access_token;
+  const refreshTokenToStore = integration.refresh_token;
   
-  try {
-    if (integration.access_token) {
-      accessTokenToStore = await encryptToken(integration.access_token);
-      console.log('[upsertUserIntegration] Access token encrypted (length:', accessTokenToStore?.length, ')');
-    }
-    if (integration.refresh_token) {
-      refreshTokenToStore = await encryptToken(integration.refresh_token);
-      console.log('[upsertUserIntegration] Refresh token encrypted (length:', refreshTokenToStore?.length, ')');
-    }
-  } catch (encryptError) {
-    console.warn('[upsertUserIntegration] Token encryption failed, storing in plaintext:', encryptError);
-    // If encryption fails, proceed with plaintext (backwards compatible)
-  }
+  console.log('[upsertUserIntegration] Storing tokens in plaintext (encryption disabled for now)');
 
   // Try RPC method first
   console.log('[upsertUserIntegration] Calling upsert_user_integration RPC...');
@@ -358,20 +347,10 @@ export async function getUserIntegrationWithDecryption(
     return null;
   }
 
-  // Decrypt tokens if they appear to be encrypted
-  try {
-    if (integration.access_token && integration.access_token.length > 100) {
-      // Likely encrypted (base64 encoded encrypted data is longer)
-      integration.access_token = await decryptToken(integration.access_token);
-    }
-    if (integration.refresh_token && integration.refresh_token.length > 100) {
-      integration.refresh_token = await decryptToken(integration.refresh_token);
-    }
-  } catch (decryptError) {
-    console.warn('Token decryption failed, assuming plaintext:', decryptError);
-    // If decryption fails, assume tokens are in plaintext (backwards compatible)
-  }
-
+  // TEMPORARY: Decryption disabled since we're storing in plaintext for now
+  // Tokens are stored in plaintext so frontend can access them
+  console.log('[getUserIntegrationWithDecryption] Returning plaintext tokens (encryption disabled)');
+  
   return integration;
 }
 
