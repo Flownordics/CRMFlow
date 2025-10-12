@@ -2,13 +2,9 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
-    Phone,
     ChevronLeft,
     ChevronRight,
     CheckCircle,
-    XCircle,
-    Clock,
-    Mail,
     Download,
     Trash2,
     Plus,
@@ -21,24 +17,15 @@ import {
     useUpdateCallListItem,
     exportCallListToCsv,
     useDeleteCallList,
-    useAddCompaniesToCallList,
 } from "@/services/callLists";
-import { useLogCompanyActivity, useCompanyActivityLogs } from "@/services/activityLog";
+import { useCompanyActivityLogs } from "@/services/activityLog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ActivityStatusBadge } from "@/components/companies/ActivityStatusBadge";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { CompanySearchDialog } from "@/components/call-lists/CompanySearchDialog";
+import { LogActivityPanel } from "@/components/activities/LogActivityPanel";
 
 export default function CallListDetail() {
     const { id } = useParams<{ id: string }>();
@@ -46,14 +33,11 @@ export default function CallListDetail() {
     const { toast } = useToast();
 
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [callOutcome, setCallOutcome] = useState("");
-    const [callNotes, setCallNotes] = useState("");
     const [showAddCompaniesDialog, setShowAddCompaniesDialog] = useState(false);
 
     const { data: callList, isLoading: listLoading } = useCallList(id!);
     const { data: items, isLoading: itemsLoading } = useCallListItems(id!);
     const updateItemMutation = useUpdateCallListItem(items?.[currentIndex]?.id || "", id!);
-    const logActivityMutation = useLogCompanyActivity(items?.[currentIndex]?.company?.id || "");
     const deleteMutation = useDeleteCallList();
     const { data: recentActivities } = useCompanyActivityLogs(items?.[currentIndex]?.company?.id || "");
 
@@ -68,54 +52,23 @@ export default function CallListDetail() {
     const handleNext = () => {
         if (items && currentIndex < items.length - 1) {
             setCurrentIndex(currentIndex + 1);
-            setCallOutcome("");
-            setCallNotes("");
         }
     };
 
     const handlePrevious = () => {
         if (currentIndex > 0) {
             setCurrentIndex(currentIndex - 1);
-            setCallOutcome("");
-            setCallNotes("");
         }
     };
 
-    const handleLogActivity = async () => {
-        if (!callOutcome) {
-            toast({
-                title: "Select Outcome",
-                description: "Please select the outcome of the call",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        if (!currentItem || !company) return;
+    const handleActivityLogged = async () => {
+        if (!currentItem) return;
 
         try {
-            // Log the activity
-            await logActivityMutation.mutateAsync({
-                companyId: company.id,
-                type: 'call',
-                outcome: callOutcome,
-                notes: callNotes,
-            });
-
             // Update the call list item status
             await updateItemMutation.mutateAsync({
                 status: 'completed',
-                notes: callNotes,
             });
-
-            toast({
-                title: "Activity Logged",
-                description: `Call to ${company.name} has been logged`,
-            });
-
-            // Clear form and move to next
-            setCallOutcome("");
-            setCallNotes("");
 
             // Auto-advance to next item
             setTimeout(() => {
@@ -126,7 +79,7 @@ export default function CallListDetail() {
         } catch (error) {
             toast({
                 title: "Error",
-                description: "Failed to log activity",
+                description: "Failed to update call list item",
                 variant: "destructive",
             });
         }
@@ -412,85 +365,13 @@ export default function CallListDetail() {
                 </Card>
 
                 {/* Call Logging */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Log Activity</CardTitle>
-                        <CardDescription>
-                            Record the outcome of your call
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="outcome">Outcome</Label>
-                            <Select value={callOutcome} onValueChange={setCallOutcome}>
-                                <SelectTrigger id="outcome">
-                                    <SelectValue placeholder="Select outcome" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="completed">
-                                        <div className="flex items-center gap-2">
-                                            <CheckCircle className="h-4 w-4 text-[#6b7c5e]" />
-                                            Completed - Call held
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="voicemail">
-                                        <div className="flex items-center gap-2">
-                                            <Mail className="h-4 w-4 text-[#7a9db3]" />
-                                            Voicemail left
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="no_answer">
-                                        <div className="flex items-center gap-2">
-                                            <XCircle className="h-4 w-4 text-[#9d855e]" />
-                                            No answer
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="scheduled_followup">
-                                        <div className="flex items-center gap-2">
-                                            <Clock className="h-4 w-4 text-[#9d94af]" />
-                                            Follow-up scheduled
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="not_interested">
-                                        <div className="flex items-center gap-2">
-                                            <XCircle className="h-4 w-4 text-[#b8695f]" />
-                                            Not interested
-                                        </div>
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="notes">Notes (optional)</Label>
-                            <Textarea
-                                id="notes"
-                                placeholder="Add notes about the call..."
-                                value={callNotes}
-                                onChange={(e) => setCallNotes(e.target.value)}
-                                rows={4}
-                            />
-                        </div>
-
-                        <div className="flex gap-2 pt-2">
-                            <Button
-                                onClick={handleLogActivity}
-                                disabled={!callOutcome || logActivityMutation.isPending}
-                                className="flex-1"
-                            >
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                {logActivityMutation.isPending ? "Logging..." : "Log Activity"}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={handleSkip}
-                                disabled={updateItemMutation.isPending}
-                            >
-                                Skip
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                <LogActivityPanel
+                    companyId={company?.id || ""}
+                    companyName={company?.name}
+                    onActivityLogged={handleActivityLogged}
+                    onSkip={handleSkip}
+                    skipDisabled={updateItemMutation.isPending}
+                />
             </div>
 
             {/* All Items List */}
@@ -505,11 +386,9 @@ export default function CallListDetail() {
                                 key={item.id}
                                 className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${index === currentIndex ? 'bg-muted border-primary' : ''
                                     }`}
-                                onClick={() => {
-                                    setCurrentIndex(index);
-                                    setCallOutcome("");
-                                    setCallNotes("");
-                                }}
+                onClick={() => {
+                    setCurrentIndex(index);
+                }}
                             >
                                 <div className="flex items-center gap-3">
                                     <span className="text-sm font-medium text-muted-foreground w-8">

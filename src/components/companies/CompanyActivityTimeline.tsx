@@ -57,9 +57,9 @@ const outcomeLabels: Record<string, string> = {
   voicemail: "Voicemail",
   no_answer: "No Answer",
   scheduled_followup: "Follow-up Scheduled",
+  not_interested: "Not Interested",
   busy: "Busy",
   wrong_number: "Wrong Number",
-  not_interested: "Not Interested",
   callback_requested: "Callback Requested",
 };
 
@@ -311,13 +311,13 @@ export function CompanyActivityTimeline({ companyId }: CompanyActivityTimelinePr
                         <SelectItem value="completed">
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4" />
-                            Completed
+                            Completed - Call held
                           </div>
                         </SelectItem>
                         <SelectItem value="voicemail">
                           <div className="flex items-center gap-2">
                             <Voicemail className="h-4 w-4" />
-                            Voicemail
+                            Voicemail left
                           </div>
                         </SelectItem>
                         <SelectItem value="no_answer">
@@ -326,16 +326,34 @@ export function CompanyActivityTimeline({ companyId }: CompanyActivityTimelinePr
                             No Answer
                           </div>
                         </SelectItem>
-                        <SelectItem value="busy">
+                        <SelectItem value="scheduled_followup">
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4" />
-                            Busy
+                            Follow-up Scheduled
                           </div>
                         </SelectItem>
                         <SelectItem value="not_interested">
                           <div className="flex items-center gap-2">
                             <PhoneOff className="h-4 w-4" />
                             Not Interested
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="busy">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            Busy
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="wrong_number">
+                          <div className="flex items-center gap-2">
+                            <PhoneOff className="h-4 w-4" />
+                            Wrong Number
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="callback_requested">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            Callback Requested
                           </div>
                         </SelectItem>
                       </>
