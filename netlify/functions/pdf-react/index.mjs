@@ -9,6 +9,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+// Brand Colors - FlowNordics
+const COLORS = {
+  brand: {
+    purple: '#330065',        // Primary brand purple
+    purpleDark: '#220044',    // Darker shade for depth
+    purpleLight: '#4d0099',   // Lighter shade
+    green: '#7ef791',         // Accent green
+    greenLight: '#b3fac1',    // Light green for backgrounds
+    greenDark: '#5ed975',     // Darker green for emphasis
+  },
+  neutral: {
+    white: '#ffffff',
+    gray50: '#fafafa',
+    gray100: '#f5f5f5',
+    gray200: '#efefef',
+    gray300: '#dcdcdc',
+    gray400: '#bdbdbd',
+    gray500: '#989898',
+    gray600: '#7c7c7c',
+    gray700: '#656565',
+    gray800: '#464646',
+    gray900: '#3d3d3d',
+    black: '#292929',
+  },
+  semantic: {
+    success: '#7ef791',
+    info: '#4d0099',
+  }
+};
+
 // Helper functions
 const formatCurrency = (value, currency = 'DKK') => {
   const amount = value / 100;
@@ -23,35 +53,224 @@ const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleDateString('da-DK');
 };
 
-// Shared styles for all document types
+// Modern shared styles for all document types
 const createSharedStyles = () => StyleSheet.create({
-  page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica', backgroundColor: '#FFFFFF' },
-  header: { marginBottom: 20, paddingBottom: 15, borderBottom: '2px solid #CDBA9A' },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  companyName: { fontSize: 20, fontWeight: 'bold', color: '#5E6367' },
-  documentTitle: { fontSize: 24, fontWeight: 'bold', color: '#5E6367', textAlign: 'right' },
-  metadata: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  metaColumn: { flex: 1 },
-  metaItem: { marginBottom: 8 },
-  metaLabel: { fontSize: 8, color: '#5E6367', marginBottom: 2 },
-  metaValue: { fontSize: 10, fontWeight: 'bold', color: '#5E6367' },
-  twoColumns: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 20, paddingVertical: 15, borderBottom: '1px solid #CDBA9A' },
-  column: { flex: 1 },
-  columnTitle: { fontSize: 10, fontWeight: 'bold', marginBottom: 8, color: '#5E6367' },
-  columnText: { fontSize: 9, marginBottom: 3, color: '#5E6367' },
-  table: { marginVertical: 15 },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#CDBA9A', padding: 8, fontWeight: 'bold', fontSize: 9 },
-  tableRow: { flexDirection: 'row', borderBottom: '1px solid #CDBA9A', padding: 8, fontSize: 8 },
-  tableRowEven: { backgroundColor: '#F8F6F0' },
-  tableCol1: { flex: 3 },
-  tableCol2: { flex: 1, textAlign: 'right' },
-  tableCol3: { flex: 1, textAlign: 'right' },
-  tableCol4: { flex: 1, textAlign: 'right' },
-  totals: { marginTop: 20, marginLeft: 'auto', width: 200, border: '2px solid #CDBA9A', padding: 15 },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, fontSize: 9 },
-  totalsDivider: { borderTop: '1px solid #CDBA9A', marginVertical: 8 },
-  totalFinal: { fontSize: 12, fontWeight: 'bold' },
-  footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid #CDBA9A', fontSize: 7 },
+  // Page structure
+  page: { 
+    padding: 45, 
+    fontSize: 10, 
+    fontFamily: 'Helvetica', 
+    backgroundColor: COLORS.neutral.white,
+    color: COLORS.neutral.gray900,
+  },
+  
+  // Header section with modern design
+  header: { 
+    marginBottom: 30,
+    paddingBottom: 20,
+    borderBottomWidth: 3,
+    borderBottomColor: COLORS.brand.purple,
+    borderBottomStyle: 'solid',
+  },
+  headerTop: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  companyName: { 
+    fontSize: 22, 
+    fontWeight: 'bold', 
+    color: COLORS.brand.purple,
+    letterSpacing: 0.5,
+  },
+  documentTitle: { 
+    fontSize: 28, 
+    fontWeight: 'bold', 
+    color: COLORS.brand.purple,
+    textAlign: 'right',
+    letterSpacing: 1.5,
+  },
+  
+  // Metadata section with clean grid
+  metadata: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  metaColumn: { 
+    flex: 1,
+    padding: 12,
+    marginHorizontal: 5,
+    backgroundColor: COLORS.neutral.gray50,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: COLORS.neutral.gray200,
+    borderStyle: 'solid',
+  },
+  metaItem: { 
+    marginBottom: 10,
+  },
+  metaLabel: { 
+    fontSize: 8, 
+    color: COLORS.neutral.gray600,
+    marginBottom: 3,
+    letterSpacing: 0.8,
+    fontWeight: 600,
+  },
+  metaValue: { 
+    fontSize: 11, 
+    fontWeight: 'bold', 
+    color: COLORS.neutral.gray900,
+  },
+  
+  // Two-column section for addresses
+  twoColumns: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between',
+    marginVertical: 25,
+  },
+  column: { 
+    flex: 1,
+    padding: 15,
+    marginHorizontal: 5,
+    backgroundColor: COLORS.neutral.gray50,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: COLORS.neutral.gray200,
+    borderStyle: 'solid',
+  },
+  columnTitle: { 
+    fontSize: 10, 
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: COLORS.brand.purple,
+    letterSpacing: 0.8,
+    paddingBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.brand.green,
+    borderBottomStyle: 'solid',
+  },
+  columnText: { 
+    fontSize: 9.5, 
+    marginBottom: 4,
+    color: COLORS.neutral.gray800,
+    lineHeight: 1.4,
+  },
+  
+  // Modern table design
+  table: { 
+    marginVertical: 20,
+    borderWidth: 1,
+    borderColor: COLORS.neutral.gray200,
+    borderStyle: 'solid',
+    borderRadius: 4,
+  },
+  tableHeader: { 
+    flexDirection: 'row',
+    backgroundColor: COLORS.brand.purple,
+    padding: 10,
+    fontWeight: 'bold',
+    fontSize: 9,
+    color: COLORS.neutral.white,
+    letterSpacing: 0.5,
+  },
+  tableRow: { 
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.neutral.gray200,
+    borderBottomStyle: 'solid',
+    padding: 10,
+    fontSize: 9,
+  },
+  tableRowEven: { 
+    backgroundColor: COLORS.neutral.gray50,
+  },
+  tableCol1: { 
+    flex: 3,
+    paddingRight: 10,
+  },
+  tableCol2: { 
+    flex: 1,
+    textAlign: 'right',
+    paddingRight: 10,
+  },
+  tableCol3: { 
+    flex: 1.2,
+    textAlign: 'right',
+    paddingRight: 10,
+  },
+  tableCol4: { 
+    flex: 1.2,
+    textAlign: 'right',
+    fontWeight: 'bold',
+  },
+  
+  // Modern totals section with accent color
+  totals: { 
+    marginTop: 25,
+    marginLeft: 'auto',
+    width: 240,
+    backgroundColor: COLORS.neutral.white,
+    borderWidth: 2,
+    borderColor: COLORS.brand.purple,
+    borderStyle: 'solid',
+    borderRadius: 4,
+  },
+  totalsHeader: {
+    backgroundColor: COLORS.brand.purple,
+    padding: 10,
+  },
+  totalsHeaderText: {
+    color: COLORS.neutral.white,
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 0.8,
+  },
+  totalsBody: {
+    padding: 15,
+  },
+  totalRow: { 
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    fontSize: 9.5,
+    color: COLORS.neutral.gray800,
+  },
+  totalsDivider: { 
+    borderTopWidth: 2,
+    borderTopColor: COLORS.brand.green,
+    borderTopStyle: 'solid',
+    marginVertical: 12,
+  },
+  totalFinal: { 
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: COLORS.brand.purple,
+    paddingTop: 5,
+  },
+  totalFinalAmount: {
+    color: COLORS.brand.green,
+    fontSize: 14,
+  },
+  
+  // Professional footer
+  footer: { 
+    position: 'absolute',
+    bottom: 30,
+    left: 45,
+    right: 45,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: 2,
+    borderTopColor: COLORS.brand.purple,
+    borderTopStyle: 'solid',
+    fontSize: 7.5,
+    color: COLORS.neutral.gray600,
+  },
+  footerText: {
+    color: COLORS.neutral.gray600,
+  },
 });
 
 // Create Quote PDF Document
@@ -169,30 +388,40 @@ const createQuotePDF = (quote, items) => {
         { style: styles.totals },
         React.createElement(
           View,
-          { style: styles.totalRow },
-          React.createElement(Text, null, 'Subtotal'),
-          React.createElement(Text, null, formatCurrency(quote.subtotal_minor || 0, currency))
+          { style: styles.totalsHeader },
+          React.createElement(Text, { style: styles.totalsHeaderText }, 'OVERSIGT')
         ),
         React.createElement(
           View,
-          { style: styles.totalRow },
-          React.createElement(Text, null, 'Moms'),
-          React.createElement(Text, null, formatCurrency(quote.tax_minor || 0, currency))
-        ),
-        React.createElement(View, { style: styles.totalsDivider }),
-        React.createElement(
-          View,
-          { style: [styles.totalRow, styles.totalFinal] },
-          React.createElement(Text, null, 'Total'),
-          React.createElement(Text, null, formatCurrency(quote.total_minor || 0, currency))
+          { style: styles.totalsBody },
+          React.createElement(
+            View,
+            { style: styles.totalRow },
+            React.createElement(Text, null, 'Subtotal'),
+            React.createElement(Text, null, formatCurrency(quote.subtotal_minor || 0, currency))
+          ),
+          React.createElement(
+            View,
+            { style: styles.totalRow },
+            React.createElement(Text, null, 'Moms (25%)'),
+            React.createElement(Text, null, formatCurrency(quote.tax_minor || 0, currency))
+          ),
+          React.createElement(View, { style: styles.totalsDivider }),
+          React.createElement(
+            View,
+            { style: [styles.totalRow, styles.totalFinal] },
+            React.createElement(Text, null, 'Total'),
+            React.createElement(Text, { style: styles.totalFinalAmount }, formatCurrency(quote.total_minor || 0, currency))
+          )
         )
       ),
       // Footer
       React.createElement(
         View,
         { style: styles.footer, fixed: true },
-        React.createElement(Text, null, companyFooter),
+        React.createElement(Text, { style: styles.footerText }, companyFooter),
         React.createElement(Text, { 
+          style: styles.footerText,
           render: ({ pageNumber, totalPages }) => `Side ${pageNumber} af ${totalPages}` 
         })
       )
@@ -315,30 +544,40 @@ const createOrderPDF = (order, items) => {
         { style: styles.totals },
         React.createElement(
           View,
-          { style: styles.totalRow },
-          React.createElement(Text, null, 'Subtotal'),
-          React.createElement(Text, null, formatCurrency(order.subtotal_minor || 0, currency))
+          { style: styles.totalsHeader },
+          React.createElement(Text, { style: styles.totalsHeaderText }, 'OVERSIGT')
         ),
         React.createElement(
           View,
-          { style: styles.totalRow },
-          React.createElement(Text, null, 'Moms'),
-          React.createElement(Text, null, formatCurrency(order.tax_minor || 0, currency))
-        ),
-        React.createElement(View, { style: styles.totalsDivider }),
-        React.createElement(
-          View,
-          { style: [styles.totalRow, styles.totalFinal] },
-          React.createElement(Text, null, 'Total'),
-          React.createElement(Text, null, formatCurrency(order.total_minor || 0, currency))
+          { style: styles.totalsBody },
+          React.createElement(
+            View,
+            { style: styles.totalRow },
+            React.createElement(Text, null, 'Subtotal'),
+            React.createElement(Text, null, formatCurrency(order.subtotal_minor || 0, currency))
+          ),
+          React.createElement(
+            View,
+            { style: styles.totalRow },
+            React.createElement(Text, null, 'Moms (25%)'),
+            React.createElement(Text, null, formatCurrency(order.tax_minor || 0, currency))
+          ),
+          React.createElement(View, { style: styles.totalsDivider }),
+          React.createElement(
+            View,
+            { style: [styles.totalRow, styles.totalFinal] },
+            React.createElement(Text, null, 'Total'),
+            React.createElement(Text, { style: styles.totalFinalAmount }, formatCurrency(order.total_minor || 0, currency))
+          )
         )
       ),
       // Footer
       React.createElement(
         View,
         { style: styles.footer, fixed: true },
-        React.createElement(Text, null, companyFooter),
+        React.createElement(Text, { style: styles.footerText }, companyFooter),
         React.createElement(Text, { 
+          style: styles.footerText,
           render: ({ pageNumber, totalPages }) => `Side ${pageNumber} af ${totalPages}` 
         })
       )
@@ -461,30 +700,40 @@ const createInvoicePDF = (invoice, items) => {
         { style: styles.totals },
         React.createElement(
           View,
-          { style: styles.totalRow },
-          React.createElement(Text, null, 'Subtotal'),
-          React.createElement(Text, null, formatCurrency(invoice.subtotal_minor || 0, currency))
+          { style: styles.totalsHeader },
+          React.createElement(Text, { style: styles.totalsHeaderText }, 'OVERSIGT')
         ),
         React.createElement(
           View,
-          { style: styles.totalRow },
-          React.createElement(Text, null, 'Moms'),
-          React.createElement(Text, null, formatCurrency(invoice.tax_minor || 0, currency))
-        ),
-        React.createElement(View, { style: styles.totalsDivider }),
-        React.createElement(
-          View,
-          { style: [styles.totalRow, styles.totalFinal] },
-          React.createElement(Text, null, 'Total'),
-          React.createElement(Text, null, formatCurrency(invoice.total_minor || 0, currency))
+          { style: styles.totalsBody },
+          React.createElement(
+            View,
+            { style: styles.totalRow },
+            React.createElement(Text, null, 'Subtotal'),
+            React.createElement(Text, null, formatCurrency(invoice.subtotal_minor || 0, currency))
+          ),
+          React.createElement(
+            View,
+            { style: styles.totalRow },
+            React.createElement(Text, null, 'Moms (25%)'),
+            React.createElement(Text, null, formatCurrency(invoice.tax_minor || 0, currency))
+          ),
+          React.createElement(View, { style: styles.totalsDivider }),
+          React.createElement(
+            View,
+            { style: [styles.totalRow, styles.totalFinal] },
+            React.createElement(Text, null, 'Total'),
+            React.createElement(Text, { style: styles.totalFinalAmount }, formatCurrency(invoice.total_minor || 0, currency))
+          )
         )
       ),
       // Footer
       React.createElement(
         View,
         { style: styles.footer, fixed: true },
-        React.createElement(Text, null, companyFooter),
+        React.createElement(Text, { style: styles.footerText }, companyFooter),
         React.createElement(Text, { 
+          style: styles.footerText,
           render: ({ pageNumber, totalPages }) => `Side ${pageNumber} af ${totalPages}` 
         })
       )
