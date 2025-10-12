@@ -58,11 +58,11 @@ export function CompaniesKpiHeader({ companies }: CompaniesKpiHeaderProps) {
                         <div className="text-xs text-muted-foreground">Total companies</div>
                         <div className="text-h2">{totalCompanies}</div>
                     </div>
-                    <div className="rounded-full p-2 bg-primary/10">
-                        <Building2 className="h-4 w-4 text-primary" aria-hidden="true" />
+                    <div className="rounded-full p-2 bg-[hsl(212,30%,57%)]/15">
+                        <Building2 className="h-4 w-4 text-[hsl(212,30%,47%)]" aria-hidden="true" />
                     </div>
                 </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent" aria-hidden="true" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-muted/50 to-transparent" aria-hidden="true" />
             </Card>
 
             {/* By Country */}
@@ -79,11 +79,11 @@ export function CompaniesKpiHeader({ companies }: CompaniesKpiHeaderProps) {
                             ))}
                         </div>
                     </div>
-                    <div className="rounded-full p-2 bg-accent/10">
-                        <Globe className="h-4 w-4 text-accent" aria-hidden="true" />
+                    <div className="rounded-full p-2 bg-[hsl(150,7%,61%)]/15">
+                        <Globe className="h-4 w-4 text-[hsl(150,7%,45%)]" aria-hidden="true" />
                     </div>
                 </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-accent/5 to-transparent" aria-hidden="true" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-muted/50 to-transparent" aria-hidden="true" />
             </Card>
 
             {/* By Industry */}
@@ -100,11 +100,11 @@ export function CompaniesKpiHeader({ companies }: CompaniesKpiHeaderProps) {
                             ))}
                         </div>
                     </div>
-                    <div className="rounded-full p-2 bg-warning/10">
-                        <Briefcase className="h-4 w-4 text-warning" aria-hidden="true" />
+                    <div className="rounded-full p-2 bg-[hsl(28,62%,68%)]/15">
+                        <Briefcase className="h-4 w-4 text-[hsl(28,62%,55%)]" aria-hidden="true" />
                     </div>
                 </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-warning/5 to-transparent" aria-hidden="true" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-muted/50 to-transparent" aria-hidden="true" />
             </Card>
         </div>
     );

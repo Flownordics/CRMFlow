@@ -39,7 +39,7 @@ export function CompanyRevenueCard({ companyId }: CompanyRevenueCardProps) {
       value: fromMinor(revenue.totalDealsValue, "DKK"),
       count: `${revenue.totalDeals} deals`,
       icon: DollarSign,
-      color: "text-primary",
+      color: "text-[hsl(212,30%,47%)]",
     },
     {
       label: "Won Deals",
@@ -53,7 +53,7 @@ export function CompanyRevenueCard({ companyId }: CompanyRevenueCardProps) {
       value: fromMinor(revenue.activePipelineValue, "DKK"),
       count: `${revenue.activeDeals} active`,
       icon: Target,
-      color: "text-blue-600",
+      color: "text-[hsl(150,7%,45%)]",
     },
   ];
 

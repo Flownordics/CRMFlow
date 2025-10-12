@@ -141,7 +141,7 @@ export function CompanyNotes({ companyId }: CompanyNotesProps) {
                 <div
                   key={note.id}
                   className={`p-3 rounded-md border ${
-                    note.isPinned ? "border-primary bg-primary/5" : "border-border"
+                    note.isPinned ? "border-muted-foreground/30 bg-muted/30" : "border-border"
                   }`}
                 >
                   {editingNoteId === note.id ? (

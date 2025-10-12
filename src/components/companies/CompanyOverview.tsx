@@ -164,7 +164,7 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
                       {activityTypeLabels[latestActivity.type] || latestActivity.type.charAt(0).toUpperCase() + latestActivity.type.slice(1)}
                     </span>
                     {latestActivity.outcome && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                         {formatOutcome(latestActivity.outcome)}
                       </span>
                     )}

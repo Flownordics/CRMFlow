@@ -56,8 +56,12 @@ export function CompanyTagsManager({ companyId }: CompanyTagsManagerProps) {
           <Badge
             key={tag.id}
             variant="secondary"
-            style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: tag.color }}
-            className="flex items-center gap-1 pr-1"
+            style={{ 
+              backgroundColor: `${tag.color}15`, 
+              color: `${tag.color}CC`, 
+              borderColor: `${tag.color}30` 
+            }}
+            className="flex items-center gap-1 pr-1 border"
           >
             {tag.name}
             <button
@@ -122,8 +126,12 @@ export function CompanyTagsBadges({ companyId }: { companyId: string }) {
         <Badge
           key={tag.id}
           variant="secondary"
-          style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: tag.color }}
-          className="text-xs px-1.5 py-0"
+          style={{ 
+            backgroundColor: `${tag.color}15`, 
+            color: `${tag.color}CC`, 
+            borderColor: `${tag.color}30` 
+          }}
+          className="text-xs px-1.5 py-0 border"
         >
           {tag.name}
         </Badge>

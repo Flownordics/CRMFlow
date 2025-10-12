@@ -2,6 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Company } from "@/lib/schemas/company";
 import { getIndustryTheme, industryTokenBg, industryTokenText, industryTokenRing } from "./industryTheme";
 import { cn } from "@/lib/utils";
+import { ActivityStatusBadge } from "./ActivityStatusBadge";
+import { ActivityStatus } from "@/lib/schemas/callList";
 
 interface CompanyCardProps {
     company: Company;
@@ -33,6 +35,10 @@ export function CompanyCard({ company, onClick, className }: CompanyCardProps) {
                     aria-hidden="true"
                 />
                 <h3 className="font-medium truncate flex-1">{company.name}</h3>
+                <ActivityStatusBadge 
+                    status={company.activityStatus as ActivityStatus} 
+                    lastActivityAt={company.lastActivityAt}
+                />
             </div>
 
             <div className="space-y-2">
@@ -51,8 +57,8 @@ export function CompanyCard({ company, onClick, className }: CompanyCardProps) {
                 )}
 
                 {company.domain && (
-                    <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs">
-                        <span className="w-1 h-1 rounded-full bg-accent/50" aria-hidden="true" />
+                    <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs">
+                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50" aria-hidden="true" />
                         {company.domain}
                     </div>
                 )}

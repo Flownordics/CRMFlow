@@ -203,10 +203,10 @@ export function CompanyActivityTimeline({ companyId }: CompanyActivityTimelinePr
                 return (
                   <div
                     key={log.id}
-                    className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
                   >
                     <div className="mt-0.5">
-                      <Icon className="h-5 w-5 text-primary" />
+                      <Icon className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
@@ -215,14 +215,14 @@ export function CompanyActivityTimeline({ companyId }: CompanyActivityTimelinePr
                             {activityTypeLabels[log.type] || log.type}
                           </span>
                           {log.outcome && (
-                            <span className="text-sm px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                            <span className="text-sm px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                               {formatOutcome(log.outcome)}
                             </span>
                           )}
                           {relatedLink && (
                             <Link 
                               to={relatedLink}
-                              className="text-xs px-2 py-0.5 rounded-full bg-accent hover:bg-accent/80 text-accent-foreground"
+                              className="text-xs px-2 py-0.5 rounded-full bg-secondary hover:bg-secondary/70 text-secondary-foreground border border-border"
                             >
                               Se {log.relatedType}
                             </Link>
