@@ -14,6 +14,7 @@ import { PersonDocuments } from "@/components/people/PersonDocuments";
 import { PersonActivity } from "@/components/people/PersonActivity";
 import { EditPersonModal } from "@/components/people/EditPersonModal";
 import { DeletePersonDialog } from "@/components/people/DeletePersonDialog";
+import { CreateDealModal } from "@/components/deals/CreateDealModal";
 
 export default function PersonPage() {
     const { id } = useParams<{ id: string }>();
@@ -21,6 +22,7 @@ export default function PersonPage() {
     const { t } = useI18n();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isCreateDealModalOpen, setIsCreateDealModalOpen] = useState(false);
 
     const { data: person, isLoading, isError } = usePerson(id!);
 
@@ -97,7 +99,7 @@ export default function PersonPage() {
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => navigate(`/deals/new?contactId=${person.id}`)}
+                            onClick={() => setIsCreateDealModalOpen(true)}
                             aria-label={t("people.addDeal")}
                         >
                             <Plus className="h-4 w-4 mr-2" />
@@ -167,6 +169,12 @@ export default function PersonPage() {
                 open={isDeleteDialogOpen}
                 onOpenChange={setIsDeleteDialogOpen}
                 onSuccess={handleDeleteSuccess}
+            />
+            
+            <CreateDealModal
+                open={isCreateDealModalOpen}
+                onOpenChange={setIsCreateDealModalOpen}
+                defaultCompanyId={person.companyId}
             />
         </div>
     );

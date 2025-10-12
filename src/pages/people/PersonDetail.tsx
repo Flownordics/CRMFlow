@@ -20,6 +20,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { PersonModal } from "@/components/people/PersonModal";
+import { CreateDealModal } from "@/components/deals/CreateDealModal";
+import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
 import { usePerson, useUpdatePerson } from "@/services/people";
 import { useCompanies } from "@/services/companies";
 import { Person, PersonCreate } from "@/lib/schemas/person";
@@ -34,6 +36,8 @@ export default function PersonDetail() {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState("overview");
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isCreateDealModalOpen, setIsCreateDealModalOpen] = useState(false);
+    const [isCreateQuoteModalOpen, setIsCreateQuoteModalOpen] = useState(false);
 
     const { data: person, isLoading, error } = usePerson(id || "");
     const { data: companiesResponse, isLoading: companiesLoading } = useCompanies();
@@ -102,11 +106,11 @@ export default function PersonDetail() {
     };
 
     const handleCreateDeal = () => {
-        navigate(`/deals/new?personId=${person.id}&companyId=${person.companyId}`);
+        setIsCreateDealModalOpen(true);
     };
 
     const handleCreateQuote = () => {
-        navigate(`/quotes/new?personId=${person.id}&companyId=${person.companyId}`);
+        setIsCreateQuoteModalOpen(true);
     };
 
     const getCompanyName = (companyId: string) => {
@@ -368,6 +372,22 @@ export default function PersonDetail() {
                 open={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
                 onSuccess={() => setIsEditModalOpen(false)}
+            />
+            
+            {/* Create Deal Modal */}
+            <CreateDealModal
+                open={isCreateDealModalOpen}
+                onOpenChange={setIsCreateDealModalOpen}
+                defaultCompanyId={person.companyId}
+            />
+            
+            {/* Create Quote Modal */}
+            <CreateQuoteModal
+                open={isCreateQuoteModalOpen}
+                onOpenChange={setIsCreateQuoteModalOpen}
+                defaultCompanyId={person.companyId}
+                defaultContactId={person.id}
+                defaultTitle={`Quote for ${person.firstName} ${person.lastName}`}
             />
         </div>
     );
