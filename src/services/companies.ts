@@ -1,4 +1,4 @@
-import { api, apiClient, apiPostWithReturn, normalizeApiData } from "../lib/api";
+import { api, apiClient, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "../lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { z } from "zod";
@@ -326,7 +326,7 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
 
   try {
     
-    const response = await apiClient.patch(`/companies?id=eq.${id}`, dbPatch);
+    const response = await apiPatchWithReturn(`/companies?id=eq.${id}`, dbPatch);
     const raw = normalizeApiData(response);
 
     if (typeof raw === "string") {

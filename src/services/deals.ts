@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { LineItem } from "@/lib/schemas/lineItem";
-import { apiClient, api, apiPostWithReturn, normalizeApiData } from "../lib/api";
+import { apiClient, api, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "../lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { USE_MOCKS } from "@/lib/debug";
@@ -170,7 +170,7 @@ export async function updateDeal(id: string, updates: Partial<Deal>): Promise<De
   }
 
   try {
-    const response = await apiClient.patch(`/deals?id=eq.${id}`, updates);
+    const response = await apiPatchWithReturn(`/deals?id=eq.${id}`, updates);
     const raw = normalizeApiData(response);
 
     // Handle array response from Supabase
@@ -254,7 +254,7 @@ export async function setDealOwner(dealId: string, userId: string): Promise<Deal
   }
 
   try {
-    const response = await apiClient.patch(`/deals?id=eq.${dealId}`, {
+    const response = await apiPatchWithReturn(`/deals?id=eq.${dealId}`, {
       owner_user_id: userId
     });
     const raw = normalizeApiData(response);
@@ -337,7 +337,7 @@ export async function moveDealStage(id: string, stage_id: string) {
 
   try {
     // Use PATCH instead of POST for updating stage
-    const response = await apiClient.patch(`/deals?id=eq.${id}`, { stage_id });
+    const response = await apiPatchWithReturn(`/deals?id=eq.${id}`, { stage_id });
     const raw = normalizeApiData(response);
 
     if (typeof raw === "string") {

@@ -1,4 +1,4 @@
-import { apiClient, normalizeApiData } from "@/lib/api";
+import { apiClient, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
@@ -274,7 +274,7 @@ export async function updateQuoteHeader(
     Pick<Quote, "issue_date" | "valid_until" | "notes" | "status">
   >,
 ) {
-  const response = await apiClient.patch(`/quotes?id=eq.${id}`, payload);
+  const response = await apiPatchWithReturn(`/quotes?id=eq.${id}`, payload);
   const raw = normalizeApiData(response);
 
   if (typeof raw === "string") {
@@ -302,7 +302,7 @@ export async function upsertQuoteLine(
 
   // If line.id exists → PATCH; else → POST
   if (dbLine.id) {
-    const response = await apiClient.patch(
+    const response = await apiPatchWithReturn(
       `/line_items?id=eq.${dbLine.id}`,
       dbLine,
     );

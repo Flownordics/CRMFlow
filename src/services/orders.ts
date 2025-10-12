@@ -1,4 +1,4 @@
-import { apiClient, normalizeApiData } from "@/lib/api";
+import { apiClient, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
@@ -398,7 +398,7 @@ export async function updateOrderHeader(
         Pick<Order, "order_date" | "notes" | "currency" | "status">
     >,
 ) {
-    const response = await apiClient.patch(`/orders?id=eq.${id}`, payload);
+    const response = await apiPatchWithReturn(`/orders?id=eq.${id}`, payload);
     const raw = normalizeApiData(response);
 
     if (typeof raw === "string") {
@@ -426,7 +426,7 @@ export async function upsertOrderLine(
 
     if (line.id) {
         // Update existing line
-        const response = await apiClient.patch(`/line_items?id=eq.${line.id}`, {
+        const response = await apiPatchWithReturn(`/line_items?id=eq.${line.id}`, {
             ...dbLine,
             parent_type: 'order',
             parent_id: orderId,

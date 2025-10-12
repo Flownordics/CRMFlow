@@ -1,4 +1,4 @@
-import { api, apiClient, normalizeApiData } from "@/lib/api";
+import { api, apiClient, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { z } from "zod";
@@ -267,7 +267,7 @@ export async function updateDocumentRelations(id: string, relations: {
     }
 
     try {
-        const response = await apiClient.patch(`/documents?id=eq.${id}`, {
+        const response = await apiPatchWithReturn(`/documents?id=eq.${id}`, {
             company_id: relations.companyId,
             deal_id: relations.dealId,
             person_id: relations.personId,

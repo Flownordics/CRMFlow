@@ -316,7 +316,7 @@ export async function updatePerson(id: string, patch: Partial<Person>) {
             Object.entries(normalizedPatch).filter(([_, value]) => value !== null)
         );
 
-        const response = await apiClient.patch(`/people?id=eq.${id}`, cleanPatch);
+        const response = await apiPatchWithReturn(`/people?id=eq.${id}`, cleanPatch);
         const raw = normalizeApiData(response);
 
         if (typeof raw === "string") {

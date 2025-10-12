@@ -223,6 +223,7 @@ create table if not exists public.deals (
   currency text not null default 'DKK',
   expected_value_minor int not null default 0 check (expected_value_minor >= 0),
   close_date date,
+  probability numeric(4,3) check (probability >= 0 and probability <= 1), -- Deal-specific win probability (0.00-1.00), NULL = use stage default
   owner_user_id uuid references auth.users(id) on delete set null,
   created_by uuid,
   created_at timestamptz not null default now(),
@@ -238,6 +239,7 @@ create index if not exists idx_deals_updated_at on public.deals (updated_at desc
 create index if not exists idx_deals_title on public.deals (lower(title));
 create index if not exists idx_deals_owner on public.deals (owner_user_id);
 create index if not exists idx_deals_close_date on public.deals (close_date);
+create index if not exists idx_deals_probability on public.deals (probability) where probability is not null;
 
 -- Deal Integrations (for tracking external calendar events, etc.)
 create table if not exists public.deal_integrations (

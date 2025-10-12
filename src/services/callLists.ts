@@ -1,4 +1,4 @@
-import { apiClient, apiPostWithReturn, normalizeApiData } from "@/lib/api";
+import { apiClient, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { z } from "zod";
@@ -139,7 +139,7 @@ export async function updateCallList(id: string, patch: CallListUpdate) {
         if (patch.isShared !== undefined) dbPatch.is_shared = patch.isShared;
         if (patch.description !== undefined) dbPatch.description = patch.description;
 
-        const response = await apiClient.patch(`/call_lists?id=eq.${id}`, dbPatch);
+        const response = await apiPatchWithReturn(`/call_lists?id=eq.${id}`, dbPatch);
         const raw = normalizeApiData(response);
 
         if (typeof raw === "string") {
@@ -256,7 +256,7 @@ export async function updateCallListItem(id: string, patch: CallListItemUpdate) 
             }
         }
 
-        const response = await apiClient.patch(`/call_list_items?id=eq.${id}`, dbPatch);
+        const response = await apiPatchWithReturn(`/call_list_items?id=eq.${id}`, dbPatch);
         const raw = normalizeApiData(response);
 
         if (typeof raw === "string") {

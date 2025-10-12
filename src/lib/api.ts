@@ -564,6 +564,23 @@ export const apiPostWithReturn = <T = unknown>(url: string, body?: unknown, cfg?
   return apiClient.post(url, body, config);
 };
 
+// Helper function for PATCH requests that return the updated resource
+export const apiPatchWithReturn = <T = unknown>(url: string, body?: unknown, cfg?: ApiConfig): Promise<ApiResponse<T>> => {
+  if (USE_MOCKS && mockApi) {
+    return mockApi.patch(url, body, cfg);
+  }
+
+  const config: ApiConfig = {
+    ...cfg,
+    headers: {
+      ...cfg?.headers,
+      "Prefer": "return=representation"
+    }
+  };
+
+  return apiClient.patch(url, body, config);
+};
+
 // Type-safe API data normalization
 export function normalizeApiData<T = unknown>(res: ApiResponse<T> | T): T | null {
   // axios: { data, status, headers, ... } – ellers kan mocks være direkte payload

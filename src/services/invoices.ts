@@ -1,4 +1,4 @@
-import { apiClient, normalizeApiData } from "@/lib/api";
+import { apiClient, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
@@ -178,7 +178,7 @@ export async function addPayment(invoiceId: string, payload: PaymentPayload): Pr
 
         // Step 2: Update the invoice's paid_minor field
         const newPaidMinor = currentInvoice.paid_minor + payload.amountMinor;
-        const response = await apiClient.patch(`/invoices?id=eq.${invoiceId}`, {
+        const response = await apiPatchWithReturn(`/invoices?id=eq.${invoiceId}`, {
             paid_minor: newPaidMinor
         });
 
@@ -371,7 +371,7 @@ export async function updateInvoice(id: string, payload: Partial<{
             }
         }
 
-        const response = await apiClient.patch(`/invoices?id=eq.${id}`, payload);
+        const response = await apiPatchWithReturn(`/invoices?id=eq.${id}`, payload);
 
         // Handle 204 No Content response (common for PATCH operations)
         if (response.status === 204) {
@@ -723,7 +723,7 @@ export async function upsertInvoiceLine(
 
     if (line.id) {
         // Update existing line
-        const response = await apiClient.patch(`/line_items?id=eq.${line.id}`, linePayload);
+        const response = await apiPatchWithReturn(`/line_items?id=eq.${line.id}`, linePayload);
         return normalizeApiData(response);
     } else {
         // Create new line
