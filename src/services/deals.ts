@@ -595,13 +595,12 @@ export function useCreateDeal() {
 }
 
 // Search function for deals
-export async function searchDeals(query: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
+export async function searchDeals(query: string, companyId?: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
   try {
-    const result = await fetchDeals({ q: query, limit: 20 });
+    const result = await fetchDeals({ q: query, limit: 20, company_id: companyId });
     return result.data.map(deal => ({
       id: deal.id,
-      label: deal.title,
-      subtitle: deal.company_name ? `(${deal.company_name})` : undefined
+      label: deal.title
     }));
   } catch (error) {
     handleError(error, 'searchDeals');

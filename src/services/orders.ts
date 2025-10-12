@@ -549,13 +549,12 @@ export function useDeleteOrderLine(orderId: string) {
 }
 
 // Search function for orders
-export async function searchOrders(query: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
+export async function searchOrders(query: string, companyId?: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
     try {
-        const result = await fetchOrders({ q: query, limit: 20 });
+        const result = await fetchOrders({ q: query, limit: 20, company_id: companyId });
         return result.data.map(order => ({
             id: order.id,
-            label: order.title || `Order #${order.order_number}`,
-            subtitle: order.company_name ? `(${order.company_name})` : undefined
+            label: order.order_number ? `Order #${order.order_number}` : `Order ${order.id.slice(0, 8)}`
         }));
     } catch (error) {
         logger.error("Failed to search orders:", error);

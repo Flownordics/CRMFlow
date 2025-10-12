@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -173,8 +173,8 @@ export function CreateEventDialog({
         onOpenChange(false);
     };
 
-    // Set default dates when dialog opens
-    const handleOpenChange = (open: boolean) => {
+    // Set default dates and values when dialog opens
+    useEffect(() => {
         if (open) {
             const now = new Date();
             const tomorrow = new Date(now);
@@ -192,14 +192,16 @@ export function CreateEventDialog({
             if (defaultTitle) {
                 setTitle(defaultTitle);
             }
+        } else {
+            // Reset form when dialog closes
+            resetForm();
         }
-        onOpenChange(open);
-    };
+    }, [open, defaultCompanyId, defaultTitle]);
 
     const isLoading = createNativeEvent.isPending;
 
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <AccessibleDialogContent
                 className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto"
             >
@@ -381,9 +383,9 @@ export function CreateEventDialog({
                                 <SearchSelect
                                     value={selectedDealId}
                                     onChange={setSelectedDealId}
-                                    onSearch={searchDeals}
+                                    onSearch={(query) => searchDeals(query, selectedCompanyId)}
                                     placeholder="Search deals..."
-                                    emptyMessage="No deals found"
+                                    emptyMessage={selectedCompanyId ? "No deals found for this company" : "No deals found"}
                                 />
                             </div>
                         </div>
@@ -394,9 +396,9 @@ export function CreateEventDialog({
                                 <SearchSelect
                                     value={selectedQuoteId}
                                     onChange={setSelectedQuoteId}
-                                    onSearch={searchQuotes}
+                                    onSearch={(query) => searchQuotes(query, selectedCompanyId)}
                                     placeholder="Search quotes..."
-                                    emptyMessage="No quotes found"
+                                    emptyMessage={selectedCompanyId ? "No quotes found for this company" : "No quotes found"}
                                 />
                             </div>
 
@@ -405,9 +407,9 @@ export function CreateEventDialog({
                                 <SearchSelect
                                     value={selectedOrderId}
                                     onChange={setSelectedOrderId}
-                                    onSearch={searchOrders}
+                                    onSearch={(query) => searchOrders(query, selectedCompanyId)}
                                     placeholder="Search orders..."
-                                    emptyMessage="No orders found"
+                                    emptyMessage={selectedCompanyId ? "No orders found for this company" : "No orders found"}
                                 />
                             </div>
                         </div>

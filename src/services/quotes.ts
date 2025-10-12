@@ -647,13 +647,12 @@ export function useDeleteQuote() {
 }
 
 // Search function for quotes
-export async function searchQuotes(query: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
+export async function searchQuotes(query: string, companyId?: string): Promise<Array<{ id: string; label: string; subtitle?: string }>> {
   try {
-    const result = await fetchQuotes({ q: query, limit: 20 });
+    const result = await fetchQuotes({ q: query, limit: 20, company_id: companyId });
     return result.data.map(quote => ({
       id: quote.id,
-      label: quote.title || `Quote #${quote.quote_number}`,
-      subtitle: quote.company_name ? `(${quote.company_name})` : undefined
+      label: quote.number ? `Quote #${quote.number}` : `Quote ${quote.id.slice(0, 8)}`
     }));
   } catch (error) {
     logger.error("Failed to search quotes:", error);
