@@ -64,11 +64,11 @@ export function QuotesKpiHeader({ quotes, currency = "DKK" }: QuotesKpiHeaderPro
                             {(byStatus.draft || 0) > 0 ? `${Math.round(((byStatus.draft || 0) / totalCount) * 100)}% of total` : "No draft quotes"}
                         </div>
                     </div>
-                    <div className="rounded-full p-2 bg-muted/10">
-                        <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <div className="rounded-full p-2 bg-[hsl(210,5%,39%)]/15">
+                        <FileText className="h-4 w-4 text-[hsl(210,5%,35%)]" aria-hidden="true" />
                     </div>
                 </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-muted/5 to-transparent" aria-hidden="true" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[hsl(210,5%,39%)]/10 to-transparent" aria-hidden="true" />
             </Card>
 
             <Card className="p-4 overflow-hidden relative">

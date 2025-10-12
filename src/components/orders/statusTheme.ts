@@ -3,8 +3,8 @@ import { CheckCircle, XCircle, Clock, Package, FileText, Circle } from "lucide-r
 export const orderStatusTheme = {
     draft: {
         icon: Circle,
-        color: "text-muted-foreground",
-        bgColor: "bg-muted",
+        color: "text-[hsl(210,5%,35%)]",
+        bgColor: "bg-[hsl(210,5%,39%)]/15",
     },
     accepted: {
         icon: CheckCircle,
