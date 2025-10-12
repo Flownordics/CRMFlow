@@ -35,6 +35,8 @@ export async function fetchCompanyActivityLogs(companyId: string) {
             outcome: log.outcome,
             notes: log.notes,
             meta: log.meta,
+            relatedType: log.related_type,
+            relatedId: log.related_id,
             createdAt: log.created_at,
         }));
 
@@ -55,6 +57,8 @@ export async function logCompanyActivity(data: ActivityLogCreate): Promise<Activ
             outcome: data.outcome,
             notes: data.notes,
             meta: data.meta || {},
+            related_type: data.relatedType || null,
+            related_id: data.relatedId || null,
         };
 
         const response = await apiPostWithReturn("/activity_log", dbData);
@@ -73,6 +77,8 @@ export async function logCompanyActivity(data: ActivityLogCreate): Promise<Activ
             outcome: created.outcome,
             notes: created.notes,
             meta: created.meta,
+            relatedType: created.related_type,
+            relatedId: created.related_id,
             createdAt: created.created_at,
         };
 
@@ -87,11 +93,11 @@ export async function logCompanyActivity(data: ActivityLogCreate): Promise<Activ
 export function getActivityStatusColor(status: ActivityStatus | null | undefined): string {
     switch (status) {
         case 'green':
-            return 'bg-green-500';
+            return 'bg-[#b5c69f]';
         case 'yellow':
-            return 'bg-yellow-500';
+            return 'bg-[#d4a574]';
         case 'red':
-            return 'bg-red-500';
+            return 'bg-[#fb8674]';
         default:
             return 'bg-gray-400';
     }
@@ -185,5 +191,62 @@ export async function logNote(companyId: string, notes: string) {
         type: 'note',
         notes,
         meta: { timestamp: new Date().toISOString() },
+    });
+}
+
+// Auto-log activities when deals/quotes/orders/invoices are created
+export async function logDealCreated(companyId: string, dealId: string, dealTitle: string) {
+    return logCompanyActivity({
+        companyId,
+        type: 'deal',
+        notes: `Deal oprettet: ${dealTitle}`,
+        relatedType: 'deal',
+        relatedId: dealId,
+        meta: { dealTitle },
+    });
+}
+
+export async function logQuoteCreated(companyId: string, quoteId: string, quoteNumber: string) {
+    return logCompanyActivity({
+        companyId,
+        type: 'quote',
+        notes: `Tilbud oprettet: ${quoteNumber}`,
+        relatedType: 'quote',
+        relatedId: quoteId,
+        meta: { quoteNumber },
+    });
+}
+
+export async function logOrderCreated(companyId: string, orderId: string, orderNumber: string) {
+    return logCompanyActivity({
+        companyId,
+        type: 'order',
+        notes: `Ordre oprettet: ${orderNumber}`,
+        relatedType: 'order',
+        relatedId: orderId,
+        meta: { orderNumber },
+    });
+}
+
+export async function logInvoiceCreated(companyId: string, invoiceId: string, invoiceNumber: string) {
+    return logCompanyActivity({
+        companyId,
+        type: 'invoice',
+        notes: `Faktura oprettet: ${invoiceNumber}`,
+        relatedType: 'invoice',
+        relatedId: invoiceId,
+        meta: { invoiceNumber },
+    });
+}
+
+export async function logPaymentReceived(companyId: string, invoiceId: string, amountMinor: number) {
+    return logCompanyActivity({
+        companyId,
+        type: 'payment',
+        outcome: 'completed',
+        notes: `Betaling modtaget: ${(amountMinor / 100).toLocaleString('da-DK')} DKK`,
+        relatedType: 'invoice',
+        relatedId: invoiceId,
+        meta: { amountMinor },
     });
 }

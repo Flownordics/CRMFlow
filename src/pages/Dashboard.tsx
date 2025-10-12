@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -28,6 +29,15 @@ import { cn } from "@/lib/utils";
 import { useDashboardData, formatCurrency } from "@/services/dashboard";
 import { useUpcomingTasks } from "@/services/tasks";
 import { useNavigate } from "react-router-dom";
+import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
+import { PipelineSummary } from "@/components/dashboard/PipelineSummary";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { DealsChart } from "@/components/dashboard/DealsChart";
+import { EnhancedKPIs } from "@/components/dashboard/EnhancedKPIs";
+import { ForecastWidget } from "@/components/dashboard/ForecastWidget";
+import { CompaniesWidget } from "@/components/dashboard/CompaniesWidget";
+import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { DateRangeSelector, getInitialDateRange, type DateRange } from "@/components/dashboard/DateRangeSelector";
 
 // Loading skeleton component
 function MetricCardSkeleton() {
@@ -47,6 +57,7 @@ function MetricCardSkeleton() {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [dateRange, setDateRange] = useState<DateRange>(() => getInitialDateRange());
   const { metrics, recentDeals, recentQuotes, recentInvoices, isLoading, user } = useDashboardData();
   const { data: upcomingTasks, isLoading: tasksLoading } = useUpcomingTasks();
 
@@ -120,76 +131,99 @@ export default function Dashboard() {
       <PageHeader
         title={`Welcome back, ${user?.name || 'User'}`}
         actions={
-          <div className="flex gap-3">
-            <Button variant="outline" size="sm">
-              <Calendar aria-hidden="true" className="mr-2 h-4 w-4" />
-              This Month
-            </Button>
-            <Button
-              size="sm"
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => handleQuickAction('deal')}
-            >
-              <Plus aria-hidden="true" className="mr-2 h-4 w-4" />
-              New Deal
-            </Button>
-          </div>
+          <DateRangeSelector value={dateRange} onChange={setDateRange} />
         }
       />
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, index) => (
-            <MetricCardSkeleton key={index} />
-          ))
-        ) : (
-          metricCards.map((metric, index) => (
-            <Card
-              key={index}
-              className="ease-out-soft rounded-2xl border shadow-card transition-shadow duration-base hover:shadow-hover"
+      {/* Quick Actions - Top Row */}
+      <Card className="rounded-2xl border shadow-card">
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common tasks and shortcuts</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-7">
+            <Button
+              variant="outline"
+              className="h-20 flex-col gap-2"
+              onClick={() => handleQuickAction('deal')}
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {metric.title}
-                </CardTitle>
-                <metric.icon
-                  aria-hidden="true"
-                  className={cn("h-4 w-4", metric.color)}
-                />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">
-                  {metric.value}
-                </div>
-                <div className="mt-1 flex items-center text-xs text-muted-foreground">
-                  {metric.trend === "up" ? (
-                    <ArrowUp
-                      aria-hidden="true"
-                      className="mr-1 h-3 w-3 text-success"
-                    />
-                  ) : (
-                    <ArrowDown
-                      aria-hidden="true"
-                      className="mr-1 h-3 w-3 text-destructive"
-                    />
-                  )}
-                  <span
-                    className={cn(
-                      metric.trend === "up" ? "text-success" : "text-destructive",
-                    )}
-                  >
-                    {metric.change}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+              <Plus aria-hidden="true" className="h-6 w-6" />
+              <span className="text-sm">New Deal</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex-col gap-2"
+              onClick={() => handleQuickAction('company')}
+            >
+              <Building2 aria-hidden="true" className="h-6 w-6" />
+              <span className="text-sm">Add Company</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex-col gap-2"
+              onClick={() => handleQuickAction('contact')}
+            >
+              <Users aria-hidden="true" className="h-6 w-6" />
+              <span className="text-sm">Add Contact</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex-col gap-2"
+              onClick={() => handleQuickAction('quote')}
+            >
+              <FileText aria-hidden="true" className="h-6 w-6" />
+              <span className="text-sm">Create Quote</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex-col gap-2"
+              onClick={() => handleQuickAction('order')}
+            >
+              <ShoppingCart aria-hidden="true" className="h-6 w-6" />
+              <span className="text-sm">New Order</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex-col gap-2"
+              onClick={() => handleQuickAction('invoice')}
+            >
+              <Receipt aria-hidden="true" className="h-6 w-6" />
+              <span className="text-sm">New Invoice</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex-col gap-2"
+              onClick={() => handleQuickAction('task')}
+            >
+              <Calendar aria-hidden="true" className="h-6 w-6" />
+              <span className="text-sm">New Task</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Second Row: Alerts, Forecast, Companies */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <AlertsPanel />
+        <ForecastWidget />
+        <CompaniesWidget />
+      </div>
+
+      {/* Enhanced KPIs */}
+      <EnhancedKPIs />
+
+      {/* Sales Pipeline */}
+      <PipelineSummary />
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <RevenueChart />
+        <DealsChart />
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-5">
         {/* Recent Deals */}
         <Card className="rounded-2xl border shadow-card">
           <CardHeader>
@@ -409,75 +443,12 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Quick Actions */}
-      <Card className="rounded-2xl border shadow-card">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks and shortcuts</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-7">
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2"
-              onClick={() => handleQuickAction('deal')}
-            >
-              <Plus aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">New Deal</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2"
-              onClick={() => handleQuickAction('company')}
-            >
-              <Building2 aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">Add Company</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2"
-              onClick={() => handleQuickAction('contact')}
-            >
-              <Users aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">Add Contact</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2"
-              onClick={() => handleQuickAction('quote')}
-            >
-              <FileText aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">Create Quote</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2"
-              onClick={() => handleQuickAction('order')}
-            >
-              <ShoppingCart aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">New Order</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2"
-              onClick={() => handleQuickAction('invoice')}
-            >
-              <Receipt aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">New Invoice</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2"
-              onClick={() => handleQuickAction('task')}
-            >
-              <Calendar aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">New Task</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Activity Feed - spans 2 columns on XL */}
+        <div className="xl:col-span-2">
+          <ActivityFeed />
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,18 +8,18 @@ export const orderStatusTheme = {
     },
     accepted: {
         icon: CheckCircle,
-        color: "text-green-600",
-        bgColor: "bg-green-100",
+        color: "text-[#6b7c5e]",
+        bgColor: "bg-[#f0f4ec]",
     },
     cancelled: {
         icon: XCircle,
-        color: "text-red-600",
-        bgColor: "bg-red-100",
+        color: "text-[#b8695f]",
+        bgColor: "bg-[#fef2f0]",
     },
     backorder: {
         icon: Clock,
-        color: "text-orange-600",
-        bgColor: "bg-orange-100",
+        color: "text-[#9d855e]",
+        bgColor: "bg-[#faf5ef]",
     },
     invoiced: {
         icon: FileText,

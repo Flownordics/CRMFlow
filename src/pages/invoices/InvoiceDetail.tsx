@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useState } from "react";
-import { useInvoice, useUpdateInvoice, useUpsertInvoiceLine, useDeleteInvoiceLine } from "@/services/invoices";
+import { useInvoice, useUpdateInvoice, useUpsertInvoiceLine, useDeleteInvoiceLine, Invoice } from "@/services/invoices";
 import { formatMoneyMinor } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,18 +19,28 @@ import { FormRow } from "@/components/forms/FormRow";
 import { LineItemsTable } from "@/components/lines/LineItemsTable";
 import { getInvoicePdfUrl } from "@/services/pdf";
 import { logPdfGenerated } from "@/services/activity";
-import { Plus, DollarSign } from "lucide-react";
+import { Plus, DollarSign, Receipt } from "lucide-react";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 import { AddPaymentModal } from "@/components/invoices/AddPaymentModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OpenPdfButton } from "@/components/common/OpenPdfButton";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from '@/lib/logger';
+import { useInvoicePayments } from "@/services/payments";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function InvoiceDetail() {
   const { id = "" } = useParams();
   const { toast } = useToast();
   const { data: invoice, isLoading, error } = useInvoice(id);
+  const { data: payments = [], isLoading: paymentsLoading } = useInvoicePayments(id);
   const [creating, setCreating] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
@@ -121,7 +131,7 @@ export default function InvoiceDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-[#6b7c5e]">
               {formatMoneyMinor(invoice.paid_minor, invoice.currency)}
             </div>
           </CardContent>
@@ -134,12 +144,65 @@ export default function InvoiceDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-[#9d855e]">
               {formatMoneyMinor(invoice.balance_minor, invoice.currency)}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Payment History */}
+      {payments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-muted-foreground" aria-hidden="true" focusable="false" />
+              <CardTitle className="text-base">Payment History</CardTitle>
+              <span className="text-sm text-muted-foreground">
+                ({payments.length} payment{payments.length !== 1 ? 's' : ''})
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {paymentsLoading ? (
+              <div className="space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-12 bg-muted/30 animate-pulse rounded" />
+                ))}
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="max-w-[300px]">Note</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(payment.date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="capitalize">{payment.method}</TableCell>
+                        <TableCell className="text-right font-medium whitespace-nowrap">
+                          {formatMoneyMinor(payment.amount_minor, invoice.currency)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-[300px] truncate">
+                          {payment.note || "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Linked Deal information */}
       {invoice.deal_id && (
@@ -237,7 +300,6 @@ export default function InvoiceDetail() {
                   <SelectItem value="sent">Sent</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             }
@@ -367,11 +429,11 @@ export default function InvoiceDetail() {
             {formatMoneyMinor(invoice.total_minor, invoice.currency)}
           </div>
           <div className="text-muted-foreground">Paid</div>
-          <div className="text-right text-green-600">
+          <div className="text-right text-[#6b7c5e]">
             {formatMoneyMinor(invoice.paid_minor, invoice.currency)}
           </div>
           <div className="font-semibold">Balance</div>
-          <div className="text-right font-semibold text-orange-600">
+          <div className="text-right font-semibold text-[#9d855e]">
             {formatMoneyMinor(invoice.balance_minor, invoice.currency)}
           </div>
         </div>

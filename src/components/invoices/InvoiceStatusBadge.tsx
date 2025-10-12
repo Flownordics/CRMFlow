@@ -14,37 +14,37 @@ export function InvoiceStatusBadge({ invoice, className }: InvoiceStatusBadgePro
       case 'paid':
         return {
           variant: 'default' as const,
-          className: 'bg-green-100 text-green-800 border-green-200',
+          className: 'status-paid border',
           label: 'Paid'
         };
       case 'overdue':
         return {
           variant: 'destructive' as const,
-          className: 'bg-red-100 text-red-800 border-red-200',
+          className: 'status-overdue border',
           label: 'Overdue'
         };
       case 'partial':
         return {
           variant: 'secondary' as const,
-          className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          className: 'status-partial border',
           label: 'Partial'
         };
       case 'sent':
         return {
           variant: 'secondary' as const,
-          className: 'bg-blue-100 text-blue-800 border-blue-200',
+          className: 'status-sent border',
           label: 'Sent'
         };
       case 'draft':
         return {
           variant: 'outline' as const,
-          className: 'bg-gray-100 text-gray-600 border-gray-200',
+          className: 'status-draft border',
           label: 'Draft'
         };
       default:
         return {
           variant: 'secondary' as const,
-          className: 'bg-gray-100 text-gray-600 border-gray-200',
+          className: 'status-draft border',
           label: status
         };
     }

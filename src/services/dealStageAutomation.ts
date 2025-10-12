@@ -25,16 +25,16 @@ export const DEFAULT_STAGE_RULES: DealStageRule[] = [
     // Note: quote_accepted trigger is handled by quote-to-order conversion flow
     // When quote is accepted, it converts to order which triggers order_created automation
 
-    // When a quote is declined, move to "Closed Lost"
+    // When a quote is declined, move to "Lost"
     {
         trigger: 'quote_declined',
-        toStage: 'Closed Lost'
+        toStage: 'Lost'
     },
 
-    // When an order is created (quote converted to order), move to "Closed Won"
+    // When an order is created (quote converted to order), move to "Won"
     {
         trigger: 'order_created',
-        toStage: 'Closed Won'
+        toStage: 'Won'
     },
 
     // When an order is cancelled, move back to "Negotiation"
@@ -43,16 +43,16 @@ export const DEFAULT_STAGE_RULES: DealStageRule[] = [
         toStage: 'Negotiation'
     },
 
-    // When an invoice is created, ensure deal is in "Closed Won"
+    // When an invoice is created, ensure deal is in "Won"
     {
         trigger: 'invoice_created',
-        toStage: 'Closed Won'
+        toStage: 'Won'
     },
 
-    // When an invoice is paid, ensure deal is in "Closed Won" (redundant but explicit)
+    // When an invoice is paid, ensure deal is in "Won" (redundant but explicit)
     {
         trigger: 'invoice_paid',
-        toStage: 'Closed Won'
+        toStage: 'Won'
     }
 ];
 

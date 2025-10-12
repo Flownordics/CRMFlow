@@ -38,7 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Invoice } from "@/services/invoices";
+import { Invoice, deriveInvoiceStatus } from "@/services/invoices";
 import { useInvoices, useDeleteInvoice } from "@/services/invoices";
 import { generatePDF } from "@/lib/pdf";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -79,14 +79,17 @@ const Invoices: React.FC = () => {
     const matchesSearch = invoice.number
       ? invoice.number.toLowerCase().includes(searchTerm.toLowerCase())
       : true;
+    // Use derived status for filtering to properly handle "overdue"
+    const derivedStatus = deriveInvoiceStatus(invoice);
     const matchesStatus =
-      statusFilter === "all" || invoice.status === statusFilter;
+      statusFilter === "all" || derivedStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate counts for status filters
+  // Calculate counts for status filters using derived status
   const statusCounts = invoices.reduce((acc, invoice) => {
-    acc[invoice.status] = (acc[invoice.status] || 0) + 1;
+    const derivedStatus = deriveInvoiceStatus(invoice);
+    acc[derivedStatus] = (acc[derivedStatus] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
@@ -183,8 +186,10 @@ const Invoices: React.FC = () => {
     });
   };
 
-  const isOverdue = (dueDate: string) => {
-    return new Date(dueDate) < new Date();
+  const isOverdue = (invoice: Invoice) => {
+    // Only overdue if past due date AND has outstanding balance
+    if (!invoice.due_date || invoice.balance_minor === 0) return false;
+    return new Date(invoice.due_date) < new Date() && invoice.balance_minor > 0;
   };
 
   const getDaysOverdue = (dueDate: string) => {
@@ -193,9 +198,10 @@ const Invoices: React.FC = () => {
     return diffDays;
   };
 
-  const isDueSoon = (dueDate: string) => {
-    if (!dueDate) return false;
-    const due = new Date(dueDate);
+  const isDueSoon = (invoice: Invoice) => {
+    // Only due soon if has outstanding balance
+    if (!invoice.due_date || invoice.balance_minor === 0) return false;
+    const due = new Date(invoice.due_date);
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     return due <= sevenDaysFromNow && due > now;
@@ -275,10 +281,12 @@ const Invoices: React.FC = () => {
           </TableHeader>
           <TableBody>
             {filteredInvoices.map((invoice) => {
-              const theme = getInvoiceTheme(invoice.status);
+              // Use derived status based on payment state, not just database status
+              const derivedStatus = deriveInvoiceStatus(invoice);
+              const theme = getInvoiceTheme(derivedStatus);
               const Icon = theme.icon;
-              const overdue = invoice.due_date ? isOverdue(invoice.due_date) : false;
-              const dueSoon = invoice.due_date ? isDueSoon(invoice.due_date) : false;
+              const overdue = isOverdue(invoice);
+              const dueSoon = isDueSoon(invoice);
 
               return (
                 <TableRow key={invoice.id} className="hover:bg-muted/30 transition">
@@ -295,11 +303,12 @@ const Invoices: React.FC = () => {
                     {formatMoneyMinor(invoice.total_minor || 0, invoice.currency || "DKK")}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge intent={invoice.status === "draft" ? "draft" :
-                      invoice.status === "sent" ? "active" :
-                        invoice.status === "paid" ? "closed" :
-                          invoice.status === "overdue" ? "overdue" : "draft"}>
-                      {invoice.status}
+                    <StatusBadge intent={derivedStatus === "draft" ? "draft" :
+                      derivedStatus === "sent" ? "active" :
+                        derivedStatus === "paid" ? "closed" :
+                          derivedStatus === "overdue" ? "overdue" :
+                            derivedStatus === "partial" ? "active" : "draft"}>
+                      {derivedStatus}
                     </StatusBadge>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">

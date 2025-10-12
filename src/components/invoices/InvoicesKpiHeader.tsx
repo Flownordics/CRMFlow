@@ -35,10 +35,10 @@ export function InvoicesKpiHeader({ invoices, currency = "DKK" }: InvoicesKpiHea
             <Card className="p-4 overflow-hidden relative">
                 <div className="flex items-start justify-between">
                     <div>
-                        <div className="text-xs text-muted-foreground">{t("invoices.total_billed")}</div>
-                        <div className="text-h2">{formatMoneyMinor(totalBilled, currency)}</div>
+                        <div className="text-xs text-muted-foreground">Total Billed</div>
+                        <div className="text-2xl font-bold">{formatMoneyMinor(totalBilled, currency)}</div>
                         <div className="text-xs text-muted-foreground mt-1">
-                            {invoices.length} {t("invoices.invoices")}
+                            {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
                         </div>
                     </div>
                     <div className="rounded-full p-2 bg-primary/10">
@@ -51,10 +51,10 @@ export function InvoicesKpiHeader({ invoices, currency = "DKK" }: InvoicesKpiHea
             <Card className="p-4 overflow-hidden relative">
                 <div className="flex items-start justify-between">
                     <div>
-                        <div className="text-xs text-muted-foreground">{t("invoices.paid")}</div>
-                        <div className="text-h2">{formatMoneyMinor(totalPaid, currency)}</div>
+                        <div className="text-xs text-muted-foreground">Paid</div>
+                        <div className="text-2xl font-bold">{formatMoneyMinor(totalPaid, currency)}</div>
                         <div className="text-xs text-muted-foreground mt-1">
-                            {invoices.filter(inv => inv.status === "paid").length} {t("invoices.invoices")}
+                            {invoices.filter(inv => inv.status === "paid").length} invoice{invoices.filter(inv => inv.status === "paid").length !== 1 ? 's' : ''}
                         </div>
                     </div>
                     <div className="rounded-full p-2 bg-success/10">
@@ -67,10 +67,10 @@ export function InvoicesKpiHeader({ invoices, currency = "DKK" }: InvoicesKpiHea
             <Card className="p-4 overflow-hidden relative">
                 <div className="flex items-start justify-between">
                     <div>
-                        <div className="text-xs text-muted-foreground">{t("invoices.overdue")}</div>
-                        <div className="text-h2">{formatMoneyMinor(totalOverdue, currency)}</div>
+                        <div className="text-xs text-muted-foreground">Overdue</div>
+                        <div className="text-2xl font-bold">{formatMoneyMinor(totalOverdue, currency)}</div>
                         <div className="text-xs text-muted-foreground mt-1">
-                            {invoices.filter(inv => inv.status === "overdue").length} {t("invoices.invoices")}
+                            {invoices.filter(inv => inv.status === "overdue").length} invoice{invoices.filter(inv => inv.status === "overdue").length !== 1 ? 's' : ''}
                         </div>
                     </div>
                     <div className="rounded-full p-2 bg-danger/10">
@@ -83,10 +83,10 @@ export function InvoicesKpiHeader({ invoices, currency = "DKK" }: InvoicesKpiHea
             <Card className="p-4 overflow-hidden relative">
                 <div className="flex items-start justify-between">
                     <div>
-                        <div className="text-xs text-muted-foreground">{t("invoices.due_soon")}</div>
-                        <div className="text-h2">{formatMoneyMinor(totalDueSoon, currency)}</div>
+                        <div className="text-xs text-muted-foreground">Due Soon</div>
+                        <div className="text-2xl font-bold">{formatMoneyMinor(totalDueSoon, currency)}</div>
                         <div className="text-xs text-muted-foreground mt-1">
-                            {dueSoon.length} {t("invoices.invoices")}
+                            {dueSoon.length} invoice{dueSoon.length !== 1 ? 's' : ''}
                         </div>
                     </div>
                     <div className="rounded-full p-2 bg-warning/10">

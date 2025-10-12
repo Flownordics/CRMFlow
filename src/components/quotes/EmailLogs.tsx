@@ -66,11 +66,11 @@ export function EmailLogs({ quoteId }: EmailLogsProps) {
     const getStatusIcon = (status: string) => {
         switch (status) {
             case 'sent':
-                return <CheckCircle className="h-4 w-4 text-green-600" />;
+                return <CheckCircle className="h-4 w-4 text-[#6b7c5e]" />;
             case 'error':
-                return <XCircle className="h-4 w-4 text-red-600" />;
+                return <XCircle className="h-4 w-4 text-[#b8695f]" />;
             case 'queued':
-                return <Clock className="h-4 w-4 text-yellow-600" />;
+                return <Clock className="h-4 w-4 text-[#9d855e]" />;
             default:
                 return <AlertCircle className="h-4 w-4 text-gray-600" />;
         }

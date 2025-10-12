@@ -257,7 +257,7 @@ export default function OrderEditor() {
                     <CardContent>
                         <Link
                             to={`/deals/${order.deal_id}`}
-                            className="text-blue-600 hover:text-blue-800 underline"
+                            className="text-[#7a9db3] hover:text-[#6a8da3] underline"
                         >
                             View Deal
                         </Link>

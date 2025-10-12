@@ -82,8 +82,8 @@ export function CompanyPeople({ companyId, onAddPerson }: CompanyPeopleProps) {
         <div className="space-y-4">
           {people.map((person) => (
             <div key={person.id} className="flex items-center space-x-4 p-3 rounded-lg border">
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                <span className="text-sm font-medium">
+              <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                <span className="text-sm font-medium text-primary-foreground">
                   {person.name?.charAt(0).toUpperCase()}
                 </span>
               </div>

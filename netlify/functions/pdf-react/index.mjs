@@ -23,39 +23,41 @@ const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleDateString('da-DK');
 };
 
+// Shared styles for all document types
+const createSharedStyles = () => StyleSheet.create({
+  page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica', backgroundColor: '#FFFFFF' },
+  header: { marginBottom: 20, paddingBottom: 15, borderBottom: '2px solid #CDBA9A' },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  companyName: { fontSize: 20, fontWeight: 'bold', color: '#5E6367' },
+  documentTitle: { fontSize: 24, fontWeight: 'bold', color: '#5E6367', textAlign: 'right' },
+  metadata: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  metaColumn: { flex: 1 },
+  metaItem: { marginBottom: 8 },
+  metaLabel: { fontSize: 8, color: '#5E6367', marginBottom: 2 },
+  metaValue: { fontSize: 10, fontWeight: 'bold', color: '#5E6367' },
+  twoColumns: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 20, paddingVertical: 15, borderBottom: '1px solid #CDBA9A' },
+  column: { flex: 1 },
+  columnTitle: { fontSize: 10, fontWeight: 'bold', marginBottom: 8, color: '#5E6367' },
+  columnText: { fontSize: 9, marginBottom: 3, color: '#5E6367' },
+  table: { marginVertical: 15 },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#CDBA9A', padding: 8, fontWeight: 'bold', fontSize: 9 },
+  tableRow: { flexDirection: 'row', borderBottom: '1px solid #CDBA9A', padding: 8, fontSize: 8 },
+  tableRowEven: { backgroundColor: '#F8F6F0' },
+  tableCol1: { flex: 3 },
+  tableCol2: { flex: 1, textAlign: 'right' },
+  tableCol3: { flex: 1, textAlign: 'right' },
+  tableCol4: { flex: 1, textAlign: 'right' },
+  totals: { marginTop: 20, marginLeft: 'auto', width: 200, border: '2px solid #CDBA9A', padding: 15 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, fontSize: 9 },
+  totalsDivider: { borderTop: '1px solid #CDBA9A', marginVertical: 8 },
+  totalFinal: { fontSize: 12, fontWeight: 'bold' },
+  footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid #CDBA9A', fontSize: 7 },
+});
+
 // Create Quote PDF Document
 const createQuotePDF = (quote, items) => {
   const currency = quote.currency || 'DKK';
-  
-  const styles = StyleSheet.create({
-    page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica', backgroundColor: '#FFFFFF' },
-    header: { marginBottom: 20, paddingBottom: 15, borderBottom: '2px solid #CDBA9A' },
-    headerTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-    companyName: { fontSize: 20, fontWeight: 'bold', color: '#5E6367' },
-    documentTitle: { fontSize: 24, fontWeight: 'bold', color: '#5E6367', textAlign: 'right' },
-    metadata: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-    metaColumn: { flex: 1 },
-    metaItem: { marginBottom: 8 },
-    metaLabel: { fontSize: 8, color: '#5E6367', marginBottom: 2 },
-    metaValue: { fontSize: 10, fontWeight: 'bold', color: '#5E6367' },
-    twoColumns: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 20, paddingVertical: 15, borderBottom: '1px solid #CDBA9A' },
-    column: { flex: 1 },
-    columnTitle: { fontSize: 10, fontWeight: 'bold', marginBottom: 8, color: '#5E6367' },
-    columnText: { fontSize: 9, marginBottom: 3, color: '#5E6367' },
-    table: { marginVertical: 15 },
-    tableHeader: { flexDirection: 'row', backgroundColor: '#CDBA9A', padding: 8, fontWeight: 'bold', fontSize: 9 },
-    tableRow: { flexDirection: 'row', borderBottom: '1px solid #CDBA9A', padding: 8, fontSize: 8 },
-    tableRowEven: { backgroundColor: '#F8F6F0' },
-    tableCol1: { flex: 3 },
-    tableCol2: { flex: 1, textAlign: 'right' },
-    tableCol3: { flex: 1, textAlign: 'right' },
-    tableCol4: { flex: 1, textAlign: 'right' },
-    totals: { marginTop: 20, marginLeft: 'auto', width: 200, border: '2px solid #CDBA9A', padding: 15 },
-    totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, fontSize: 9 },
-    totalsDivider: { borderTop: '1px solid #CDBA9A', marginVertical: 8 },
-    totalFinal: { fontSize: 12, fontWeight: 'bold' },
-    footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid #CDBA9A', fontSize: 7 },
-  });
+  const styles = createSharedStyles();
 
   const soldByLines = [
     quote.company?.name,
@@ -198,6 +200,298 @@ const createQuotePDF = (quote, items) => {
   );
 };
 
+// Create Order PDF Document
+const createOrderPDF = (order, items) => {
+  const currency = order.currency || 'DKK';
+  const styles = createSharedStyles();
+
+  const soldByLines = [
+    order.company?.name,
+    order.company?.address,
+    `${order.company?.postal_code || ''} ${order.company?.city || ''}`.trim(),
+    order.company?.email,
+    order.company?.phone,
+  ].filter(Boolean);
+
+  const billToLines = [
+    order.person?.name || 'Kunde',
+    order.person?.email,
+    order.person?.phone,
+  ].filter(Boolean);
+
+  const companyFooter = [
+    order.company?.website,
+    order.company?.email,
+    order.company?.phone,
+  ].filter(Boolean).join('  •  ');
+
+  return React.createElement(
+    Document,
+    null,
+    React.createElement(
+      Page,
+      { size: 'A4', style: styles.page },
+      // Header
+      React.createElement(
+        View,
+        { style: styles.header },
+        React.createElement(
+          View,
+          { style: styles.headerTop },
+          React.createElement(Text, { style: styles.companyName }, order.company?.name || 'VIRKSOMHED'),
+          React.createElement(Text, { style: styles.documentTitle }, 'ORDRE')
+        ),
+        React.createElement(
+          View,
+          { style: styles.metadata },
+          React.createElement(
+            View,
+            { style: styles.metaColumn },
+            React.createElement(View, { style: styles.metaItem }, 
+              React.createElement(Text, { style: styles.metaLabel }, 'ORDRE DATO'),
+              React.createElement(Text, { style: styles.metaValue }, formatDate(order.order_date || order.created_at))
+            ),
+            React.createElement(View, { style: styles.metaItem },
+              React.createElement(Text, { style: styles.metaLabel }, 'ORDRE NR.'),
+              React.createElement(Text, { style: styles.metaValue }, order.number || '-')
+            )
+          ),
+          React.createElement(
+            View,
+            { style: styles.metaColumn },
+            React.createElement(View, { style: styles.metaItem },
+              React.createElement(Text, { style: styles.metaLabel }, 'STATUS'),
+              React.createElement(Text, { style: styles.metaValue }, (order.status || 'draft').toUpperCase())
+            )
+          )
+        )
+      ),
+      // Two Columns
+      React.createElement(
+        View,
+        { style: styles.twoColumns },
+        React.createElement(
+          View,
+          { style: styles.column },
+          React.createElement(Text, { style: styles.columnTitle }, 'SOLGT AF'),
+          ...soldByLines.map((line, i) => React.createElement(Text, { key: i, style: styles.columnText }, line))
+        ),
+        React.createElement(
+          View,
+          { style: styles.column },
+          React.createElement(Text, { style: styles.columnTitle }, 'KUNDE'),
+          ...billToLines.map((line, i) => React.createElement(Text, { key: i, style: styles.columnText }, line))
+        )
+      ),
+      // Table
+      React.createElement(
+        View,
+        { style: styles.table },
+        React.createElement(
+          View,
+          { style: styles.tableHeader },
+          React.createElement(Text, { style: styles.tableCol1 }, 'PRODUKT'),
+          React.createElement(Text, { style: styles.tableCol2 }, 'ENHEDER'),
+          React.createElement(Text, { style: styles.tableCol3 }, 'ENHEDSPRIS'),
+          React.createElement(Text, { style: styles.tableCol4 }, 'TOTAL')
+        ),
+        ...items.map((item, i) => {
+          const qty = item.qty || 1;
+          const unitPrice = item.unit_minor || 0;
+          const total = qty * unitPrice;
+          return React.createElement(
+            View,
+            { key: i, style: [styles.tableRow, i % 2 === 0 && styles.tableRowEven] },
+            React.createElement(Text, { style: styles.tableCol1 }, item.description || '—'),
+            React.createElement(Text, { style: styles.tableCol2 }, String(qty)),
+            React.createElement(Text, { style: styles.tableCol3 }, formatCurrency(unitPrice, currency)),
+            React.createElement(Text, { style: styles.tableCol4 }, formatCurrency(total, currency))
+          );
+        })
+      ),
+      // Totals
+      React.createElement(
+        View,
+        { style: styles.totals },
+        React.createElement(
+          View,
+          { style: styles.totalRow },
+          React.createElement(Text, null, 'Subtotal'),
+          React.createElement(Text, null, formatCurrency(order.subtotal_minor || 0, currency))
+        ),
+        React.createElement(
+          View,
+          { style: styles.totalRow },
+          React.createElement(Text, null, 'Moms'),
+          React.createElement(Text, null, formatCurrency(order.tax_minor || 0, currency))
+        ),
+        React.createElement(View, { style: styles.totalsDivider }),
+        React.createElement(
+          View,
+          { style: [styles.totalRow, styles.totalFinal] },
+          React.createElement(Text, null, 'Total'),
+          React.createElement(Text, null, formatCurrency(order.total_minor || 0, currency))
+        )
+      ),
+      // Footer
+      React.createElement(
+        View,
+        { style: styles.footer, fixed: true },
+        React.createElement(Text, null, companyFooter),
+        React.createElement(Text, { 
+          render: ({ pageNumber, totalPages }) => `Side ${pageNumber} af ${totalPages}` 
+        })
+      )
+    )
+  );
+};
+
+// Create Invoice PDF Document
+const createInvoicePDF = (invoice, items) => {
+  const currency = invoice.currency || 'DKK';
+  const styles = createSharedStyles();
+
+  const soldByLines = [
+    invoice.company?.name,
+    invoice.company?.address,
+    `${invoice.company?.postal_code || ''} ${invoice.company?.city || ''}`.trim(),
+    invoice.company?.email,
+    invoice.company?.phone,
+  ].filter(Boolean);
+
+  const billToLines = [
+    invoice.person?.name || 'Kunde',
+    invoice.person?.email,
+    invoice.person?.phone,
+  ].filter(Boolean);
+
+  const companyFooter = [
+    invoice.company?.website,
+    invoice.company?.email,
+    invoice.company?.phone,
+  ].filter(Boolean).join('  •  ');
+
+  return React.createElement(
+    Document,
+    null,
+    React.createElement(
+      Page,
+      { size: 'A4', style: styles.page },
+      // Header
+      React.createElement(
+        View,
+        { style: styles.header },
+        React.createElement(
+          View,
+          { style: styles.headerTop },
+          React.createElement(Text, { style: styles.companyName }, invoice.company?.name || 'VIRKSOMHED'),
+          React.createElement(Text, { style: styles.documentTitle }, 'FAKTURA')
+        ),
+        React.createElement(
+          View,
+          { style: styles.metadata },
+          React.createElement(
+            View,
+            { style: styles.metaColumn },
+            React.createElement(View, { style: styles.metaItem }, 
+              React.createElement(Text, { style: styles.metaLabel }, 'FAKTURA DATO'),
+              React.createElement(Text, { style: styles.metaValue }, formatDate(invoice.invoice_date || invoice.created_at))
+            ),
+            React.createElement(View, { style: styles.metaItem },
+              React.createElement(Text, { style: styles.metaLabel }, 'FAKTURA NR.'),
+              React.createElement(Text, { style: styles.metaValue }, invoice.invoice_number || '-')
+            )
+          ),
+          React.createElement(
+            View,
+            { style: styles.metaColumn },
+            React.createElement(View, { style: styles.metaItem },
+              React.createElement(Text, { style: styles.metaLabel }, 'BETALINGSFRIST'),
+              React.createElement(Text, { style: styles.metaValue }, formatDate(invoice.due_date))
+            )
+          )
+        )
+      ),
+      // Two Columns
+      React.createElement(
+        View,
+        { style: styles.twoColumns },
+        React.createElement(
+          View,
+          { style: styles.column },
+          React.createElement(Text, { style: styles.columnTitle }, 'SOLGT AF'),
+          ...soldByLines.map((line, i) => React.createElement(Text, { key: i, style: styles.columnText }, line))
+        ),
+        React.createElement(
+          View,
+          { style: styles.column },
+          React.createElement(Text, { style: styles.columnTitle }, 'FAKTURERET TIL'),
+          ...billToLines.map((line, i) => React.createElement(Text, { key: i, style: styles.columnText }, line))
+        )
+      ),
+      // Table
+      React.createElement(
+        View,
+        { style: styles.table },
+        React.createElement(
+          View,
+          { style: styles.tableHeader },
+          React.createElement(Text, { style: styles.tableCol1 }, 'PRODUKT'),
+          React.createElement(Text, { style: styles.tableCol2 }, 'ENHEDER'),
+          React.createElement(Text, { style: styles.tableCol3 }, 'ENHEDSPRIS'),
+          React.createElement(Text, { style: styles.tableCol4 }, 'TOTAL')
+        ),
+        ...items.map((item, i) => {
+          const qty = item.qty || 1;
+          const unitPrice = item.unit_minor || 0;
+          const total = qty * unitPrice;
+          return React.createElement(
+            View,
+            { key: i, style: [styles.tableRow, i % 2 === 0 && styles.tableRowEven] },
+            React.createElement(Text, { style: styles.tableCol1 }, item.description || '—'),
+            React.createElement(Text, { style: styles.tableCol2 }, String(qty)),
+            React.createElement(Text, { style: styles.tableCol3 }, formatCurrency(unitPrice, currency)),
+            React.createElement(Text, { style: styles.tableCol4 }, formatCurrency(total, currency))
+          );
+        })
+      ),
+      // Totals
+      React.createElement(
+        View,
+        { style: styles.totals },
+        React.createElement(
+          View,
+          { style: styles.totalRow },
+          React.createElement(Text, null, 'Subtotal'),
+          React.createElement(Text, null, formatCurrency(invoice.subtotal_minor || 0, currency))
+        ),
+        React.createElement(
+          View,
+          { style: styles.totalRow },
+          React.createElement(Text, null, 'Moms'),
+          React.createElement(Text, null, formatCurrency(invoice.tax_minor || 0, currency))
+        ),
+        React.createElement(View, { style: styles.totalsDivider }),
+        React.createElement(
+          View,
+          { style: [styles.totalRow, styles.totalFinal] },
+          React.createElement(Text, null, 'Total'),
+          React.createElement(Text, null, formatCurrency(invoice.total_minor || 0, currency))
+        )
+      ),
+      // Footer
+      React.createElement(
+        View,
+        { style: styles.footer, fixed: true },
+        React.createElement(Text, null, companyFooter),
+        React.createElement(Text, { 
+          render: ({ pageNumber, totalPages }) => `Side ${pageNumber} af ${totalPages}` 
+        })
+      )
+    )
+  );
+};
+
 export const handler = async (event) => {
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
@@ -290,7 +584,21 @@ export const handler = async (event) => {
     // Generate PDF using React PDF
     console.log('[PDF-React] Generating PDF with @react-pdf/renderer');
     
-    const pdfDoc = createQuotePDF(docData, items);
+    // Select the appropriate PDF generator based on type
+    let pdfDoc;
+    switch (type) {
+      case 'quote':
+        pdfDoc = createQuotePDF(docData, items);
+        break;
+      case 'order':
+        pdfDoc = createOrderPDF(docData, items);
+        break;
+      case 'invoice':
+        pdfDoc = createInvoicePDF(docData, items);
+        break;
+      default:
+        throw new Error(`Unsupported document type: ${type}`);
+    }
     
     // Convert stream to buffer
     const stream = await renderToStream(pdfDoc);

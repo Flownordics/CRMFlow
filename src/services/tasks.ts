@@ -411,11 +411,11 @@ export function useAddTaskComment() {
 export function getTaskStatusColor(status: Task['status']): string {
     switch (status) {
         case 'pending':
-            return 'text-yellow-600 bg-yellow-100';
+            return 'text-[#9d855e] bg-[#faf5ef]';
         case 'in_progress':
-            return 'text-blue-600 bg-blue-100';
+            return 'text-[#7a9db3] bg-[#eff4f7]';
         case 'completed':
-            return 'text-green-600 bg-green-100';
+            return 'text-[#6b7c5e] bg-[#f0f4ec]';
         case 'cancelled':
             return 'text-gray-600 bg-gray-100';
         default:
@@ -428,11 +428,11 @@ export function getTaskPriorityColor(priority: Task['priority']): string {
         case 'low':
             return 'text-gray-600 bg-gray-100';
         case 'medium':
-            return 'text-blue-600 bg-blue-100';
+            return 'text-[#7a9db3] bg-[#eff4f7]';
         case 'high':
-            return 'text-orange-600 bg-orange-100';
+            return 'text-[#9d855e] bg-[#faf5ef]';
         case 'urgent':
-            return 'text-red-600 bg-red-100';
+            return 'text-[#b8695f] bg-[#fef2f0]';
         default:
             return 'text-gray-600 bg-gray-100';
     }

@@ -17,8 +17,25 @@ export function toMinor(amount: number) {
   return Math.round(amount * 100);
 }
 
-export function fromMinor(minor: number) {
+export function fromMinor(minor: number, currency?: string, locale?: string): string | number {
+  // If currency is provided, return formatted string
+  if (currency) {
+    return formatMoneyMinor(minor, currency, locale);
+  }
+  // Otherwise return number (for backwards compatibility with calculations)
   return minor / 100;
+}
+
+// Format number with thousand separator (no currency)
+export function formatNumber(value: number, locale = "da-DK"): string {
+  try {
+    return new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    return value.toLocaleString();
+  }
 }
 
 export function computeLineTotals(params: {

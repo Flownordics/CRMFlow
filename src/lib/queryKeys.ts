@@ -66,6 +66,19 @@ export const qk = {
   accounting: (params?: Record<string, unknown>) => ['accounting', params ?? {}] as const,
   overdueInvoices: (p?: { limit?: number; offset?: number }) => ['invoices', 'overdue', p ?? {}] as const,
   recentInvoices: (p?: { limit?: number; offset?: number }) => ['invoices', 'recent', p ?? {}] as const,
+  
+  // Payments
+  payments: (params?: {
+    limit?: number;
+    offset?: number;
+    invoice_id?: string;
+    company_id?: string;
+    from_date?: string;
+    to_date?: string;
+    method?: string;
+  }) => ["payments", params ?? {}] as const,
+  invoicePayments: (invoiceId: string) => ["payments", "invoice", invoiceId] as const,
+  companyPayments: (companyId: string) => ["payments", "company", companyId] as const,
 
   calendarEvents: (range?: { start: string; end: string }) =>
     ["calendarEvents", range] as const,
@@ -118,4 +131,11 @@ export const qk = {
 
   // Activity Logs (company-level)
   companyActivityLogs: (companyId: string) => ["company", companyId, "activityLogs"] as const,
+  
+  // Company Tags
+  companyTags: () => ["companyTags"] as const,
+  companyTagsForCompany: (companyId: string) => ["company", companyId, "tags"] as const,
+  
+  // Company Notes
+  companyNotes: (companyId: string) => ["company", companyId, "notes"] as const,
 };

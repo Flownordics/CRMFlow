@@ -23,7 +23,7 @@ import {
     useDeleteCallList,
     useAddCompaniesToCallList,
 } from "@/services/callLists";
-import { useLogCompanyActivity } from "@/services/activityLog";
+import { useLogCompanyActivity, useCompanyActivityLogs } from "@/services/activityLog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { CompanySearchDialog } from "@/components/call-lists/CompanySearchDialog";
 
 export default function CallListDetail() {
     const { id } = useParams<{ id: string }>();
@@ -47,12 +48,14 @@ export default function CallListDetail() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [callOutcome, setCallOutcome] = useState("");
     const [callNotes, setCallNotes] = useState("");
+    const [showAddCompaniesDialog, setShowAddCompaniesDialog] = useState(false);
 
     const { data: callList, isLoading: listLoading } = useCallList(id!);
     const { data: items, isLoading: itemsLoading } = useCallListItems(id!);
     const updateItemMutation = useUpdateCallListItem(items?.[currentIndex]?.id || "", id!);
     const logActivityMutation = useLogCompanyActivity(items?.[currentIndex]?.company?.id || "");
     const deleteMutation = useDeleteCallList();
+    const { data: recentActivities } = useCompanyActivityLogs(items?.[currentIndex]?.company?.id || "");
 
     const isLoading = listLoading || itemsLoading;
     const currentItem = items?.[currentIndex];
@@ -240,6 +243,10 @@ export default function CallListDetail() {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowAddCompaniesDialog(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Companies
+                    </Button>
                     <Button variant="outline" onClick={handleExport}>
                         <Download className="mr-2 h-4 w-4" />
                         Export
@@ -307,6 +314,72 @@ export default function CallListDetail() {
                             </div>
                         )}
 
+                        {/* Last Activity */}
+                        {recentActivities && recentActivities.length > 0 && (() => {
+                            const activity = recentActivities[0];
+                            
+                            const typeLabels: Record<string, string> = {
+                                call: 'Call',
+                                email: 'Email',
+                                meeting: 'Meeting',
+                                note: 'Note',
+                                task: 'Task',
+                                deal: 'Deal Created',
+                                quote: 'Quote Created',
+                                order: 'Order Created',
+                                invoice: 'Invoice Created',
+                                payment: 'Payment Received',
+                            };
+
+                            const outcomeLabels: Record<string, string> = {
+                                completed: 'Completed',
+                                voicemail: 'Voicemail',
+                                no_answer: 'No Answer',
+                                busy: 'Busy',
+                                scheduled_followup: 'Follow-up Scheduled',
+                                wrong_number: 'Wrong Number',
+                                not_interested: 'Not Interested',
+                                callback_requested: 'Callback Requested',
+                            };
+
+                            // Format any outcome not in the mapping (remove underscores, capitalize)
+                            const formatOutcome = (outcome: string) => {
+                                if (outcomeLabels[outcome]) return outcomeLabels[outcome];
+                                return outcome.split('_').map(word => 
+                                    word.charAt(0).toUpperCase() + word.slice(1)
+                                ).join(' ');
+                            };
+
+                            return (
+                                <div className="p-3 bg-muted/30 rounded-lg border">
+                                    <p className="text-xs font-medium text-muted-foreground mb-2">Latest Activity:</p>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-medium">
+                                                {typeLabels[activity.type] || activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
+                                            </span>
+                                            {activity.outcome && (
+                                                <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                                                    {formatOutcome(activity.outcome)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">
+                                            {new Date(activity.createdAt).toLocaleDateString('en-US', {
+                                                day: 'numeric',
+                                                month: 'short'
+                                            })}
+                                        </span>
+                                    </div>
+                                    {activity.notes && (
+                                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                                            {activity.notes}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
                         {currentItem.notes && (
                             <div className="p-3 bg-muted rounded-lg">
                                 <p className="text-sm font-medium mb-1">Notes:</p>
@@ -356,31 +429,31 @@ export default function CallListDetail() {
                                 <SelectContent>
                                     <SelectItem value="completed">
                                         <div className="flex items-center gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-600" />
+                                            <CheckCircle className="h-4 w-4 text-[#6b7c5e]" />
                                             Completed - Call held
                                         </div>
                                     </SelectItem>
                                     <SelectItem value="voicemail">
                                         <div className="flex items-center gap-2">
-                                            <Mail className="h-4 w-4 text-blue-600" />
+                                            <Mail className="h-4 w-4 text-[#7a9db3]" />
                                             Voicemail left
                                         </div>
                                     </SelectItem>
                                     <SelectItem value="no_answer">
                                         <div className="flex items-center gap-2">
-                                            <XCircle className="h-4 w-4 text-orange-600" />
+                                            <XCircle className="h-4 w-4 text-[#9d855e]" />
                                             No answer
                                         </div>
                                     </SelectItem>
                                     <SelectItem value="scheduled_followup">
                                         <div className="flex items-center gap-2">
-                                            <Clock className="h-4 w-4 text-purple-600" />
+                                            <Clock className="h-4 w-4 text-[#9d94af]" />
                                             Follow-up scheduled
                                         </div>
                                     </SelectItem>
                                     <SelectItem value="not_interested">
                                         <div className="flex items-center gap-2">
-                                            <XCircle className="h-4 w-4 text-red-600" />
+                                            <XCircle className="h-4 w-4 text-[#b8695f]" />
                                             Not interested
                                         </div>
                                     </SelectItem>
@@ -450,7 +523,7 @@ export default function CallListDetail() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {item.status === 'completed' && (
-                                        <Badge variant="default" className="bg-green-600">
+                                        <Badge variant="default" className="bg-[#b5c69f] hover:bg-[#a5b68f] text-white">
                                             <CheckCircle className="h-3 w-3 mr-1" />
                                             Completed
                                         </Badge>
@@ -471,6 +544,14 @@ export default function CallListDetail() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Add Companies Dialog */}
+            <CompanySearchDialog
+                open={showAddCompaniesDialog}
+                onOpenChange={setShowAddCompaniesDialog}
+                callListId={id!}
+                existingCompanyIds={items?.map((item) => item.companyId) || []}
+            />
         </div>
     );
 }

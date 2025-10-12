@@ -46,6 +46,18 @@ export interface PerformanceMetrics {
     quoteToOrderConversion: number;
     orderToInvoiceConversion: number;
     invoiceToPaymentConversion: number;
+    
+    // Additional metrics for charts
+    wonDeals: number;
+    lostDeals: number;
+    openDeals: number;
+    totalQuotes: number;
+    quotesValue: number;
+    totalOrders: number;
+    ordersValue: number;
+    totalInvoices: number;
+    invoicesValue: number;
+    paidInvoices: number;
 }
 
 // KPI data
@@ -295,6 +307,17 @@ export function useAnalytics(dateRange?: DateRange) {
         const invoiceToPaymentConversion = currentInvoices.length > 0 ?
             (currentInvoices.filter(invoice => invoice.status === 'paid').length / currentInvoices.length) * 100 : 0;
 
+        // Additional metrics for charts
+        const lostDeals = currentDeals.filter(deal =>
+            getStageName(deal.stage_id).toLowerCase().includes('lost') ||
+            getStageName(deal.stage_id).toLowerCase().includes('closed lost')
+        );
+        
+        const quotesValue = currentQuotes.reduce((sum, quote) => sum + (quote.total_minor || 0), 0);
+        const ordersValue = currentOrders.reduce((sum, order) => sum + (order.total_minor || 0), 0);
+        const invoicesValue = currentInvoices.reduce((sum, invoice) => sum + (invoice.total_minor || 0), 0);
+        const paidInvoicesCount = currentInvoices.filter(invoice => invoice.status === 'paid').length;
+
         return {
             totalRevenue,
             revenueGrowth,
@@ -309,6 +332,18 @@ export function useAnalytics(dateRange?: DateRange) {
             quoteToOrderConversion,
             orderToInvoiceConversion,
             invoiceToPaymentConversion,
+            
+            // Additional metrics
+            wonDeals: wonDeals.length,
+            lostDeals: lostDeals.length,
+            openDeals: totalDeals - wonDeals.length - lostDeals.length,
+            totalQuotes: currentQuotes.length,
+            quotesValue,
+            totalOrders: currentOrders.length,
+            ordersValue,
+            totalInvoices: currentInvoices.length,
+            invoicesValue,
+            paidInvoices: paidInvoicesCount,
         };
     };
 

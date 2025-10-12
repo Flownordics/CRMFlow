@@ -53,9 +53,15 @@ export function AppSidebar() {
       isCollapsed ? "w-[var(--sidebar-width-collapsed)]" : "w-[var(--sidebar-width)]"
     )}>
       {/* Header */}
-      <div className="border-b border-sidebar-hover p-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
+      <div className={cn(
+        "border-b border-sidebar-hover transition-all duration-300",
+        isCollapsed ? "p-3" : "p-6"
+      )}>
+        <div className={cn(
+          "flex items-center transition-all duration-300",
+          isCollapsed ? "justify-center" : "gap-3"
+        )}>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent flex-shrink-0">
             <div className="h-4 w-4 rotate-45 transform rounded-sm bg-white" />
           </div>
           {!isCollapsed && (
@@ -68,16 +74,27 @@ export function AppSidebar() {
           )}
         </div>
         {/* Toggle button */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute top-6 right-4 p-1 rounded hover:bg-sidebar-hover transition-colors"
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <ChevronLeft className={cn(
-            "h-4 w-4 text-white transition-transform",
-            isCollapsed && "rotate-180"
-          )} />
-        </button>
+        {!isCollapsed && (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="absolute top-6 right-4 p-1 rounded hover:bg-sidebar-hover transition-colors"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <ChevronLeft className={cn(
+              "h-4 w-4 text-white transition-transform",
+              isCollapsed && "rotate-180"
+            )} />
+          </button>
+        )}
+        {isCollapsed && (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="mt-3 w-full flex justify-center p-1 rounded hover:bg-sidebar-hover transition-colors"
+            title="Expand sidebar"
+          >
+            <ChevronLeft className="h-4 w-4 text-white rotate-180" />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -119,14 +136,15 @@ export function AppSidebar() {
 
       {/* Footer with Logo */}
       <div className="border-t border-sidebar-hover p-4">
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center overflow-hidden">
           <img
             src="/FLOWNORDICS6tiny.png"
             alt="FlowNordics Logo"
             className={cn(
-              "transition-all duration-300",
-              isCollapsed ? "h-8 w-8" : "h-12 w-auto"
+              "transition-all duration-300 object-contain",
+              isCollapsed ? "h-10 w-10 rotate-90" : "h-12 w-auto rotate-0"
             )}
+            style={{ transformOrigin: "center" }}
           />
         </div>
       </div>

@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { FileUploader } from "@/components/documents/FileUploader";
 import { FileList } from "@/components/documents/FileList";
 import { useDocuments } from "@/services/documents";
+import { CompanyAccountingSummary } from "@/components/companies/CompanyAccountingSummary";
 
 export default function CompanyDetail() {
     const { id } = useParams<{ id: string }>();
@@ -121,7 +122,7 @@ export default function CompanyDetail() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary">
+                            <AvatarFallback className="bg-primary text-primary-foreground">
                                 <Building2 className="h-4 w-4" />
                             </AvatarFallback>
                         </Avatar>
@@ -169,15 +170,18 @@ export default function CompanyDetail() {
 
                 {/* Overview Tab */}
                 <TabsContent value="overview" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Company Details</CardTitle>
-                            <CardDescription>
-                                Update company information
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={form.handleSubmit(handleSaveOverview)} className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        {/* Company Details - Takes 2/3 width on large screens */}
+                        <div className="lg:col-span-2">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Company Details</CardTitle>
+                                    <CardDescription>
+                                        Update company information
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <form onSubmit={form.handleSubmit(handleSaveOverview)} className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="name">Company Name *</Label>
@@ -266,6 +270,13 @@ export default function CompanyDetail() {
                             </form>
                         </CardContent>
                     </Card>
+                        </div>
+
+                        {/* Accounting Summary - Takes 1/3 width on large screens */}
+                        <div className="lg:col-span-1">
+                            <CompanyAccountingSummary companyId={company.id} currency="DKK" />
+                        </div>
+                    </div>
                 </TabsContent>
 
                 {/* People Tab */}
@@ -298,7 +309,7 @@ export default function CompanyDetail() {
                                             <td className="p-2">
                                                 <div className="flex items-center gap-2">
                                                     <Avatar className="h-6 w-6">
-                                                        <AvatarFallback className="text-xs">
+                                                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
                                                             {person.firstName[0]}{person.lastName[0]}
                                                         </AvatarFallback>
                                                     </Avatar>

@@ -25,16 +25,16 @@
     --accent-dark: 160 90% 30%;
     /* Darker emerald */
 
-    /* Success & Status Colors */
-    --success: 160 83% 39%;
-    /* Emerald for success */
-    --success-foreground: 0 0% 98%;
-    --warning: 43 96% 56%;
-    /* Amber for warnings */
-    --warning-foreground: 0 0% 9%;
-    --destructive: 0 72% 51%;
-    /* Red for errors */
-    --destructive-foreground: 0 0% 98%;
+    /* Success & Status Colors - Muted Palette */
+    --success: 86 25% 70%;
+    /* Sage green for success */
+    --success-foreground: 86 25% 25%;
+    --warning: 32 46% 65%;
+    /* Muted gold for warnings */
+    --warning-foreground: 32 46% 20%;
+    --destructive: 8 95% 72%;
+    /* Muted coral for errors */
+    --destructive-foreground: 8 95% 20%;
 
     /* Neutral Palette */
     --background: 0 0% 100%;
@@ -67,15 +67,21 @@
     --sidebar-width-collapsed: 64px;
     --sidebar-width-icon: 64px;
 
-    /* Status indicators - updated with user's preferred colors */
-    --status-draft: 42 45% 85%;
-    /* Warm cream */
+    /* Status indicators - muted palette */
+    --status-draft: 0 0% 70%;
+    /* Neutral gray */
     --status-active: 86 25% 70%;
     /* Sage green */
     --status-closed: 150 7% 61%;
     /* Muted green */
     --status-overdue: 8 95% 72%;
-    /* Coral red */
+    /* Muted coral */
+    --status-sent: 205 25% 60%;
+    /* Muted blue-grey */
+    --status-paid: 86 25% 70%;
+    /* Sage green */
+    --status-partial: 32 46% 65%;
+    /* Muted gold */
 
     /* Brand colors - user's preferred palette */
     --brand-primary: 212 30% 57%;
@@ -100,8 +106,10 @@
     /* Earth red */
 
     /* Feedback colors */
-    --danger: 12 44% 47%;
-    /* Earth red */
+    --danger: 8 95% 72%;
+    /* Muted coral */
+    --info: 205 25% 60%;
+    /* Muted blue-grey */
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg,
@@ -162,12 +170,12 @@
     --accent-light: 160 70% 55%;
     --accent-dark: 160 90% 35%;
 
-    /* Success & Status Colors - Dark Mode */
-    --success: 160 83% 45%;
+    /* Success & Status Colors - Dark Mode - Muted Palette */
+    --success: 86 25% 60%;
     --success-foreground: 0 0% 98%;
-    --warning: 43 96% 62%;
-    --warning-foreground: 0 0% 9%;
-    --destructive: 0 72% 55%;
+    --warning: 32 46% 60%;
+    --warning-foreground: 0 0% 98%;
+    --destructive: 8 95% 68%;
     --destructive-foreground: 0 0% 98%;
 
     /* Neutral Palette - Dark Mode */
@@ -200,15 +208,21 @@
     --sidebar-width-collapsed: 64px;
     --sidebar-width-icon: 64px;
 
-    /* Status indicators - Dark Mode with user's palette */
-    --status-draft: 42 30% 32%;
-    /* Darker cream */
-    --status-active: 86 18% 30%;
-    /* Darker sage */
-    --status-closed: 150 6% 28%;
+    /* Status indicators - Dark Mode - muted palette */
+    --status-draft: 0 0% 50%;
+    /* Darker gray */
+    --status-active: 86 25% 60%;
+    /* Sage green */
+    --status-closed: 150 7% 50%;
     /* Darker muted green */
-    --status-overdue: 8 80% 55%;
-    /* Darker coral */
+    --status-overdue: 8 90% 65%;
+    /* Coral */
+    --status-sent: 205 25% 55%;
+    /* Muted blue-grey */
+    --status-paid: 86 25% 60%;
+    /* Sage green */
+    --status-partial: 32 46% 60%;
+    /* Muted gold */
 
     /* Brand colors - Dark Mode */
     --brand-primary: 212 30% 65%;
@@ -233,8 +247,10 @@
     /* Lighter earth red */
 
     /* Feedback colors - Dark Mode */
-    --danger: 12 44% 50%;
-    /* Lighter earth red */
+    --danger: 8 90% 65%;
+    /* Muted coral */
+    --info: 205 25% 55%;
+    /* Muted blue-grey */
 
     /* Gradients - Dark Mode */
     --gradient-primary: linear-gradient(135deg,
@@ -319,5 +335,36 @@
   .scrollbar-thin::-webkit-scrollbar-track {
     background: hsl(var(--muted));
     border-radius: 9999px;
+  }
+
+  /* Status badge utility classes - muted palette */
+  .status-paid {
+    background-color: #f0f4ec;
+    color: #6b7c5e;
+    border-color: #d4dcc8;
+  }
+
+  .status-overdue {
+    background-color: #fef2f0;
+    color: #b8695f;
+    border-color: #fdd9d3;
+  }
+
+  .status-partial {
+    background-color: #faf5ef;
+    color: #9d855e;
+    border-color: #e8dac8;
+  }
+
+  .status-sent {
+    background-color: #eff4f7;
+    color: #5a7b8f;
+    border-color: #d0dfe8;
+  }
+
+  .status-draft {
+    background-color: #f5f5f5;
+    color: #6b6b6b;
+    border-color: #d9d9d9;
   }
 }

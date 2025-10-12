@@ -29,6 +29,16 @@ export const companyReadSchema = z.object({
   lastActivityAt: z.string().nullable().optional(),
   activityStatus: z.enum(['green', 'yellow', 'red']).nullable().optional(),
   doNotCall: z.boolean().optional().default(false),
+  // Enhanced fields
+  employeeCount: z.number().nullable().optional(),
+  annualRevenueRange: z.string().nullable().optional(),
+  lifecycleStage: z.enum(['lead', 'prospect', 'customer', 'partner', 'inactive']).nullable().optional(),
+  linkedinUrl: z.string().url().nullable().optional().or(z.literal("")),
+  twitterUrl: z.string().url().nullable().optional().or(z.literal("")),
+  facebookUrl: z.string().url().nullable().optional().or(z.literal("")),
+  description: z.string().nullable().optional(),
+  foundedDate: z.string().nullable().optional(),
+  parentCompanyId: z.string().uuid().nullable().optional(),
 });
 
 export const companyCreateSchema = z.object({
@@ -43,6 +53,16 @@ export const companyCreateSchema = z.object({
   industry: z.string().optional().nullable(),
   website: websiteValidator.optional().nullable().or(z.literal("")),
   doNotCall: z.boolean().optional(),
+  // Enhanced fields
+  employeeCount: z.number().optional().nullable(),
+  annualRevenueRange: z.string().optional().nullable(),
+  lifecycleStage: z.enum(['lead', 'prospect', 'customer', 'partner', 'inactive']).optional().nullable(),
+  linkedinUrl: z.string().url().optional().nullable().or(z.literal("")),
+  twitterUrl: z.string().url().optional().nullable().or(z.literal("")),
+  facebookUrl: z.string().url().optional().nullable().or(z.literal("")),
+  description: z.string().optional().nullable(),
+  foundedDate: z.string().optional().nullable(),
+  parentCompanyId: z.string().uuid().optional().nullable(),
 });
 
 export const companyUpdateSchema = companyCreateSchema.partial();

@@ -20,16 +20,40 @@ export function getRoleTheme(title?: string) {
 }
 
 export function roleTokenBg(color: string) {
-    if (color === "secondary") return "bg-secondary/10";
-    return `bg-${color}/10`;
+    const bgMap: Record<string, string> = {
+        accent: "bg-accent",
+        info: "bg-blue-100 dark:bg-blue-950",
+        warning: "bg-amber-100 dark:bg-amber-950",
+        secondary: "bg-secondary",
+        success: "bg-green-100 dark:bg-green-950",
+        muted: "bg-muted",
+        danger: "bg-red-100 dark:bg-red-950",
+    };
+    return bgMap[color] || "bg-muted";
 }
 
 export function roleTokenText(color: string) {
-    if (color === "secondary") return "text-secondary-foreground";
-    return `text-${color}`;
+    const textMap: Record<string, string> = {
+        accent: "text-accent-foreground",
+        info: "text-[#5a7b8f] dark:text-[#7a9db3]",
+        warning: "text-[#7d6a4a] dark:text-[#9d855e]",
+        secondary: "text-secondary-foreground",
+        success: "text-[#6b7c5e] dark:text-[#b5c69f]",
+        muted: "text-muted-foreground",
+        danger: "text-[#b8695f] dark:text-[#fb8674]",
+    };
+    return textMap[color] || "text-muted-foreground";
 }
 
 export function roleTokenRing(color: string) {
-    if (color === "secondary") return "ring-secondary/30";
-    return `ring-${color}/30`;
+    const ringMap: Record<string, string> = {
+        accent: "ring-accent/50",
+        info: "ring-blue-300/50",
+        warning: "ring-amber-300/50",
+        secondary: "ring-secondary/50",
+        success: "ring-green-300/50",
+        muted: "ring-muted-foreground/30",
+        danger: "ring-red-300/50",
+    };
+    return ringMap[color] || "ring-muted-foreground/30";
 }

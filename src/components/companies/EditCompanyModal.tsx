@@ -12,9 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useUpdateCompany } from "@/services/companies";
 import { toastBus } from "@/lib/toastBus";
-import { FormRow } from "@/components/forms/FormRow";
 import { useI18n } from "@/lib/i18n";
-import { Mail, Building2 } from "lucide-react";
+import { Mail } from "lucide-react";
 import { Company, companyUpdateSchema } from "@/lib/schemas/company";
 import { logger } from '@/lib/logger';
 
@@ -32,7 +31,6 @@ export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyMod
     name: company.name,
     email: company.email || "",
     invoiceEmail: company.invoiceEmail || "",
-    domain: company.domain || "",
     vat: company.vat || "",
     phone: company.phone || "",
     address: company.address || "",
@@ -48,7 +46,6 @@ export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyMod
       name: company.name,
       email: company.email || "",
       invoiceEmail: company.invoiceEmail || "",
-      domain: company.domain || "",
       vat: company.vat || "",
       phone: company.phone || "",
       address: company.address || "",
@@ -104,17 +101,15 @@ export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyMod
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
-            <FormRow>
-              <div className="space-y-2">
-                <Label htmlFor="name">{t("companies.name")} *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  required
-                />
-              </div>
-            </FormRow>
+            <div className="space-y-2">
+              <Label htmlFor="name">{t("companies.name")} *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => handleInputChange("name", e.target.value)}
+                required
+              />
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -170,26 +165,14 @@ export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyMod
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="domain">{t("companies.domain")}</Label>
-                <Input
-                  id="domain"
-                  value={formData.domain}
-                  onChange={(e) => handleInputChange("domain", e.target.value)}
-                  placeholder="company.com"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="vat">{t("companies.vat")}</Label>
-                <Input
-                  id="vat"
-                  value={formData.vat}
-                  onChange={(e) => handleInputChange("vat", e.target.value)}
-                  placeholder="DK12345678"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="vat">{t("companies.vat")}</Label>
+              <Input
+                id="vat"
+                value={formData.vat}
+                onChange={(e) => handleInputChange("vat", e.target.value)}
+                placeholder="DK12345678"
+              />
             </div>
 
             <div className="space-y-2">

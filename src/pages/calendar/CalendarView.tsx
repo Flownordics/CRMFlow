@@ -241,10 +241,10 @@ export default function CalendarView() {
 
       {/* Localhost Notice */}
       {isLocalhost && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="bg-[#faf5ef] border border-[#e8dac8] rounded-lg p-4">
           <div className="flex items-center gap-2">
-            <div className="text-yellow-600">⚠️</div>
-            <div className="text-sm text-yellow-800">
+            <div className="text-[#9d855e]">⚠️</div>
+            <div className="text-sm text-[#7d6a4a]">
               <strong>Development Mode:</strong> Google Calendar integration is disabled in localhost.
               Deploy to Netlify to test Google Calendar features.
             </div>

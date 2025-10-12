@@ -8,12 +8,8 @@ import { Deal } from "./deals";
 import { Document } from "./documents";
 import { Activity } from "./activity";
 import { USE_MOCKS } from "@/lib/debug";
-import { supabase } from "@/integrations/supabase/client";
 import { handleError } from "@/lib/errorHandler";
-import { validateCompanyCreate, validateCompanyUpdate } from "@/lib/validation";
 import { logger } from "@/lib/logger";
-import { normalizeApiResponse, handleApiError, createMockResponse, handleMockApiCall } from "@/lib/sharedUtils";
-import { executeApiWithRecovery } from "@/lib/errorRecovery";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -24,13 +20,13 @@ export type PaginatedResponse<T> = {
   totalPages: number;
 };
 
-// Robust response schema that handles multiple formats
-const CompaniesResponse = z.union([
-  z.array(companyReadSchema),
-  z.object({ data: z.array(companyReadSchema), total: z.number().optional(), page: z.number().optional(), limit: z.number().optional(), totalPages: z.number().optional() }),
-  z.object({ items: z.array(companyReadSchema) }),
-  z.object({ results: z.array(companyReadSchema) }),
-]);
+// Robust response schema that handles multiple formats (unused currently)
+// const CompaniesResponse = z.union([
+//   z.array(companyReadSchema),
+//   z.object({ data: z.array(companyReadSchema), total: z.number().optional(), page: z.number().optional(), limit: z.number().optional(), totalPages: z.number().optional() }),
+//   z.object({ items: z.array(companyReadSchema) }),
+//   z.object({ results: z.array(companyReadSchema) }),
+// ]);
 
 export async function fetchCompanies(params: {
   page?: number;
@@ -128,6 +124,16 @@ export async function fetchCompanies(params: {
       lastActivityAt: company.last_activity_at,
       activityStatus: company.activity_status,
       doNotCall: company.do_not_call,
+      // Enhanced fields
+      employeeCount: company.employee_count,
+      annualRevenueRange: company.annual_revenue_range,
+      lifecycleStage: company.lifecycle_stage,
+      linkedinUrl: company.linkedin_url,
+      twitterUrl: company.twitter_url,
+      facebookUrl: company.facebook_url,
+      description: company.description,
+      foundedDate: company.founded_date,
+      parentCompanyId: company.parent_company_id,
     })) : [];
 
     // Parse the mapped companies array
@@ -188,6 +194,16 @@ export async function fetchCompany(id: string) {
       lastActivityAt: company.last_activity_at,
       activityStatus: company.activity_status,
       doNotCall: company.do_not_call,
+      // Enhanced fields
+      employeeCount: company.employee_count,
+      annualRevenueRange: company.annual_revenue_range,
+      lifecycleStage: company.lifecycle_stage,
+      linkedinUrl: company.linkedin_url,
+      twitterUrl: company.twitter_url,
+      facebookUrl: company.facebook_url,
+      description: company.description,
+      foundedDate: company.founded_date,
+      parentCompanyId: company.parent_company_id,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -215,6 +231,17 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       country: companyData.country,
       industry: companyData.industry,
       website: companyData.website,
+      do_not_call: companyData.doNotCall ?? false,
+      // Enhanced fields
+      employee_count: companyData.employeeCount,
+      annual_revenue_range: companyData.annualRevenueRange,
+      lifecycle_stage: companyData.lifecycleStage,
+      linkedin_url: companyData.linkedinUrl,
+      twitter_url: companyData.twitterUrl,
+      facebook_url: companyData.facebookUrl,
+      description: companyData.description,
+      founded_date: companyData.foundedDate,
+      parent_company_id: companyData.parentCompanyId,
     };
 
     const response = await apiPostWithReturn("/companies", dbData);
@@ -246,6 +273,19 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       website: createdCompany.website,
       createdAt: createdCompany.created_at,
       updatedAt: createdCompany.updated_at,
+      lastActivityAt: createdCompany.last_activity_at,
+      activityStatus: createdCompany.activity_status,
+      doNotCall: createdCompany.do_not_call,
+      // Enhanced fields
+      employeeCount: createdCompany.employee_count,
+      annualRevenueRange: createdCompany.annual_revenue_range,
+      lifecycleStage: createdCompany.lifecycle_stage,
+      linkedinUrl: createdCompany.linkedin_url,
+      twitterUrl: createdCompany.twitter_url,
+      facebookUrl: createdCompany.facebook_url,
+      description: createdCompany.description,
+      foundedDate: createdCompany.founded_date,
+      parentCompanyId: createdCompany.parent_company_id,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -260,20 +300,32 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
     return companyReadSchema.parse(data);
   }
 
-  try {
-    // Map camelCase to DB snake_case
-    const dbPatch: any = {};
-    if (patch.name !== undefined) dbPatch.name = patch.name;
-    if (patch.email !== undefined) dbPatch.email = patch.email?.toLowerCase();
-    if (patch.invoiceEmail !== undefined) dbPatch.invoice_email = patch.invoiceEmail?.toLowerCase();
-    if (patch.vat !== undefined) dbPatch.vat = patch.vat;
-    if (patch.phone !== undefined) dbPatch.phone = patch.phone;
-    if (patch.address !== undefined) dbPatch.address = patch.address;
-    if (patch.city !== undefined) dbPatch.city = patch.city;
-    if (patch.country !== undefined) dbPatch.country = patch.country;
-    if (patch.industry !== undefined) dbPatch.industry = patch.industry;
-    if (patch.website !== undefined) dbPatch.website = patch.website;
+  // Map camelCase to DB snake_case (declare outside try-catch for error logging)
+  const dbPatch: any = {};
+  if (patch.name !== undefined) dbPatch.name = patch.name;
+  if (patch.email !== undefined) dbPatch.email = patch.email?.toLowerCase();
+  if (patch.invoiceEmail !== undefined) dbPatch.invoice_email = patch.invoiceEmail?.toLowerCase();
+  if (patch.vat !== undefined) dbPatch.vat = patch.vat;
+  if (patch.phone !== undefined) dbPatch.phone = patch.phone;
+  if (patch.address !== undefined) dbPatch.address = patch.address;
+  if (patch.city !== undefined) dbPatch.city = patch.city;
+  if (patch.country !== undefined) dbPatch.country = patch.country;
+  if (patch.industry !== undefined) dbPatch.industry = patch.industry;
+  if (patch.website !== undefined) dbPatch.website = patch.website;
+  if (patch.doNotCall !== undefined) dbPatch.do_not_call = patch.doNotCall;
+  // Enhanced fields
+  if (patch.employeeCount !== undefined) dbPatch.employee_count = patch.employeeCount;
+  if (patch.annualRevenueRange !== undefined) dbPatch.annual_revenue_range = patch.annualRevenueRange;
+  if (patch.lifecycleStage !== undefined) dbPatch.lifecycle_stage = patch.lifecycleStage;
+  if (patch.linkedinUrl !== undefined) dbPatch.linkedin_url = patch.linkedinUrl;
+  if (patch.twitterUrl !== undefined) dbPatch.twitter_url = patch.twitterUrl;
+  if (patch.facebookUrl !== undefined) dbPatch.facebook_url = patch.facebookUrl;
+  if (patch.description !== undefined) dbPatch.description = patch.description;
+  if (patch.foundedDate !== undefined) dbPatch.founded_date = patch.foundedDate;
+  if (patch.parentCompanyId !== undefined) dbPatch.parent_company_id = patch.parentCompanyId;
 
+  try {
+    
     const response = await apiClient.patch(`/companies?id=eq.${id}`, dbPatch);
     const raw = normalizeApiData(response);
 
@@ -302,12 +354,32 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
       website: company.website,
       createdAt: company.created_at,
       updatedAt: company.updated_at,
+      lastActivityAt: company.last_activity_at,
+      activityStatus: company.activity_status,
+      doNotCall: company.do_not_call,
+      // Enhanced fields
+      employeeCount: company.employee_count,
+      annualRevenueRange: company.annual_revenue_range,
+      lifecycleStage: company.lifecycle_stage,
+      linkedinUrl: company.linkedin_url,
+      twitterUrl: company.twitter_url,
+      facebookUrl: company.facebook_url,
+      description: company.description,
+      foundedDate: company.founded_date,
+      parentCompanyId: company.parent_company_id,
     };
 
     return companyReadSchema.parse(mappedCompany);
-  } catch (error) {
-    logger.error("Failed to update company", { error, companyId: id }, 'CompanyUpdate');
-    throw new Error("Failed to update company");
+  } catch (error: any) {
+    logger.error("Failed to update company", { 
+      error, 
+      companyId: id,
+      errorMessage: error?.message,
+      errorResponse: error?.response?.data,
+      errorStatus: error?.response?.status,
+      dbPatch
+    }, 'CompanyUpdate');
+    throw handleError(error, 'updateCompany');
   }
 }
 

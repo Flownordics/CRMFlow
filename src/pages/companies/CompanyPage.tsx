@@ -8,7 +8,7 @@ import { CompanyOverview } from "@/components/companies/CompanyOverview";
 import { CompanyPeople } from "@/components/companies/CompanyPeople";
 import { CompanyDeals } from "@/components/companies/CompanyDeals";
 import { CompanyDocuments } from "@/components/companies/CompanyDocuments";
-import { CompanyActivity } from "@/components/companies/CompanyActivity";
+import { CompanyActivityTimeline } from "@/components/companies/CompanyActivityTimeline";
 import { EditCompanyModal } from "@/components/companies/EditCompanyModal";
 import { PersonModal } from "@/components/people/PersonModal";
 import { CreateDealModal } from "@/components/deals/CreateDealModal";
@@ -125,7 +125,7 @@ export default function CompanyPage() {
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-6">
-          <CompanyActivity companyId={company.id} />
+          <CompanyActivityTimeline companyId={company.id} />
         </TabsContent>
       </Tabs>
 

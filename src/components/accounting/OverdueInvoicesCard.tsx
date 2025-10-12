@@ -47,6 +47,8 @@ function SimpleInvoiceTable({ ariaLabel, rows, currency }: {
     balance_minor?: number;
   }>; currency: string
 }) {
+  const { getCompanyName } = useCompanyLookup();
+  
   return (
     <div role="table" aria-label={ariaLabel} className="divide-y">
       <div role="row" className="grid grid-cols-5 py-2 text-xs text-muted-foreground">

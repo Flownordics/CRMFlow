@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable } from "@/components/tables/DataTable";
 import { CompanyModal } from "@/components/companies/CompanyModal";
 import { Company } from "@/lib/schemas/company";
-import { ChevronLeft, ChevronRight, Search, Grid3X3, List, Filter } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Grid3X3, List, Filter, Phone } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DEBUG_UI } from "@/lib/debug";
 import { CompaniesKpiHeader } from "@/components/companies/CompaniesKpiHeader";
@@ -17,6 +17,11 @@ import { cn } from "@/lib/utils";
 import { getIndustryTheme, industryTokenText } from "@/components/companies/industryTheme";
 import { ActivityStatusBadge } from "@/components/companies/ActivityStatusBadge";
 import { ActivityStatus } from "@/lib/schemas/callList";
+import { AddToCallListDialog } from "@/components/call-lists/AddToCallListDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { BulkActionsMenu } from "@/components/companies/BulkActionsMenu";
+import { CompanyTagsBadges } from "@/components/companies/CompanyTagsManager";
+import { exportCompaniesToCSV } from "@/services/export/companiesExport";
 
 export default function CompaniesList() {
     const [q, setQ] = useState("");
@@ -28,6 +33,8 @@ export default function CompaniesList() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState<Company | undefined>();
     const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+    const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
+    const [showAddToListDialog, setShowAddToListDialog] = useState(false);
     const navigate = useNavigate();
 
     const { data: companiesResponse, isLoading, error } = useCompanies({
@@ -88,7 +95,45 @@ export default function CompaniesList() {
         setPage(newPage);
     };
 
+    const toggleSelectCompany = (companyId: string) => {
+        setSelectedCompanyIds((prev) =>
+            prev.includes(companyId)
+                ? prev.filter((id) => id !== companyId)
+                : [...prev, companyId]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedCompanyIds.length === companies.length) {
+            setSelectedCompanyIds([]);
+        } else {
+            setSelectedCompanyIds(companies.map((c) => c.id));
+        }
+    };
+
+    const handleAddToCallList = () => {
+        if (selectedCompanyIds.length === 0) return;
+        setShowAddToListDialog(true);
+    };
+
+    const handleAddToCallListSuccess = () => {
+        setSelectedCompanyIds([]);
+        setShowAddToListDialog(false);
+    };
+
     const columns = [
+        {
+            header: "",
+            accessorKey: "_select",
+            cell: (r: any) => (
+                <Checkbox
+                    checked={selectedCompanyIds.includes(r.id)}
+                    onCheckedChange={() => toggleSelectCompany(r.id)}
+                    onClick={(e) => e.stopPropagation()}
+                />
+            ),
+            meta: { width: "50px" }
+        },
         {
             header: "Status",
             accessorKey: "activityStatus",
@@ -127,6 +172,13 @@ export default function CompaniesList() {
                 <span className="text-muted-foreground">—</span>
             ),
             meta: { sortable: true }
+        },
+        {
+            header: "Tags",
+            accessorKey: "tags",
+            cell: (r: any) => (
+                <CompanyTagsBadges companyId={r.id} />
+            ),
         },
         {
             header: "Website",
@@ -169,10 +221,14 @@ export default function CompaniesList() {
         },
         {
             header: "",
+            accessorKey: "actions",
             cell: (r: any) => <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>,
-            meta: { align: "end" }
+            meta: { align: "end" as "end" }
         },
-    ];
+    ] as const;
+
+    const selectedCompanies = companies.filter((c) => selectedCompanyIds.includes(c.id));
+    const selectedCompanyNames = selectedCompanies.map((c) => c.name);
 
     return (
         <div className="space-y-6 p-6">
@@ -180,7 +236,29 @@ export default function CompaniesList() {
             <PageHeader
                 title="Companies"
                 subtitle="Organize your accounts and manage relationships."
-                actions={<Button onClick={() => openCreate()}>Add Company</Button>}
+                actions={
+                    <div className="flex gap-2">
+                        {selectedCompanyIds.length > 0 && (
+                            <>
+                                <BulkActionsMenu
+                                    selectedCompanyIds={selectedCompanyIds}
+                                    selectedCompanyNames={selectedCompanyNames}
+                                    selectedCompanies={selectedCompanies}
+                                    onClearSelection={() => setSelectedCompanyIds([])}
+                                />
+                                <Button
+                                    variant="outline"
+                                    onClick={handleAddToCallList}
+                                    className="gap-2"
+                                >
+                                    <Phone className="h-4 w-4" />
+                                    Add to Call List ({selectedCompanyIds.length})
+                                </Button>
+                            </>
+                        )}
+                        <Button onClick={() => openCreate()}>Add Company</Button>
+                    </div>
+                }
             />
 
             {/* Gradient separator */}
@@ -210,9 +288,25 @@ export default function CompaniesList() {
                                 className="pl-10"
                             />
                         </div>
-                        <Button variant="outline">
+                        {companies.length > 0 && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={toggleSelectAll}
+                            >
+                                <Checkbox
+                                    checked={selectedCompanyIds.length === companies.length}
+                                    className="mr-2"
+                                />
+                                Select All
+                            </Button>
+                        )}
+                        <Button 
+                            variant="outline" 
+                            onClick={() => exportCompaniesToCSV(companies)}
+                        >
                             <Filter className="mr-2 h-4 w-4" />
-                            Export
+                            Export All
                         </Button>
                     </div>
 
@@ -246,19 +340,19 @@ export default function CompaniesList() {
                             <SelectItem value="all">All statuses</SelectItem>
                             <SelectItem value="green">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                                    <div className="w-2 h-2 rounded-full bg-[#b5c69f]" />
                                     Green (≤3 mo)
                                 </div>
                             </SelectItem>
                             <SelectItem value="yellow">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                                    <div className="w-2 h-2 rounded-full bg-[#d4a574]" />
                                     Yellow (3-6 mo)
                                 </div>
                             </SelectItem>
                             <SelectItem value="red">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                                    <div className="w-2 h-2 rounded-full bg-[#fb8674]" />
                                     Red ({'>'}6 mo)
                                 </div>
                             </SelectItem>
@@ -297,7 +391,7 @@ export default function CompaniesList() {
 
             {/* Companies View */}
             {viewMode === "table" ? (
-                <DataTable columns={columns} data={companies} pageSize={limit} />
+                <DataTable columns={columns as any} data={companies} pageSize={limit} />
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {companies.map((company) => (
@@ -350,6 +444,15 @@ export default function CompaniesList() {
                 open={isModalOpen}
                 onOpenChange={handleModalClose}
                 onSuccess={handleModalSuccess}
+            />
+
+            {/* Add to Call List Dialog */}
+            <AddToCallListDialog
+                open={showAddToListDialog}
+                onOpenChange={setShowAddToListDialog}
+                companyIds={selectedCompanyIds}
+                companyNames={selectedCompanyNames}
+                onSuccess={handleAddToCallListSuccess}
             />
         </div>
     );

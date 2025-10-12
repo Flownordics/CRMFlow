@@ -16,6 +16,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { useCompanies } from "@/services/companies";
 import { logger } from '@/lib/logger';
+import { DealAccountingSummary } from "@/components/deals/DealAccountingSummary";
 
 export default function DealDetail() {
   const { id = "" } = useParams();
@@ -196,6 +197,9 @@ export default function DealDetail() {
           )}
         </div>
       </div>
+
+      {/* Deal to Cash Summary */}
+      <DealAccountingSummary dealId={deal.id} currency={deal.currency} />
 
       {/* (Næste punkt) Activity timeline UI */}
       <div className="rounded-2xl border p-4 shadow-card">

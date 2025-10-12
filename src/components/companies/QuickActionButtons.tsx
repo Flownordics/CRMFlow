@@ -1,0 +1,185 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Mail, Phone, Calendar, Handshake, FileText, PhoneCall } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { useLogCompanyActivity } from "@/services/activityLog";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+
+interface QuickActionButtonsProps {
+  companyId: string;
+  companyName: string;
+  companyEmail?: string | null;
+}
+
+export function QuickActionButtons({ companyId, companyName, companyEmail }: QuickActionButtonsProps) {
+  const navigate = useNavigate();
+  const [logCallDialogOpen, setLogCallDialogOpen] = useState(false);
+  const [callOutcome, setCallOutcome] = useState<string>("");
+  const [callNotes, setCallNotes] = useState("");
+  const logActivity = useLogCompanyActivity(companyId);
+
+  const handleSendEmail = () => {
+    if (companyEmail) {
+      // Open Gmail compose or native email client
+      window.location.href = `mailto:${companyEmail}?subject=Re: ${companyName}`;
+    } else {
+      toast.error("No email address available");
+    }
+  };
+
+  const handleLogCall = async () => {
+    if (!callOutcome) {
+      toast.error("Please select a call outcome");
+      return;
+    }
+
+    try {
+      await logActivity.mutateAsync({
+        companyId,
+        type: 'call',
+        outcome: callOutcome,
+        notes: callNotes || undefined,
+      });
+      toast.success("Call logged successfully");
+      setLogCallDialogOpen(false);
+      setCallOutcome("");
+      setCallNotes("");
+    } catch (error) {
+      toast.error("Failed to log call");
+    }
+  };
+
+  const handleScheduleMeeting = () => {
+    // Navigate to calendar or open meeting scheduler
+    navigate(`/calendar?companyId=${companyId}`);
+  };
+
+  const handleCreateDeal = () => {
+    navigate(`/deals/new?companyId=${companyId}`);
+  };
+
+  const handleCreateQuote = () => {
+    navigate(`/quotes/new?companyId=${companyId}`);
+  };
+
+  const actions = [
+    {
+      label: "Send Email",
+      icon: Mail,
+      onClick: handleSendEmail,
+      variant: "default" as const,
+      disabled: !companyEmail,
+    },
+    {
+      label: "Log Call",
+      icon: Phone,
+      onClick: () => setLogCallDialogOpen(true),
+      variant: "outline" as const,
+    },
+    {
+      label: "Schedule Meeting",
+      icon: Calendar,
+      onClick: handleScheduleMeeting,
+      variant: "outline" as const,
+    },
+    {
+      label: "Create Deal",
+      icon: Handshake,
+      onClick: handleCreateDeal,
+      variant: "outline" as const,
+    },
+    {
+      label: "Create Quote",
+      icon: FileText,
+      onClick: handleCreateQuote,
+      variant: "outline" as const,
+    },
+  ];
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <PhoneCall className="h-4 w-4" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-2">
+          {actions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Button
+                key={action.label}
+                variant={action.variant}
+                size="sm"
+                onClick={action.onClick}
+                disabled={action.disabled}
+                className="w-full"
+              >
+                <Icon className="h-4 w-4 mr-2" />
+                {action.label}
+              </Button>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* Log Call Dialog */}
+      <Dialog open={logCallDialogOpen} onOpenChange={setLogCallDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Log Call</DialogTitle>
+            <DialogDescription>
+              Record a call with {companyName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="outcome">Call Outcome *</Label>
+              <Select value={callOutcome} onValueChange={setCallOutcome}>
+                <SelectTrigger id="outcome">
+                  <SelectValue placeholder="Select outcome..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="voicemail">Voicemail</SelectItem>
+                  <SelectItem value="no_answer">No Answer</SelectItem>
+                  <SelectItem value="busy">Busy</SelectItem>
+                  <SelectItem value="scheduled_followup">Scheduled Follow-up</SelectItem>
+                  <SelectItem value="wrong_number">Wrong Number</SelectItem>
+                  <SelectItem value="not_interested">Not Interested</SelectItem>
+                  <SelectItem value="callback_requested">Callback Requested</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                placeholder="Add call notes..."
+                value={callNotes}
+                onChange={(e) => setCallNotes(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setLogCallDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleLogCall} disabled={logActivity.isPending || !callOutcome}>
+                {logActivity.isPending ? "Logging..." : "Log Call"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+

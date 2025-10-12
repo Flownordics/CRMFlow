@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Select,
     SelectContent,
@@ -21,10 +22,11 @@ import {
     DollarSign,
     Target,
     BarChart3,
-    PieChart,
-    Calendar,
+    PieChart as PieChartIcon,
     Download,
     RefreshCw,
+    Activity,
+    Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { cn } from "@/lib/utils";
@@ -33,92 +35,40 @@ import { DateRange } from "@/services/analytics";
 import { DateRangePicker } from "@/components/analytics/DateRangePicker";
 import { logger } from '@/lib/logger';
 
-// Chart components (simplified for now - would use a proper charting library like Recharts)
-function RevenueTrendChart({ data }: { data: any[] }) {
-    if (data.length === 0) {
-        return (
-            <div className="flex items-center justify-center h-64 text-muted-foreground">
-                No data available
-            </div>
-        );
-    }
+// New Recharts components
+import { RevenueChart } from "@/components/analytics/charts/RevenueChart";
+import { PipelineChart } from "@/components/analytics/charts/PipelineChart";
+import { WinRateChart } from "@/components/analytics/charts/WinRateChart";
+import { SalesFunnelChart } from "@/components/analytics/charts/SalesFunnelChart";
 
-    const maxRevenue = Math.max(...data.map(d => d.revenue));
-    const maxDeals = Math.max(...data.map(d => d.deals));
+// Activity analytics
+import { useActivityAnalytics } from "@/services/activityAnalytics";
+import { ActivityTimelineChart } from "@/components/analytics/charts/ActivityTimelineChart";
+import { ActivityDistributionChart } from "@/components/analytics/charts/ActivityDistributionChart";
+import { CallOutcomesChart } from "@/components/analytics/charts/CallOutcomesChart";
+import { ActivityMetricsCard } from "@/components/analytics/ActivityMetricsCard";
 
-    return (
-        <div className="space-y-4">
-            <div className="h-64 flex items-end space-x-2">
-                {data.map((point, index) => (
-                    <div key={index} className="flex-1 flex flex-col items-center space-y-2">
-                        <div className="w-full flex flex-col items-center space-y-1">
-                            <div
-                                className="w-full bg-primary rounded-t"
-                                style={{ height: `${(point.revenue / maxRevenue) * 200}px` }}
-                                title={`Revenue: ${formatCurrency(point.revenue)}`}
-                            />
-                            <div
-                                className="w-full bg-accent rounded-t"
-                                style={{ height: `${(point.deals / maxDeals) * 100}px` }}
-                                title={`Deals: ${point.deals}`}
-                            />
-                        </div>
-                        <div className="text-xs text-muted-foreground text-center">
-                            {new Date(point.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <div className="flex items-center justify-center space-x-4 text-sm">
-                <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-primary rounded"></div>
-                    <span>Revenue</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-accent rounded"></div>
-                    <span>Deals</span>
-                </div>
-            </div>
-        </div>
-    );
-}
+// Salesperson analytics
+import { useSalespersonAnalytics } from "@/services/salespersonAnalytics";
+import { SalespersonLeaderboard } from "@/components/analytics/SalespersonLeaderboard";
+import { SalespersonComparisonChart } from "@/components/analytics/charts/SalespersonComparisonChart";
 
-function PipelineChart({ data }: { data: any[] }) {
-    if (data.length === 0) {
-        return (
-            <div className="flex items-center justify-center h-64 text-muted-foreground">
-                No data available
-            </div>
-        );
-    }
+// Forecasting
+import { useForecast } from "@/services/forecasting";
+import { ForecastChart } from "@/components/analytics/charts/ForecastChart";
+import { ForecastSummaryCard } from "@/components/analytics/ForecastSummaryCard";
 
-    const maxValue = Math.max(...data.map(d => d.totalValue));
+// Additional insights
+import { CompanyHealthSection } from "@/components/analytics/CompanyHealthSection";
+import { DealVelocityCard } from "@/components/analytics/DealVelocityCard";
+import { QuoteToCashSection } from "@/components/analytics/QuoteToCashSection";
 
-    return (
-        <div className="space-y-4">
-            <div className="space-y-3">
-                {data.map((stage, index) => (
-                    <div key={stage.stageId} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium">{stage.stageName}</span>
-                            <div className="flex items-center space-x-4 text-muted-foreground">
-                                <span>{stage.dealCount} deals</span>
-                                <span>{formatCurrency(stage.totalValue)}</span>
-                                <span>{formatPercentage(stage.conversionRate)}</span>
-                            </div>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                            <div
-                                className="bg-primary h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${(stage.totalValue / maxValue) * 100}%` }}
-                            />
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
+// Export utilities
+import { exportAnalyticsToCSV, exportActivitiesToCSV, exportSalespersonDataToCSV } from "@/services/export/csvExport";
+import { downloadAnalyticsPDF } from "@/services/export/analyticsPDFService";
+import { convertMultipleCharts, waitForChartAnimations } from "@/utils/chartToImage";
+
+// Old chart components removed - now using Recharts
 
 function KPICard({
     title,
@@ -194,8 +144,12 @@ function KPICard({
 export default function Analytics() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
+    const [activeTab, setActiveTab] = useState<string>("overview");
 
     const { revenueTrends, pipelineAnalysis, performanceMetrics, kpiData, isLoading } = useAnalytics(dateRange);
+    const { data: activityData, isLoading: activityLoading } = useActivityAnalytics(dateRange);
+    const { data: salespersonData, isLoading: salespersonLoading } = useSalespersonAnalytics(dateRange);
+    const { data: forecastData, isLoading: forecastLoading } = useForecast(dateRange);
 
     const handlePeriodChange = (period: string) => {
         setSelectedPeriod(period);
@@ -233,13 +187,78 @@ export default function Analytics() {
         setSelectedPeriod("custom");
     };
 
-    const handleExport = () => {
-        // TODO: Implement export functionality
-        logger.debug("Export analytics data");
+    const handleExport = (format: 'csv' | 'pdf' = 'csv') => {
+        logger.debug("Exporting analytics data", { tab: activeTab, format });
+        
+        try {
+            if (format === 'csv') {
+                if (activeTab === "activity" && activityData) {
+                    exportActivitiesToCSV(activityData.metrics, dateRange);
+                } else if (activeTab === "team" && salespersonData) {
+                    exportSalespersonDataToCSV(salespersonData.salespeople, dateRange);
+                } else {
+                    // Export main analytics
+                    exportAnalyticsToCSV(
+                        { kpiData, performanceMetrics, revenueTrends, pipelineAnalysis },
+                        dateRange
+                    );
+                }
+            } else if (format === 'pdf') {
+                handleExportPDF();
+            }
+        } catch (error) {
+            logger.error("Failed to export analytics", error);
+        }
+    };
+
+    const handleExportPDF = async () => {
+        try {
+            logger.debug("Generating PDF report");
+            
+            // Wait for charts to render
+            await waitForChartAnimations(500);
+            
+            // Collect chart elements
+            const chartElements = new Map<string, HTMLElement>();
+            
+            // Find all chart containers by their data attributes or classes
+            const chartContainers = document.querySelectorAll('[data-chart-name]');
+            chartContainers.forEach((container) => {
+                const chartName = container.getAttribute('data-chart-name');
+                if (chartName) {
+                    chartElements.set(chartName, container as HTMLElement);
+                }
+            });
+            
+            // Convert charts to images
+            const chartImages = await convertMultipleCharts(chartElements, {
+                format: 'png',
+                backgroundColor: '#ffffff',
+            });
+            
+            // Prepare PDF data
+            const pdfData = {
+                dateRange,
+                kpiData,
+                performanceMetrics,
+                charts: chartImages,
+                activityMetrics: activityData?.metrics,
+                salespersonData: salespersonData?.salespeople,
+                forecastSummary: forecastData?.summary,
+            };
+            
+            // Generate filename
+            const timestamp = new Date().toISOString().split('T')[0];
+            const filename = `analytics-report-${timestamp}.pdf`;
+            
+            // Download PDF
+            await downloadAnalyticsPDF(pdfData, filename);
+        } catch (error) {
+            logger.error("Failed to generate PDF", error);
+        }
     };
 
     const handleRefresh = () => {
-        // TODO: Implement refresh functionality
         window.location.reload();
     };
 
@@ -275,16 +294,51 @@ export default function Analytics() {
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Refresh
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handleExport}>
+                        <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
                             <Download className="h-4 w-4 mr-2" />
-                            Export
+                            Export CSV
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleExport('pdf')}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Export PDF
                         </Button>
                     </div>
                 }
             />
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Tabbed Navigation */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
+                    <TabsTrigger value="overview">
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Overview
+                    </TabsTrigger>
+                    <TabsTrigger value="pipeline">
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        Pipeline
+                    </TabsTrigger>
+                    <TabsTrigger value="activity">
+                        <Activity className="h-4 w-4 mr-2" />
+                        Activity
+                    </TabsTrigger>
+                    <TabsTrigger value="team">
+                        <Users className="h-4 w-4 mr-2" />
+                        Team
+                    </TabsTrigger>
+                    <TabsTrigger value="forecast">
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        Forecast
+                    </TabsTrigger>
+                    <TabsTrigger value="insights">
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Insights
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* OVERVIEW TAB */}
+                <TabsContent value="overview" className="space-y-6">
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {isLoading ? (
                     Array.from({ length: 4 }).map((_, index) => (
                         <Card key={index}>
@@ -339,111 +393,322 @@ export default function Analytics() {
                 )}
             </div>
 
-            {/* Revenue Trends */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5" />
-                        Revenue Trends
-                    </CardTitle>
-                    <CardDescription>
-                        Monthly revenue and deal activity over time
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <Skeleton className="h-64 w-full" />
-                    ) : (
-                        <RevenueTrendChart data={revenueTrends} />
-                    )}
-                </CardContent>
-            </Card>
+                    {/* Revenue Trends */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <TrendingUp className="h-5 w-5" />
+                                Revenue Trends
+                            </CardTitle>
+                            <CardDescription>
+                                Monthly revenue and deal activity over time
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {isLoading ? (
+                                <Skeleton className="h-64 w-full" />
+                            ) : (
+                                <div data-chart-name="Revenue Trends">
+                                    <RevenueChart data={revenueTrends} />
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
-            {/* Pipeline Analysis */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <PieChart className="h-5 w-5" />
-                            Pipeline Analysis
-                        </CardTitle>
-                        <CardDescription>
-                            Deal distribution and conversion rates by stage
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoading ? (
-                            <Skeleton className="h-64 w-full" />
-                        ) : (
-                            <PipelineChart data={pipelineAnalysis} />
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Performance Metrics */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <BarChart3 className="h-5 w-5" />
-                            Performance Metrics
-                        </CardTitle>
-                        <CardDescription>
-                            Key performance indicators and conversion rates
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoading ? (
-                            <div className="space-y-4">
-                                {Array.from({ length: 6 }).map((_, index) => (
-                                    <div key={index} className="space-y-2">
-                                        <Skeleton className="h-4 w-32" />
-                                        <Skeleton className="h-2 w-full" />
+                    {/* Combined Charts */}
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <PieChartIcon className="h-5 w-5" />
+                                    Win Rate Distribution
+                                </CardTitle>
+                                <CardDescription>
+                                    Breakdown of deals by status
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {isLoading ? (
+                                    <Skeleton className="h-64 w-full" />
+                                ) : (
+                                    <div data-chart-name="Win Rate Distribution">
+                                        <WinRateChart
+                                            wonDeals={performanceMetrics.wonDeals || 0}
+                                            lostDeals={performanceMetrics.lostDeals || 0}
+                                            openDeals={performanceMetrics.openDeals || 0}
+                                        />
                                     </div>
-                                ))}
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <BarChart3 className="h-5 w-5" />
+                                    Sales Funnel
+                                </CardTitle>
+                                <CardDescription>
+                                    Conversion through sales stages
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {isLoading ? (
+                                    <Skeleton className="h-64 w-full" />
+                                ) : (
+                                    <div data-chart-name="Sales Funnel">
+                                        <SalesFunnelChart
+                                            dealsCount={performanceMetrics.totalDeals || 0}
+                                            dealsValue={performanceMetrics.totalRevenue || 0}
+                                            quotesCount={performanceMetrics.totalQuotes || 0}
+                                            quotesValue={performanceMetrics.quotesValue || 0}
+                                            ordersCount={performanceMetrics.totalOrders || 0}
+                                            ordersValue={performanceMetrics.ordersValue || 0}
+                                            invoicesCount={performanceMetrics.totalInvoices || 0}
+                                            invoicesValue={performanceMetrics.invoicesValue || 0}
+                                            paidCount={performanceMetrics.paidInvoices || 0}
+                                            paidValue={performanceMetrics.totalRevenue || 0}
+                                        />
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Performance Metrics */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <BarChart3 className="h-5 w-5" />
+                                Performance Metrics
+                            </CardTitle>
+                            <CardDescription>
+                                Key performance indicators and conversion rates
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {isLoading ? (
+                                <div className="space-y-4">
+                                    {Array.from({ length: 6 }).map((_, index) => (
+                                        <div key={index} className="space-y-2">
+                                            <Skeleton className="h-4 w-32" />
+                                            <Skeleton className="h-2 w-full" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">Quote to Order</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {formatPercentage(performanceMetrics.quoteToOrderConversion)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">Order to Invoice</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {formatPercentage(performanceMetrics.orderToInvoiceConversion)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">Invoice to Payment</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {formatPercentage(performanceMetrics.invoiceToPaymentConversion)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">Average Sales Cycle</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {performanceMetrics.averageSalesCycle} days
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">Total Deals</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {performanceMetrics.totalDeals}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">Total Revenue</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {formatCurrency(performanceMetrics.totalRevenue)}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* PIPELINE TAB */}
+                <TabsContent value="pipeline" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <TrendingUp className="h-5 w-5" />
+                                Pipeline Analysis
+                            </CardTitle>
+                            <CardDescription>
+                                Deal distribution and conversion rates by stage
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {isLoading ? (
+                                <Skeleton className="h-96 w-full" />
+                            ) : (
+                                <div data-chart-name="Pipeline Analysis">
+                                    <PipelineChart data={pipelineAnalysis} height={400} />
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* ACTIVITY TAB */}
+                <TabsContent value="activity" className="space-y-6">
+                    {activityLoading ? (
+                        <div className="space-y-4">
+                            <Skeleton className="h-32 w-full" />
+                            <Skeleton className="h-64 w-full" />
+                        </div>
+                    ) : activityData ? (
+                        <>
+                            <ActivityMetricsCard metrics={activityData.metrics} />
+                            
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Activity className="h-5 w-5" />
+                                        Activity Timeline
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Activity trends over time by type
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div data-chart-name="Activity Timeline">
+                                        <ActivityTimelineChart data={activityData.timeline} height={350} />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <BarChart3 className="h-5 w-5" />
+                                            Activity Distribution
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Breakdown of activities by type
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ActivityDistributionChart data={activityData.distribution} />
+                                    </CardContent>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <PieChartIcon className="h-5 w-5" />
+                                            Call Outcomes
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Success rates and outcome distribution
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div data-chart-name="Call Outcomes">
+                                            <CallOutcomesChart data={activityData.callOutcomes} />
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Quote to Order</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {formatPercentage(performanceMetrics.quoteToOrderConversion)}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Order to Invoice</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {formatPercentage(performanceMetrics.orderToInvoiceConversion)}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Invoice to Payment</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {formatPercentage(performanceMetrics.invoiceToPaymentConversion)}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Average Sales Cycle</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {performanceMetrics.averageSalesCycle} days
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Total Deals</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {performanceMetrics.totalDeals}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Total Revenue</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {formatCurrency(performanceMetrics.totalRevenue)}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+                        </>
+                    ) : (
+                        <div className="text-center text-muted-foreground py-12">
+                            No activity data available
+                        </div>
+                    )}
+                </TabsContent>
+
+                {/* TEAM TAB */}
+                <TabsContent value="team" className="space-y-6">
+                    {salespersonLoading ? (
+                        <Skeleton className="h-96 w-full" />
+                    ) : salespersonData && salespersonData.salespeople.length > 0 ? (
+                        <>
+                            <SalespersonLeaderboard salespeople={salespersonData.salespeople} />
+                            
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Team Performance Comparison</CardTitle>
+                                    <CardDescription>
+                                        Compare metrics across team members
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <SalespersonComparisonChart 
+                                        salespeople={salespersonData.salespeople}
+                                        height={400}
+                                    />
+                                </CardContent>
+                            </Card>
+                        </>
+                    ) : (
+                        <Card>
+                            <CardContent className="text-center text-muted-foreground py-12">
+                                No team performance data available
+                            </CardContent>
+                        </Card>
+                    )}
+                </TabsContent>
+
+                {/* FORECAST TAB */}
+                <TabsContent value="forecast" className="space-y-6">
+                    {forecastLoading ? (
+                        <div className="space-y-4">
+                            <Skeleton className="h-48 w-full" />
+                            <Skeleton className="h-96 w-full" />
+                        </div>
+                    ) : forecastData ? (
+                        <>
+                            <ForecastSummaryCard summary={forecastData.summary} />
+                            
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <TrendingUp className="h-5 w-5" />
+                                        Revenue Forecast (Next 6 Months)
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Historical data with projected revenue and confidence intervals
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div data-chart-name="Revenue Forecast">
+                                        <ForecastChart data={forecastData.forecastData} height={400} />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </>
+                    ) : (
+                        <Card>
+                            <CardContent className="text-center text-muted-foreground py-12">
+                                Not enough historical data for forecasting
+                            </CardContent>
+                        </Card>
+                    )}
+                </TabsContent>
+
+                {/* INSIGHTS TAB */}
+                <TabsContent value="insights" className="space-y-6">
+                    <CompanyHealthSection />
+                    <DealVelocityCard />
+                    <QuoteToCashSection />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

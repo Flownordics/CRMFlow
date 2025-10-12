@@ -3,6 +3,12 @@
   publish = "dist"
   environment = { NODE_VERSION = "18" }
 
+[dev]
+  command = "npm run dev"
+  targetPort = 8080
+  port = 8888
+  autoLaunch = false
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"

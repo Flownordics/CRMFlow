@@ -98,7 +98,7 @@ export function EventItem({ event, className, onEventUpdated }: EventItemProps) 
                             ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                             : event.source === 'task'
                                 ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                : "bg-[#f0f4ec] text-[#6b7c5e] dark:bg-[#6b7c5e]/30 dark:text-[#b5c69f]"
                     )}>
                         {event.source === 'native' ? (
                             <Database className="h-3 w-3" aria-hidden="true" />

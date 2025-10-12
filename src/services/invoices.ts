@@ -13,7 +13,7 @@ import { logger } from '@/lib/logger';
 export const Invoice = z.object({
     id: z.string(),
     number: z.string().nullable().optional(),
-    status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"]),
+    status: z.enum(["draft", "sent", "paid", "overdue"]),
     currency: z.string().default("DKK"),
     issue_date: z.string().nullable().optional(),
     due_date: z.string().nullable().optional(),
@@ -164,9 +164,22 @@ export async function addPayment(invoiceId: string, payload: PaymentPayload): Pr
         // First, get the current invoice to get the deal_id
         const currentInvoice = await fetchInvoice(invoiceId);
 
-        // Update the invoice's paid_minor field
+        // Step 1: Create a payment record in the payments table
+        const paymentData = {
+            invoice_id: invoiceId,
+            amount_minor: payload.amountMinor,
+            date: payload.date,
+            method: payload.method,
+            note: payload.note || null,
+        };
+
+        const paymentResponse = await apiClient.post('/payments', paymentData);
+        logger.debug('Payment record created:', paymentResponse.data);
+
+        // Step 2: Update the invoice's paid_minor field
+        const newPaidMinor = currentInvoice.paid_minor + payload.amountMinor;
         const response = await apiClient.patch(`/invoices?id=eq.${invoiceId}`, {
-            paid_minor: currentInvoice.paid_minor + payload.amountMinor
+            paid_minor: newPaidMinor
         });
 
         let updatedInvoice: Invoice;
@@ -249,6 +262,11 @@ export function useAddPayment() {
             queryClient.invalidateQueries({ queryKey: qk.invoice(invoiceId) });
             queryClient.invalidateQueries({ queryKey: qk.invoices() });
             queryClient.invalidateQueries({ queryKey: qk.accounting() });
+            queryClient.invalidateQueries({ queryKey: qk.overdueInvoices() });
+            queryClient.invalidateQueries({ queryKey: qk.recentInvoices() });
+            // Invalidate all payment queries to refresh payment history
+            queryClient.invalidateQueries({ queryKey: qk.payments({}) });
+            queryClient.invalidateQueries({ queryKey: qk.invoicePayments(invoiceId) });
         },
     });
 }
@@ -330,6 +348,29 @@ export async function updateInvoice(id: string, payload: Partial<{
     total_minor: number;
 }>): Promise<Invoice> {
     try {
+        // Special handling: If manually setting status to 'paid', we need to record a payment first
+        if (payload.status === 'paid') {
+            const currentInvoice = await fetchInvoice(id);
+            
+            // If there's an outstanding balance, auto-record a payment
+            if (currentInvoice.balance_minor > 0) {
+                logger.debug(`Auto-recording payment for invoice ${id} when marking as paid`);
+                
+                // Record the payment for the full outstanding balance
+                await addPayment(id, {
+                    amountMinor: currentInvoice.balance_minor,
+                    date: new Date().toISOString().split('T')[0],
+                    method: 'other', // Default method for manual status changes
+                    note: 'Payment recorded via manual status change to paid',
+                });
+                
+                // After recording payment, the trigger will auto-update status to paid
+                // So we don't need to update status again
+                const updatedInvoice = await fetchInvoice(id);
+                return updatedInvoice;
+            }
+        }
+
         const response = await apiClient.patch(`/invoices?id=eq.${id}`, payload);
 
         // Handle 204 No Content response (common for PATCH operations)
@@ -731,4 +772,124 @@ export function useDeleteInvoiceLine(invoiceId: string) {
             queryClient.invalidateQueries({ queryKey: qk.invoices() });
         },
     });
+}
+
+// Bulk operations for invoices
+
+export interface BulkOperationResult {
+    successful: string[];
+    failed: Array<{ id: string; error: string }>;
+}
+
+/**
+ * Bulk update invoice status
+ */
+export async function bulkUpdateInvoiceStatus(
+    invoiceIds: string[],
+    status: Invoice["status"]
+): Promise<BulkOperationResult> {
+    const result: BulkOperationResult = {
+        successful: [],
+        failed: [],
+    };
+
+    for (const id of invoiceIds) {
+        try {
+            await updateInvoice(id, { status });
+            result.successful.push(id);
+        } catch (error) {
+            result.failed.push({
+                id,
+                error: error instanceof Error ? error.message : "Unknown error",
+            });
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Bulk mark invoices as paid (records payments and updates status)
+ */
+export async function bulkMarkAsPaid(
+    invoices: Array<{ id: string; total_minor: number; balance_minor: number }>
+): Promise<BulkOperationResult> {
+    const result: BulkOperationResult = {
+        successful: [],
+        failed: [],
+    };
+
+    for (const invoice of invoices) {
+        try {
+            // Only process if there's an outstanding balance
+            if (invoice.balance_minor > 0) {
+                // Record a payment for the outstanding balance
+                await addPayment(invoice.id, {
+                    amountMinor: invoice.balance_minor,
+                    date: new Date().toISOString().split('T')[0],
+                    method: 'other',
+                    note: 'Payment recorded via bulk mark as paid operation',
+                });
+            }
+            // If balance is already 0, just update status
+            else {
+                await apiClient.patch(`/invoices?id=eq.${invoice.id}`, {
+                    status: "paid",
+                });
+            }
+            result.successful.push(invoice.id);
+        } catch (error) {
+            result.failed.push({
+                id: invoice.id,
+                error: error instanceof Error ? error.message : "Unknown error",
+            });
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Bulk send invoices (updates status to 'sent')
+ * Note: Actual email sending would need to be handled separately via email service
+ */
+export async function bulkSendInvoices(invoiceIds: string[]): Promise<BulkOperationResult> {
+    return bulkUpdateInvoiceStatus(invoiceIds, "sent");
+}
+
+/**
+ * React Query hook for bulk operations
+ */
+export function useBulkInvoiceOperations() {
+    const queryClient = useQueryClient();
+
+    return {
+        updateStatus: useMutation({
+            mutationFn: ({ ids, status }: { ids: string[]; status: Invoice["status"] }) =>
+                bulkUpdateInvoiceStatus(ids, status),
+            onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: qk.invoices() });
+                queryClient.invalidateQueries({ queryKey: qk.accounting() });
+                queryClient.invalidateQueries({ queryKey: qk.overdueInvoices() });
+                queryClient.invalidateQueries({ queryKey: qk.recentInvoices() });
+            },
+        }),
+        markAsPaid: useMutation({
+            mutationFn: (invoices: Array<{ id: string; total_minor: number; balance_minor: number }>) =>
+                bulkMarkAsPaid(invoices),
+            onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: qk.invoices() });
+                queryClient.invalidateQueries({ queryKey: qk.accounting() });
+                queryClient.invalidateQueries({ queryKey: qk.overdueInvoices() });
+                queryClient.invalidateQueries({ queryKey: qk.payments() });
+            },
+        }),
+        sendInvoices: useMutation({
+            mutationFn: (ids: string[]) => bulkSendInvoices(ids),
+            onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: qk.invoices() });
+                queryClient.invalidateQueries({ queryKey: qk.accounting() });
+            },
+        }),
+    };
 }

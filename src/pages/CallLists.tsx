@@ -109,6 +109,16 @@ export default function CallLists() {
                 limit: autoGenLimit,
             });
 
+            if (result.itemCount === 0) {
+                toast({
+                    title: "No Companies Available",
+                    description: "No companies found with phone numbers and not marked as 'Do Not Call'. Please add phone numbers to your companies or create a call list manually.",
+                    variant: "destructive",
+                });
+                setShowAutoGenDialog(false);
+                return;
+            }
+
             toast({
                 title: "Auto Call List Generated",
                 description: `${result.itemCount} companies added to the call list`,
@@ -116,10 +126,10 @@ export default function CallLists() {
 
             setShowAutoGenDialog(false);
             navigate(`/call-lists/${result.callListId}`);
-        } catch (error) {
+        } catch (error: any) {
             toast({
                 title: "Error",
-                description: "Failed to generate auto call list",
+                description: error?.message || "Failed to generate auto call list",
                 variant: "destructive",
             });
         }

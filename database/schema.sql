@@ -96,6 +96,7 @@ create table if not exists public.companies (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   email text,
+  invoice_email text,
   domain text,
   vat text,
   phone text,
@@ -105,9 +106,22 @@ create table if not exists public.companies (
   industry text,
   website text,
   do_not_call boolean not null default false,
+  last_activity_at timestamptz,
+  activity_status text check (activity_status in ('green','yellow','red')),
+  -- Enhanced fields
+  employee_count integer,
+  annual_revenue_range text,
+  lifecycle_stage text check (lifecycle_stage in ('lead','prospect','customer','partner','inactive')),
+  linkedin_url text,
+  twitter_url text,
+  facebook_url text,
+  description text,
+  founded_date date,
+  parent_company_id uuid references public.companies(id) on delete set null,
   created_by uuid, -- auth.users.id (nullable if no RLS)
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
 );
 create trigger trg_companies_updated_at
 before update on public.companies
@@ -117,7 +131,50 @@ create index if not exists idx_companies_name on public.companies (lower(name));
 create index if not exists idx_companies_domain on public.companies (lower(domain));
 create index if not exists idx_companies_country on public.companies (country);
 create index if not exists idx_companies_do_not_call on public.companies (do_not_call);
+create index if not exists idx_companies_activity_status on public.companies (activity_status, last_activity_at nulls last);
 create index if not exists idx_companies_updated_at on public.companies (updated_at desc);
+create index if not exists idx_companies_lifecycle_stage on public.companies (lifecycle_stage);
+create index if not exists idx_companies_employee_count on public.companies (employee_count);
+create index if not exists idx_companies_parent on public.companies (parent_company_id);
+
+-- Company Tags
+create table if not exists public.company_tags (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  color text not null default '#3b82f6',
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create trigger trg_company_tags_updated_at
+before update on public.company_tags
+for each row execute procedure set_updated_at();
+
+create table if not exists public.company_tag_assignments (
+  company_id uuid not null references public.companies(id) on delete cascade,
+  tag_id uuid not null references public.company_tags(id) on delete cascade,
+  assigned_by uuid references auth.users(id) on delete set null,
+  assigned_at timestamptz not null default now(),
+  primary key (company_id, tag_id)
+);
+create index if not exists idx_company_tag_assignments_company on public.company_tag_assignments(company_id);
+create index if not exists idx_company_tag_assignments_tag on public.company_tag_assignments(tag_id);
+
+-- Company Notes
+create table if not exists public.company_notes (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  content text not null,
+  is_pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create trigger trg_company_notes_updated_at
+before update on public.company_notes
+for each row execute procedure set_updated_at();
+create index if not exists idx_company_notes_company on public.company_notes(company_id, created_at desc);
+create index if not exists idx_company_notes_pinned on public.company_notes(company_id, is_pinned, created_at desc) where is_pinned = true;
 
 create table if not exists public.people (
   id uuid primary key default gen_random_uuid(),

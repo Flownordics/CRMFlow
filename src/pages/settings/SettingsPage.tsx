@@ -55,7 +55,7 @@ export function SettingsPage() {
             <CardDescription>Manage your application settings</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-red-600">Failed to load workspace configuration.</p>
+            <p className="text-[#b8695f]">Failed to load workspace configuration.</p>
           </CardContent>
         </Card>
       </div>

@@ -138,7 +138,7 @@ export default function PersonDetail() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary">
+                            <AvatarFallback className="bg-primary text-primary-foreground">
                                 <User className="h-4 w-4" />
                             </AvatarFallback>
                         </Avatar>

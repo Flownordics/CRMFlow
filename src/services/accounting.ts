@@ -87,3 +87,74 @@ export async function listRecentlyUpdatedInvoices({ limit = 10, offset = 0 } = {
   });
   return res.data ?? [];
 }
+
+// Detailed aging report with invoices grouped by age bucket
+export interface AgingBucket {
+  bucket: "0-30" | "31-60" | "61-90" | "90+";
+  invoices: Array<{
+    id: string;
+    number: string | null;
+    company_id: string | null;
+    due_date: string | null;
+    balance_minor: number;
+    currency: string;
+    days_overdue: number;
+  }>;
+  total_minor: number;
+  count: number;
+}
+
+export async function getDetailedAgingReport(): Promise<AgingBucket[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  
+  // Get all overdue invoices with outstanding balance
+  const res = await api.get("/invoices", {
+    params: {
+      select: "id,number,company_id,due_date,currency,balance_minor",
+      balance_minor: "gt.0",
+      due_date: `lt.${today}`,
+      order: "due_date.asc",
+      limit: 1000
+    }
+  });
+
+  const invoices = Array.isArray(res.data) ? res.data : [];
+  const now = new Date();
+
+  // Calculate days overdue and categorize
+  const buckets: Record<string, AgingBucket> = {
+    "0-30": { bucket: "0-30", invoices: [], total_minor: 0, count: 0 },
+    "31-60": { bucket: "31-60", invoices: [], total_minor: 0, count: 0 },
+    "61-90": { bucket: "61-90", invoices: [], total_minor: 0, count: 0 },
+    "90+": { bucket: "90+", invoices: [], total_minor: 0, count: 0 },
+  };
+
+  for (const invoice of invoices) {
+    if (!invoice.due_date) continue;
+
+    const dueDate = new Date(invoice.due_date);
+    const diffDays = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    const enrichedInvoice = {
+      id: invoice.id,
+      number: invoice.number,
+      company_id: invoice.company_id,
+      due_date: invoice.due_date,
+      balance_minor: invoice.balance_minor ?? 0,
+      currency: invoice.currency || "DKK",
+      days_overdue: diffDays,
+    };
+
+    let bucketKey: "0-30" | "31-60" | "61-90" | "90+";
+    if (diffDays <= 30) bucketKey = "0-30";
+    else if (diffDays <= 60) bucketKey = "31-60";
+    else if (diffDays <= 90) bucketKey = "61-90";
+    else bucketKey = "90+";
+
+    buckets[bucketKey].invoices.push(enrichedInvoice);
+    buckets[bucketKey].total_minor += enrichedInvoice.balance_minor;
+    buckets[bucketKey].count++;
+  }
+
+  return Object.values(buckets);
+}

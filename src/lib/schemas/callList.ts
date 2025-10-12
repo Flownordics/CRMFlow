@@ -63,19 +63,23 @@ export const activityLogReadSchema = z.object({
     id: z.string().uuid(),
     companyId: z.string().uuid(),
     userId: z.string().uuid().nullable(),
-    type: z.enum(['call', 'email', 'meeting', 'note', 'task']),
+    type: z.enum(['call', 'email', 'meeting', 'note', 'task', 'deal', 'quote', 'order', 'invoice', 'payment']),
     outcome: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
     meta: z.record(z.any()).optional(),
+    relatedType: z.enum(['deal', 'quote', 'order', 'invoice', 'payment']).nullable().optional(),
+    relatedId: z.string().uuid().nullable().optional(),
     createdAt: z.string(),
 });
 
 export const activityLogCreateSchema = z.object({
     companyId: z.string().uuid(),
-    type: z.enum(['call', 'email', 'meeting', 'note', 'task']),
+    type: z.enum(['call', 'email', 'meeting', 'note', 'task', 'deal', 'quote', 'order', 'invoice', 'payment']),
     outcome: z.string().optional(),
     notes: z.string().optional(),
     meta: z.record(z.any()).optional(),
+    relatedType: z.enum(['deal', 'quote', 'order', 'invoice', 'payment']).optional(),
+    relatedId: z.string().uuid().optional(),
 });
 
 export type ActivityLog = z.infer<typeof activityLogReadSchema>;
