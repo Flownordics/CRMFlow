@@ -34,15 +34,17 @@ export function CreateDealModal({
   open,
   onOpenChange,
   defaultStageId,
+  defaultCompanyId,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   defaultStageId?: string;
+  defaultCompanyId?: string;
 }) {
   const { t } = useI18n();
   const { user } = useAuthStore();
   const [title, setTitle] = useState("");
-  const [companyId, setCompanyId] = useState<string>("all");
+  const [companyId, setCompanyId] = useState<string>(defaultCompanyId || "all");
   const [contactId, setContactId] = useState<string>("");
   const [currency, setCurrency] = useState("DKK");
   const [taxPct, setTaxPct] = useState<number>(25);
@@ -66,7 +68,7 @@ export function CreateDealModal({
   useEffect(() => {
     if (!open) {
       setTitle("");
-      setCompanyId("all");
+      setCompanyId(defaultCompanyId || "all");
       setContactId("");
       setCurrency("DKK");
       setTaxPct(25);
@@ -75,8 +77,13 @@ export function CreateDealModal({
       setOwnerUserId(user?.id || "");
       setPendingCompanyName("");
       setPendingPersonName("");
+    } else {
+      // When opening, set the default company if provided
+      if (defaultCompanyId) {
+        setCompanyId(defaultCompanyId);
+      }
     }
-  }, [open, user?.id]);
+  }, [open, user?.id, defaultCompanyId]);
 
   // Reset stage when defaultStageId changes or set default stage
   useEffect(() => {

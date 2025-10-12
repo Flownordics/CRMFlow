@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CreateEventDialog } from "@/components/calendar/CreateEventDialog";
+import { CreateDealModal } from "@/components/deals/CreateDealModal";
+import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
 
 interface QuickActionButtonsProps {
   companyId: string;
@@ -21,6 +23,8 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
   const navigate = useNavigate();
   const [logCallDialogOpen, setLogCallDialogOpen] = useState(false);
   const [scheduleMeetingDialogOpen, setScheduleMeetingDialogOpen] = useState(false);
+  const [createDealModalOpen, setCreateDealModalOpen] = useState(false);
+  const [createQuoteModalOpen, setCreateQuoteModalOpen] = useState(false);
   const [callOutcome, setCallOutcome] = useState<string>("");
   const [callNotes, setCallNotes] = useState("");
   const logActivity = useLogCompanyActivity(companyId);
@@ -62,11 +66,11 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
   };
 
   const handleCreateDeal = () => {
-    navigate(`/deals/new?companyId=${companyId}`);
+    setCreateDealModalOpen(true);
   };
 
   const handleCreateQuote = () => {
-    navigate(`/quotes/new?companyId=${companyId}`);
+    setCreateQuoteModalOpen(true);
   };
 
   const actions = [
@@ -191,6 +195,21 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
         }}
         defaultCompanyId={companyId}
         defaultTitle={`Meeting with ${companyName}`}
+      />
+
+      {/* Create Deal Modal */}
+      <CreateDealModal
+        open={createDealModalOpen}
+        onOpenChange={setCreateDealModalOpen}
+        defaultCompanyId={companyId}
+      />
+
+      {/* Create Quote Modal */}
+      <CreateQuoteModal
+        open={createQuoteModalOpen}
+        onOpenChange={setCreateQuoteModalOpen}
+        defaultCompanyId={companyId}
+        defaultTitle={`Quote for ${companyName}`}
       />
     </>
   );

@@ -16,6 +16,8 @@ import { DataTable } from "@/components/tables/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { CompanyModal } from "@/components/companies/CompanyModal";
 import { PersonModal } from "@/components/people/PersonModal";
+import { CreateDealModal } from "@/components/deals/CreateDealModal";
+import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
 import { useCompany, useUpdateCompany } from "@/services/companies";
 import { usePeople } from "@/services/people";
 import { Company, CompanyCreate } from "@/lib/schemas/company";
@@ -26,6 +28,8 @@ import { FileUploader } from "@/components/documents/FileUploader";
 import { FileList } from "@/components/documents/FileList";
 import { useDocuments } from "@/services/documents";
 import { CompanyAccountingSummary } from "@/components/companies/CompanyAccountingSummary";
+import { LogActivityPanel } from "@/components/activities/LogActivityPanel";
+import { ActivityLogList } from "@/components/activities/ActivityLogList";
 
 export default function CompanyDetail() {
     const { id } = useParams<{ id: string }>();
@@ -33,6 +37,8 @@ export default function CompanyDetail() {
     const [activeTab, setActiveTab] = useState("overview");
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
+    const [isAddDealModalOpen, setIsAddDealModalOpen] = useState(false);
+    const [isAddQuoteModalOpen, setIsAddQuoteModalOpen] = useState(false);
     const [editingPerson, setEditingPerson] = useState<Person | undefined>();
 
     const { data: company, isLoading, error } = useCompany(id || "");
@@ -90,11 +96,11 @@ export default function CompanyDetail() {
     };
 
     const handleCreateDeal = () => {
-        navigate(`/deals/new?companyId=${company.id}`);
+        setIsAddDealModalOpen(true);
     };
 
     const handleCreateQuote = () => {
-        navigate(`/quotes/new?companyId=${company.id}`);
+        setIsAddQuoteModalOpen(true);
     };
 
     return (
@@ -163,6 +169,7 @@ export default function CompanyDetail() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="activities">Activities</TabsTrigger>
                     <TabsTrigger value="people">People</TabsTrigger>
                     <TabsTrigger value="deals">Deals</TabsTrigger>
                     <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -276,6 +283,17 @@ export default function CompanyDetail() {
                         <div className="lg:col-span-1">
                             <CompanyAccountingSummary companyId={company.id} currency="DKK" />
                         </div>
+                    </div>
+                </TabsContent>
+
+                {/* Activities Tab */}
+                <TabsContent value="activities" className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <LogActivityPanel 
+                            companyId={company.id} 
+                            companyName={company.name}
+                        />
+                        <ActivityLogList companyId={company.id} />
                     </div>
                 </TabsContent>
 
@@ -421,6 +439,19 @@ export default function CompanyDetail() {
                     setIsAddPersonModalOpen(false);
                     setEditingPerson(undefined);
                 }}
+            />
+            
+            <CreateDealModal
+                open={isAddDealModalOpen}
+                onOpenChange={setIsAddDealModalOpen}
+                defaultCompanyId={company.id}
+            />
+            
+            <CreateQuoteModal
+                open={isAddQuoteModalOpen}
+                onOpenChange={setIsAddQuoteModalOpen}
+                defaultCompanyId={company.id}
+                defaultTitle={`Quote for ${company.name}`}
             />
         </div>
     );
