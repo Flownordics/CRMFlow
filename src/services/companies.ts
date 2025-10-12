@@ -10,6 +10,7 @@ import { Activity } from "./activity";
 import { USE_MOCKS } from "@/lib/debug";
 import { handleError } from "@/lib/errorHandler";
 import { logger } from "@/lib/logger";
+import { isValidUuid } from "@/lib/validation";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -578,7 +579,7 @@ export function useCompany(id: string) {
   return useQuery({
     queryKey: qk.company(id),
     queryFn: () => fetchCompany(id),
-    enabled: !!id
+    enabled: !!id && isValidUuid(id)
   });
 }
 

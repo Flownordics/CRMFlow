@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "./dealStageAutomation";
 import { logger } from '@/lib/logger';
+import { isValidUuid } from "@/lib/validation";
 
 // Adapter functions for DB ↔ UI conversion
 const lineDbToUi = (l: any) => ({
@@ -529,7 +530,7 @@ export function useQuote(id: string) {
   return useQuery<QuoteUI>({
     queryKey: qk.quote(id),
     queryFn: () => fetchQuote(id),
-    enabled: !!id,
+    enabled: !!id && isValidUuid(id),
   });
 }
 

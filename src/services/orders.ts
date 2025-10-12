@@ -5,6 +5,7 @@ import { qk } from "@/lib/queryKeys";
 import { logger } from '@/lib/logger';
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "./activity";
+import { isValidUuid } from "@/lib/validation";
 
 // Adapter functions for DB ↔ UI conversion (similar to quotes)
 const lineDbToUi = (l: any) => ({
@@ -467,7 +468,7 @@ export function useOrder(id: string) {
     return useQuery<OrderUI>({
         queryKey: qk.order(id),
         queryFn: () => fetchOrder(id),
-        enabled: !!id,
+        enabled: !!id && isValidUuid(id),
     });
 }
 

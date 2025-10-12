@@ -8,6 +8,7 @@ import { toMinor } from "@/lib/money";
 import { supabase } from "@/integrations/supabase/client";
 import { toastBus } from "@/lib/toastBus";
 import { logger } from '@/lib/logger';
+import { isValidUuid } from "@/lib/validation";
 
 // Schemas
 export const Invoice = z.object({
@@ -247,7 +248,7 @@ export function useInvoice(id: string) {
     return useQuery({
         queryKey: qk.invoice(id),
         queryFn: () => fetchInvoice(id),
-        enabled: !!id,
+        enabled: !!id && isValidUuid(id),
     });
 }
 

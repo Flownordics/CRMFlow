@@ -10,6 +10,7 @@ import { invalidateDealQueries, createOptimizedQueryClient } from "@/lib/queryCa
 import { logger } from "@/lib/logger";
 import { normalizeApiResponse, handleApiError, createMockResponse, handleMockApiCall } from "@/lib/sharedUtils";
 import { executeApiWithRecovery, executeCalendarSyncWithRecovery } from "@/lib/errorRecovery";
+import { isValidUuid } from "@/lib/validation";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -434,7 +435,7 @@ export function useDeals(params: {
     queryKey: qk.deals(params),
     queryFn: () => fetchDeals(params),
     staleTime: 2 * 60 * 1000, // 2 minutes
-    cacheTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: true,
@@ -445,9 +446,9 @@ export function useDeal(id: string) {
   return useQuery({
     queryKey: qk.deal(id),
     queryFn: () => fetchDeal(id),
-    enabled: !!id,
+    enabled: !!id && isValidUuid(id),
     staleTime: 2 * 60 * 1000, // 2 minutes
-    cacheTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: true,

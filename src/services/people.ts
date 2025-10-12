@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Person, PersonCreate, personReadSchema, type Person as PersonCamelCase } from "@/lib/schemas/person";
 import { USE_MOCKS } from "@/lib/debug";
 import { logger } from '@/lib/logger';
+import { isValidUuid } from "@/lib/validation";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -456,7 +457,7 @@ export function usePerson(id: string) {
     return useQuery({
         queryKey: qk.person(id),
         queryFn: () => fetchPersonById(id),
-        enabled: !!id
+        enabled: !!id && isValidUuid(id)
     });
 }
 
