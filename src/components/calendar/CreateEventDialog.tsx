@@ -31,6 +31,8 @@ interface CreateEventDialogProps {
     onEventCreated: () => void;
     showGoogleLayer?: boolean;
     isGoogleConnected?: boolean;
+    defaultCompanyId?: string;
+    defaultTitle?: string;
 }
 
 export function CreateEventDialog({
@@ -39,6 +41,8 @@ export function CreateEventDialog({
     onEventCreated,
     showGoogleLayer = false,
     isGoogleConnected = false,
+    defaultCompanyId,
+    defaultTitle,
 }: CreateEventDialogProps) {
     const { t } = useI18n();
     const [title, setTitle] = useState("");
@@ -180,6 +184,14 @@ export function CreateEventDialog({
             setStartTime(now.toTimeString().slice(0, 5));
             setEndDate(tomorrow.toISOString().split('T')[0]);
             setEndTime(now.toTimeString().slice(0, 5));
+            
+            // Set default values from props
+            if (defaultCompanyId) {
+                setSelectedCompanyId(defaultCompanyId);
+            }
+            if (defaultTitle) {
+                setTitle(defaultTitle);
+            }
         }
         onOpenChange(open);
     };
@@ -189,7 +201,7 @@ export function CreateEventDialog({
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <AccessibleDialogContent
-                className="sm:max-w-[600px]"
+                className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto"
             >
                 {/* 🔒 These must render on the very first paint, unconditionally */}
                 <DialogHeader>

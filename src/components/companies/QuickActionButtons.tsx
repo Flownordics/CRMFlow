@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CreateEventDialog } from "@/components/calendar/CreateEventDialog";
 
 interface QuickActionButtonsProps {
   companyId: string;
@@ -19,6 +20,7 @@ interface QuickActionButtonsProps {
 export function QuickActionButtons({ companyId, companyName, companyEmail }: QuickActionButtonsProps) {
   const navigate = useNavigate();
   const [logCallDialogOpen, setLogCallDialogOpen] = useState(false);
+  const [scheduleMeetingDialogOpen, setScheduleMeetingDialogOpen] = useState(false);
   const [callOutcome, setCallOutcome] = useState<string>("");
   const [callNotes, setCallNotes] = useState("");
   const logActivity = useLogCompanyActivity(companyId);
@@ -55,8 +57,8 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
   };
 
   const handleScheduleMeeting = () => {
-    // Navigate to calendar or open meeting scheduler
-    navigate(`/calendar?companyId=${companyId}`);
+    // Open create event dialog with pre-filled company info
+    setScheduleMeetingDialogOpen(true);
   };
 
   const handleCreateDeal = () => {
@@ -179,6 +181,17 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Schedule Meeting Dialog */}
+      <CreateEventDialog
+        open={scheduleMeetingDialogOpen}
+        onOpenChange={setScheduleMeetingDialogOpen}
+        onEventCreated={() => {
+          toast.success("Meeting scheduled successfully");
+        }}
+        defaultCompanyId={companyId}
+        defaultTitle={`Meeting with ${companyName}`}
+      />
     </>
   );
 }
