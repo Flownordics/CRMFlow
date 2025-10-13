@@ -118,7 +118,7 @@ export function SalespersonComparisonChart({
       <ResponsiveContainer width="100%" height={height}>
         <BarChart
           data={chartData}
-          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+          margin={{ top: 20, right: 30, left: 70, bottom: 5 }}
         >
           <CartesianGrid
             strokeDasharray="3 3"

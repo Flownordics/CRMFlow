@@ -66,7 +66,7 @@ export function RevenueChart({ data, height = 300 }: RevenueChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={data} margin={defaultMargin}>
+      <ComposedChart data={data} margin={{ top: 10, right: 30, left: 70, bottom: 0 }}>
         <defs>
           <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={chartColors.primary} stopOpacity={0.3} />
@@ -121,8 +121,10 @@ export function RevenueChart({ data, height = 300 }: RevenueChartProps) {
           yAxisId="right"
           dataKey="deals"
           fill={chartColors.accent}
+          fillOpacity={0.6}
           name="Deals"
           radius={[4, 4, 0, 0]}
+          barSize={40}
           animationDuration={animationDuration}
         />
       </ComposedChart>
