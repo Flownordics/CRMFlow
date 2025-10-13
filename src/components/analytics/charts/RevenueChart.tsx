@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -14,7 +13,6 @@ import { formatCurrency } from '@/services/analytics';
 import {
   chartColors,
   chartTheme,
-  defaultMargin,
   animationDuration,
 } from './chartConfig';
 

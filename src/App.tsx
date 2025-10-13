@@ -18,7 +18,6 @@ import { USE_MOCKS } from "@/lib/debug";
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const CompaniesList = lazy(() => import("@/pages/companies/CompaniesList"));
 const CompanyPage = lazy(() => import("@/pages/companies/CompanyPage"));
-const Deals = lazy(() => import("@/pages/Deals"));
 const DealsBoard = lazy(() => import("@/pages/deals/DealsBoard"));
 const DealDetail = lazy(() => import("@/pages/deals/DealDetail"));
 const Quotes = lazy(() => import("@/pages/Quotes"));

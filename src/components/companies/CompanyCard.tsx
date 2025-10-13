@@ -43,22 +43,19 @@ export function CompanyCard({ company, onClick, className }: CompanyCardProps) {
 
             <div className="space-y-2">
                 {company.industry && (
-                    <div className="text-sm text-muted-foreground flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-muted-foreground/30" aria-hidden="true" />
+                    <div className="text-sm text-muted-foreground flex items-center gap-2">
                         {company.industry}
                     </div>
                 )}
 
                 {(company.city || company.country) && (
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/20" aria-hidden="true" />
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
                         {[company.city, company.country].filter(Boolean).join(", ")}
                     </div>
                 )}
 
                 {company.domain && (
-                    <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs">
-                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+                    <div className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs">
                         {company.domain}
                     </div>
                 )}

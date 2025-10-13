@@ -407,7 +407,38 @@ export function useAddTaskComment() {
     });
 }
 
-// Helper functions
+// Helper functions for status and priority dot colors (used by badge components)
+export function getTaskStatusDotColor(status: Task['status']): string {
+    switch (status) {
+        case 'pending':
+            return 'bg-[#9d855e]';
+        case 'in_progress':
+            return 'bg-[#7a9db3]';
+        case 'completed':
+            return 'bg-[#6b7c5e]';
+        case 'cancelled':
+            return 'bg-gray-400';
+        default:
+            return 'bg-gray-400';
+    }
+}
+
+export function getTaskPriorityDotColor(priority: Task['priority']): string {
+    switch (priority) {
+        case 'low':
+            return 'bg-gray-400';
+        case 'medium':
+            return 'bg-[#7a9db3]';
+        case 'high':
+            return 'bg-[#9d855e]';
+        case 'urgent':
+            return 'bg-[#b8695f]';
+        default:
+            return 'bg-gray-400';
+    }
+}
+
+// Legacy helper functions (kept for backward compatibility if used elsewhere)
 export function getTaskStatusColor(status: Task['status']): string {
     switch (status) {
         case 'pending':

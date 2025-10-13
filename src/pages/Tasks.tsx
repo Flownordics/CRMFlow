@@ -32,11 +32,13 @@ import { cn } from "@/lib/utils";
 import { useTasks, useUpcomingTasks, useOverdueTasks, Task, TaskFilters } from "@/services/tasks";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { TaskForm } from "@/components/tasks/TaskForm";
+import { TaskDetailView } from "@/components/tasks/TaskDetailView";
 import { logger } from '@/lib/logger';
 
 export default function Tasks() {
     const [selectedTask, setSelectedTask] = useState<Task | undefined>();
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
     const [filters, setFilters] = useState<TaskFilters>({});
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -59,8 +61,8 @@ export default function Tasks() {
     };
 
     const handleViewTask = (task: Task) => {
-        // TODO: Implement task detail view
-        logger.debug('View task:', task);
+        setSelectedTask(task);
+        setIsDetailViewOpen(true);
     };
 
     const handleStatusFilter = (status: string) => {
@@ -308,6 +310,18 @@ export default function Tasks() {
                 open={isFormOpen}
                 onOpenChange={setIsFormOpen}
                 task={selectedTask}
+            />
+
+            {/* Task Detail View */}
+            <TaskDetailView
+                task={selectedTask}
+                open={isDetailViewOpen}
+                onOpenChange={setIsDetailViewOpen}
+                onEdit={(task) => {
+                    setSelectedTask(task);
+                    setIsDetailViewOpen(false);
+                    setIsFormOpen(true);
+                }}
             />
         </div>
     );

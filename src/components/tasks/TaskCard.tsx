@@ -21,9 +21,11 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Task, getTaskStatusColor, getTaskPriorityColor, formatTaskDueDate } from "@/services/tasks";
+import { Task, formatTaskDueDate } from "@/services/tasks";
 import { useUpdateTask, useDeleteTask } from "@/services/tasks";
 import { logger } from '@/lib/logger';
+import { TaskStatusBadge } from "./TaskStatusBadge";
+import { TaskPriorityBadge } from "./TaskPriorityBadge";
 
 interface TaskCardProps {
   task: Task;
@@ -72,20 +74,6 @@ export function TaskCard({ task, onEdit, onView }: TaskCardProps) {
     }
   };
 
-  const getPriorityIcon = (priority: Task['priority']) => {
-    switch (priority) {
-      case 'urgent':
-        return '🔴';
-      case 'high':
-        return '🟠';
-      case 'medium':
-        return '🟡';
-      case 'low':
-        return '🟢';
-      default:
-        return '🟡';
-    }
-  };
 
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onView?.(task)}>
@@ -148,18 +136,8 @@ export function TaskCard({ task, onEdit, onView }: TaskCardProps) {
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center space-x-3">
-            <Badge
-              variant="secondary"
-              className={cn("text-xs", getTaskStatusColor(task.status))}
-            >
-              {task.status.replace('_', ' ')}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={cn("text-xs", getTaskPriorityColor(task.priority))}
-            >
-              {getPriorityIcon(task.priority)} {task.priority}
-            </Badge>
+            <TaskStatusBadge status={task.status} showLabel={true} />
+            <TaskPriorityBadge priority={task.priority} showLabel={true} />
           </div>
         </div>
 
