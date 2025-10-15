@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -12,6 +12,8 @@ import {
   Legend,
 } from "recharts";
 import { formatMoneyMinor } from "@/lib/money";
+import { AnalyticsCard } from "@/components/common/charts/AnalyticsCard";
+import { chartColors, chartTheme, animationDuration } from '@/components/analytics/charts/chartConfig';
 
 interface PaymentTrendsChartProps {
   payments: Array<{
@@ -44,86 +46,86 @@ export function PaymentTrendsChart({ payments, currency = "DKK" }: PaymentTrends
     return data;
   }, [payments, currency]);
 
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const data = payload[0].payload;
+    return (
+      <div style={chartTheme.tooltipStyle} className="shadow-lg">
+        <p className="font-semibold mb-2">{data.date}</p>
+        <p className="text-sm">
+          <span className="font-medium">Amount:</span> {data.displayAmount}
+        </p>
+      </div>
+    );
+  };
+
   if (chartData.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" focusable="false" />
-            <CardTitle className="text-base">Payment Trends</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            No payment data available
-          </div>
-        </CardContent>
-      </Card>
+      <AnalyticsCard
+        title="Payment Trends"
+        description="No data available"
+        icon={TrendingUp}
+      >
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          No payment data available
+        </div>
+      </AnalyticsCard>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" focusable="false" />
-          <CardTitle className="text-base">Payment Trends</CardTitle>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          Last {chartData.length} days
-        </p>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-            <XAxis
-              dataKey="date"
-              stroke="#6b7280"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              stroke="#6b7280"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-            />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (active && payload && payload.length) {
-                  return (
-                    <div className="rounded-lg border bg-background p-2 shadow-sm">
-                      <div className="grid gap-1">
-                        <div className="text-xs text-muted-foreground">
-                          {payload[0].payload.date}
-                        </div>
-                        <div className="text-sm font-medium">
-                          {payload[0].payload.displayAmount}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              }}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="amount"
-              name="Payment Amount"
-              stroke="#6b7c5e"
-              strokeWidth={2}
-              dot={{ fill: "#6b7c5e", r: 4 }}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+    <AnalyticsCard
+      title="Payment Trends"
+      description={`Last ${chartData.length} days`}
+      icon={TrendingUp}
+      chartName="Payment Trends"
+    >
+      <ResponsiveContainer width="100%" height={250}>
+        <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="paymentTrendsGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={chartColors.success} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={chartColors.success} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={chartTheme.gridStyle.stroke}
+            strokeOpacity={chartTheme.gridStyle.strokeOpacity}
+          />
+          <XAxis
+            dataKey="date"
+            style={chartTheme.axisStyle}
+            stroke={chartTheme.gridStyle.stroke}
+          />
+          <YAxis
+            style={chartTheme.axisStyle}
+            stroke={chartTheme.gridStyle.stroke}
+            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={chartTheme.legendStyle} iconType="rect" iconSize={12} />
+          <Area
+            type="monotone"
+            dataKey="amount"
+            stroke={chartColors.success}
+            strokeWidth={2}
+            fill="url(#paymentTrendsGradient)"
+            name="Payment Amount"
+            animationDuration={animationDuration}
+          />
+          <Line
+            type="monotone"
+            dataKey="amount"
+            stroke={chartColors.success}
+            strokeWidth={2}
+            dot={{ fill: chartColors.success, r: 4 }}
+            activeDot={{ r: 6 }}
+            animationDuration={animationDuration}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </AnalyticsCard>
   );
 }
 

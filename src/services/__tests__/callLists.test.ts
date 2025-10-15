@@ -3,7 +3,6 @@ import {
     fetchCallLists,
     createCallList,
     autoGenerateCallList,
-    addCompaniesToCallList,
 } from '../callLists';
 import { logCompanyActivity } from '../activityLog';
 import { apiClient, apiPostWithReturn } from '@/lib/api';
@@ -13,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 vi.mock('@/lib/api');
 vi.mock('@/integrations/supabase/client');
 vi.mock('@/lib/errorHandler', () => ({
-    handleError: (error: any, context: string) => {
+    handleError: (error: any) => {
         throw error;
     },
 }));

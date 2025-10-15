@@ -88,6 +88,50 @@ export function getChartColor(index: number): string {
   return chartColors.palette[index % chartColors.palette.length];
 }
 
+// Helper to get color by category name (for consistent coloring across charts)
+export function getColorByCategory(category: string): string {
+  const categoryColors: Record<string, string> = {
+    // Status colors
+    draft: chartColors.info,
+    sent: chartColors.warning,
+    accepted: chartColors.success,
+    declined: chartColors.danger,
+    expired: chartColors.danger,
+    pending: chartColors.warning,
+    confirmed: chartColors.success,
+    delivered: chartColors.success,
+    cancelled: chartColors.danger,
+    paid: chartColors.success,
+    overdue: chartColors.danger,
+    partial: chartColors.warning,
+    
+    // Activity colors
+    call: chartColors.call,
+    email: chartColors.email,
+    meeting: chartColors.meeting,
+    note: chartColors.note,
+    task: chartColors.task,
+    deal: chartColors.deal,
+    quote: chartColors.quote,
+    order: chartColors.order,
+    invoice: chartColors.invoice,
+    payment: chartColors.payment,
+
+    // Activity status
+    green: chartColors.green,
+    yellow: chartColors.yellow,
+    red: chartColors.red,
+
+    // Priority
+    low: chartColors.info,
+    medium: chartColors.warning,
+    high: chartColors.danger,
+    urgent: chartColors.danger,
+  };
+
+  return categoryColors[category.toLowerCase()] || chartColors.primary;
+}
+
 // Helper to format activity type color
 export function getActivityColor(type: string): string {
   const colorMap: Record<string, string> = {

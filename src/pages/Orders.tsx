@@ -44,6 +44,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "@/services/dealStageAutomation";
 import { logger } from '@/lib/logger';
+import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
+import { OrderStatusChart } from "@/components/orders/OrderStatusChart";
+import { OrderValueTrendChart } from "@/components/orders/OrderValueTrendChart";
+import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon } from "lucide-react";
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
@@ -160,6 +164,27 @@ const Orders: React.FC = () => {
 
       {/* KPI Header */}
       <OrdersKpiHeader orders={orders} currency="DKK" />
+
+      {/* Analytics Charts */}
+      <AnalyticsCardGrid columns={2}>
+        <AnalyticsCard
+          title="Order Status Distribution"
+          description="Breakdown by status"
+          icon={PieChartIcon}
+          chartName="Order Status Distribution"
+        >
+          <OrderStatusChart orders={orders} />
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Order Value Trend"
+          description="Monthly order value over time"
+          icon={TrendingUpIcon}
+          chartName="Order Value Trend"
+        >
+          <OrderValueTrendChart orders={orders} />
+        </AnalyticsCard>
+      </AnalyticsCardGrid>
 
       {/* Search and Filters */}
       <div className="flex flex-col gap-4">

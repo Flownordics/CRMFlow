@@ -51,6 +51,11 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { formatMoneyMinor } from "@/lib/money";
 import { useCompanyLookup } from "@/hooks/useCompanyLookup";
+import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
+import { InvoiceStatusChart } from "@/components/invoices/InvoiceStatusChart";
+import { InvoiceAgingChart } from "@/components/invoices/InvoiceAgingChart";
+import { InvoiceValueTrendChart } from "@/components/invoices/InvoiceValueTrendChart";
+import { PieChart as PieChartIcon, BarChart3, TrendingUp as TrendingUpIcon } from "lucide-react";
 
 const Invoices: React.FC = () => {
   const navigate = useNavigate();
@@ -229,6 +234,36 @@ const Invoices: React.FC = () => {
 
       {/* KPI Cards */}
       <InvoicesKpiHeader invoices={invoices} currency="DKK" />
+
+      {/* Analytics Charts */}
+      <AnalyticsCardGrid columns={3}>
+        <AnalyticsCard
+          title="Invoice Status Distribution"
+          description="Breakdown by status"
+          icon={PieChartIcon}
+          chartName="Invoice Status Distribution"
+        >
+          <InvoiceStatusChart invoices={invoices} />
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Aging Analysis"
+          description="Overdue invoices by age"
+          icon={BarChart3}
+          chartName="Invoice Aging"
+        >
+          <InvoiceAgingChart invoices={invoices} />
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Invoice Value Trend"
+          description="Monthly billing over time"
+          icon={TrendingUpIcon}
+          chartName="Invoice Value Trend"
+        >
+          <InvoiceValueTrendChart invoices={invoices} />
+        </AnalyticsCard>
+      </AnalyticsCardGrid>
 
       {/* Search and Filters */}
       <div className="flex flex-col gap-4">

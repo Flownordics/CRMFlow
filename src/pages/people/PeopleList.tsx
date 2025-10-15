@@ -26,6 +26,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getRoleTheme, roleTokenBg, roleTokenText, roleTokenRing } from "@/components/people/roleTheme";
 import { Mail, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
+import { RoleDistributionChart } from "@/components/people/RoleDistributionChart";
+import { ContactGrowthChart } from "@/components/people/ContactGrowthChart";
+import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon } from "lucide-react";
 
 export default function PeopleList() {
     const { t } = useI18n();
@@ -216,6 +220,29 @@ export default function PeopleList() {
                 withPhone={withPhone}
                 newThisMonth={newThisMonth}
             />
+
+            {/* Analytics Charts */}
+            {people.length > 0 && (
+                <AnalyticsCardGrid columns={2}>
+                    <AnalyticsCard
+                        title="Role Distribution"
+                        description="People by role/title"
+                        icon={PieChartIcon}
+                        chartName="Role Distribution"
+                    >
+                        <RoleDistributionChart people={people} />
+                    </AnalyticsCard>
+
+                    <AnalyticsCard
+                        title="Contact Growth"
+                        description="Total contacts over time"
+                        icon={TrendingUpIcon}
+                        chartName="Contact Growth"
+                    >
+                        <ContactGrowthChart people={people} />
+                    </AnalyticsCard>
+                </AnalyticsCardGrid>
+            )}
 
             {/* Search and Filters */}
             <div className="flex flex-col gap-4">

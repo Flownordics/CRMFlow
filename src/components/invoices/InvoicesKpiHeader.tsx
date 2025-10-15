@@ -1,8 +1,8 @@
 import { formatMoneyMinor } from "@/lib/money";
-import { Card } from "@/components/ui/card";
 import { Coins, CheckCircle2, AlertTriangle, CalendarClock } from "lucide-react";
 import { Invoice } from "@/services/invoices";
 import { useI18n } from "@/lib/i18n";
+import { EnhancedKpiCard, EnhancedKpiGrid } from "@/components/common/kpi/EnhancedKpiCard";
 
 interface InvoicesKpiHeaderProps {
     invoices: Invoice[];
@@ -30,71 +30,45 @@ export function InvoicesKpiHeader({ invoices, currency = "DKK" }: InvoicesKpiHea
     });
     const totalDueSoon = dueSoon.reduce((sum, inv) => sum + (inv.total_minor || 0), 0);
 
+    const paidCount = invoices.filter(inv => inv.status === "paid").length;
+    const overdueCount = invoices.filter(inv => inv.status === "overdue").length;
+    const collectionRate = invoices.length > 0 ? ((paidCount / invoices.length) * 100) : 0;
+
     return (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Total Billed</div>
-                        <div className="text-2xl font-bold">{formatMoneyMinor(totalBilled, currency)}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-primary/10">
-                        <Coins className="h-4 w-4 text-primary" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent" aria-hidden="true" />
-            </Card>
+        <EnhancedKpiGrid columns={4}>
+            <EnhancedKpiCard
+                title="Total Billed"
+                value={formatMoneyMinor(totalBilled, currency)}
+                subtitle={`${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}`}
+                icon={Coins}
+            />
 
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Paid</div>
-                        <div className="text-2xl font-bold">{formatMoneyMinor(totalPaid, currency)}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {invoices.filter(inv => inv.status === "paid").length} invoice{invoices.filter(inv => inv.status === "paid").length !== 1 ? 's' : ''}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-success/10">
-                        <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-success/5 to-transparent" aria-hidden="true" />
-            </Card>
+            <EnhancedKpiCard
+                title="Paid"
+                value={formatMoneyMinor(totalPaid, currency)}
+                subtitle={`${paidCount} invoice${paidCount !== 1 ? 's' : ''}`}
+                icon={CheckCircle2}
+                progress={collectionRate}
+                showProgress={true}
+                progressLabel="Collection Rate"
+                valueColor="text-[#6b7c5e]"
+            />
 
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Overdue</div>
-                        <div className="text-2xl font-bold">{formatMoneyMinor(totalOverdue, currency)}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {invoices.filter(inv => inv.status === "overdue").length} invoice{invoices.filter(inv => inv.status === "overdue").length !== 1 ? 's' : ''}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-danger/10">
-                        <AlertTriangle className="h-4 w-4 text-danger" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-danger/5 to-transparent" aria-hidden="true" />
-            </Card>
+            <EnhancedKpiCard
+                title="Overdue"
+                value={formatMoneyMinor(totalOverdue, currency)}
+                subtitle={`${overdueCount} invoice${overdueCount !== 1 ? 's' : ''}`}
+                icon={AlertTriangle}
+                valueColor={totalOverdue > 0 ? "text-[#b8695f]" : undefined}
+            />
 
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Due Soon</div>
-                        <div className="text-2xl font-bold">{formatMoneyMinor(totalDueSoon, currency)}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {dueSoon.length} invoice{dueSoon.length !== 1 ? 's' : ''}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-warning/10">
-                        <CalendarClock className="h-4 w-4 text-warning" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-warning/5 to-transparent" aria-hidden="true" />
-            </Card>
-        </div>
+            <EnhancedKpiCard
+                title="Due Soon"
+                value={formatMoneyMinor(totalDueSoon, currency)}
+                subtitle={`${dueSoon.length} invoice${dueSoon.length !== 1 ? 's' : ''}`}
+                icon={CalendarClock}
+                valueColor={totalDueSoon > 0 ? "text-[#d4a574]" : undefined}
+            />
+        </EnhancedKpiGrid>
     );
 }

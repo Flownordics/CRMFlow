@@ -22,6 +22,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { BulkActionsMenu } from "@/components/companies/BulkActionsMenu";
 import { CompanyTagsBadges } from "@/components/companies/CompanyTagsManager";
 import { exportCompaniesToCSV } from "@/services/export/companiesExport";
+import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
+import { CompanyHealthChart } from "@/components/companies/CompanyHealthChart";
+import { CompanyGrowthChart } from "@/components/companies/CompanyGrowthChart";
+import { IndustryDistributionChart } from "@/components/companies/IndustryDistributionChart";
+import { PieChart as PieChartIcon, TrendingUp, BarChart3 } from "lucide-react";
 
 export default function CompaniesList() {
     const [q, setQ] = useState("");
@@ -267,6 +272,42 @@ export default function CompaniesList() {
             {/* KPI Header */}
             <CompaniesKpiHeader companies={companies} />
 
+            {/* Analytics Charts */}
+            <AnalyticsCardGrid columns={3}>
+                <AnalyticsCard
+                    title="Activity Status Distribution"
+                    description="Company engagement levels"
+                    icon={PieChartIcon}
+                    chartName="Company Health Distribution"
+                >
+                    <CompanyHealthChart
+                        data={{
+                            green: companies.filter((c) => c.activityStatus === 'green').length,
+                            yellow: companies.filter((c) => c.activityStatus === 'yellow').length,
+                            red: companies.filter((c) => c.activityStatus === 'red').length,
+                        }}
+                    />
+                </AnalyticsCard>
+
+                <AnalyticsCard
+                    title="Company Growth"
+                    description="Total companies over time"
+                    icon={TrendingUp}
+                    chartName="Company Growth Trend"
+                >
+                    <CompanyGrowthChart companies={companies} />
+                </AnalyticsCard>
+
+                <AnalyticsCard
+                    title="Industry Distribution"
+                    description="Companies by industry"
+                    icon={BarChart3}
+                    chartName="Industry Distribution"
+                >
+                    <IndustryDistributionChart companies={companies} />
+                </AnalyticsCard>
+            </AnalyticsCardGrid>
+
             {/* Debug UI */}
             {DEBUG_UI && error && (
                 <div className="rounded-xl border bg-muted/20 p-3 text-xs" role="alert">
@@ -289,17 +330,13 @@ export default function CompaniesList() {
                             />
                         </div>
                         {companies.length > 0 && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={toggleSelectAll}
-                            >
+                            <div className="flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-accent cursor-pointer" onClick={toggleSelectAll}>
                                 <Checkbox
                                     checked={selectedCompanyIds.length === companies.length}
-                                    className="mr-2"
+                                    onCheckedChange={toggleSelectAll}
                                 />
-                                Select All
-                            </Button>
+                                <span className="text-sm font-medium">Select All</span>
+                            </div>
                         )}
                         <Button 
                             variant="outline" 

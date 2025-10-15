@@ -18,7 +18,7 @@ import { useMemo, useState, useCallback, memo } from "react";
 import { Stage } from "@/services/pipelines";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { useMoveDeal } from "@/services/pipelines";
 import { cn } from "@/lib/utils";
 import { toastBus } from "@/lib/toastBus";
@@ -45,6 +45,18 @@ interface DealData {
     notes?: string;
     taxPct?: number;
 }
+
+// Configuration for stage limits
+const STAGE_LIMITS: Record<string, number> = {
+    won: 10,
+    lost: 10,
+    vundet: 10,
+    tabt: 10,
+    'closed won': 10,
+    'closed lost': 10,
+};
+
+const DEFAULT_STAGE_LIMIT = 50; // Default for other stages
 
 export function KanbanBoard({
     stages,
@@ -73,6 +85,9 @@ export function KanbanBoard({
     );
     const moveMutation = useMoveDeal();
     const [activeDeal, setActiveDeal] = useState<DealData | null>(null);
+    
+    // Track which stages are expanded (for Won/Lost with many deals)
+    const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
 
     // Filter out "Qualified" stage and sort by order
     const columns = useMemo(
@@ -81,6 +96,31 @@ export function KanbanBoard({
             .sort((a, b) => a.order - b.order),
         [stages],
     );
+    
+    // Helper to get the limit for a stage
+    const getStageLimit = useCallback((stageName: string): number => {
+        const lowerName = stageName.toLowerCase();
+        return STAGE_LIMITS[lowerName] || DEFAULT_STAGE_LIMIT;
+    }, []);
+    
+    // Helper to check if a stage should be limited
+    const isLimitedStage = useCallback((stageName: string): boolean => {
+        const lowerName = stageName.toLowerCase();
+        return lowerName in STAGE_LIMITS;
+    }, []);
+    
+    // Toggle stage expansion
+    const toggleStageExpansion = useCallback((stageId: string) => {
+        setExpandedStages(prev => {
+            const next = new Set(prev);
+            if (next.has(stageId)) {
+                next.delete(stageId);
+            } else {
+                next.add(stageId);
+            }
+            return next;
+        });
+    }, []);
 
     // Memoize stage items for SortableContext - use only deal IDs
     const stageItems = useMemo(() => {
@@ -103,20 +143,30 @@ export function KanbanBoard({
 
     const onDragStart = useCallback((event: DragStartEvent) => {
         const dealId = String(event.active.id);
+        logger.debug("[KanbanBoard] onDragStart - dealId:", dealId);
+        
         const deal = Object.values(dealsByStage)
             .flat()
             .find(d => d.id === dealId);
 
         if (deal) {
+            logger.debug("[KanbanBoard] onDragStart - found deal:", { id: deal.id, title: deal.title });
             setActiveDeal(deal);
+        } else {
+            logger.warn("[KanbanBoard] onDragStart - deal not found for id:", dealId);
         }
     }, [dealsByStage]);
 
     const onDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event;
-        if (!over) return;
+        if (!over) {
+            logger.debug("[KanbanBoard] Drag ended without a drop target");
+            setActiveDeal(null);
+            return;
+        }
 
         const dealId = String(active.id);
+        logger.debug("[KanbanBoard] onDragEnd - dealId extracted:", dealId);
         let toStageId: string;
 
         // Handle different types of drop targets
@@ -194,10 +244,20 @@ export function KanbanBoard({
         }
 
         // Persist to backend
+        logger.debug("[KanbanBoard] About to call moveMutation.mutate with:", {
+            dealId,
+            deal: { id: deal.id, title: deal.title },
+            fromStageId,
+            toStageId,
+            toStageName,
+            index: 0
+        });
+
         moveMutation.mutate(
             { dealId, stageId: toStageId, index: 0 },
             {
                 onSuccess: () => {
+                    logger.debug("[KanbanBoard] Move mutation succeeded for deal:", dealId);
                     toastBus.emit({ title: "Deal moved successfully" });
                     if (onStageChange) {
                         onStageChange({ deal, fromStageId, toStageId, toStageName });
@@ -224,68 +284,105 @@ export function KanbanBoard({
             onDragEnd={onDragEnd}
         >
             <div className="flex gap-4 overflow-x-auto pb-2">
-                {columns.map((col) => (
-                    <div key={col.id} className="flex-1 min-w-[240px] max-w-[320px]">
-                        <KanbanDroppableColumn id={`col:${col.id}`}>
-                            <div className="mb-2 flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    {(() => {
-                                        const theme = getStageTheme(col.name);
-                                        return (
-                                            <span className={cn("h-2 w-2 rounded-full", stageTokenBg(theme.color), stageTokenText(theme.color))} aria-hidden="true" />
-                                        );
-                                    })()}
-                                    <div className="text-sm font-medium truncate">{col.name}</div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className={cn("rounded-full px-2 py-0.5 text-xs", stageTokenBg(getStageTheme(col.name).color), "text-muted-foreground")}>
-                                        {(dealsByStage[col.id] ?? []).length}
+                {columns.map((col) => {
+                    const allDeals = dealsByStage[col.id] ?? [];
+                    const limit = getStageLimit(col.name);
+                    const isLimited = isLimitedStage(col.name);
+                    const isExpanded = expandedStages.has(col.id);
+                    const hasMore = isLimited && allDeals.length > limit;
+                    const visibleDeals = (isLimited && !isExpanded) ? allDeals.slice(0, limit) : allDeals;
+                    const hiddenCount = allDeals.length - visibleDeals.length;
+                    
+                    return (
+                        <div key={col.id} className="flex-1 min-w-[240px] max-w-[320px]">
+                            <KanbanDroppableColumn id={`col:${col.id}`}>
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        {(() => {
+                                            const theme = getStageTheme(col.name);
+                                            return (
+                                                <span className={cn("h-2 w-2 rounded-full", stageTokenBg(theme.color), stageTokenText(theme.color))} aria-hidden="true" />
+                                            );
+                                        })()}
+                                        <div className="text-sm font-medium truncate">{col.name}</div>
                                     </div>
-                                    {onCreateInStage && (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    aria-label="Add deal"
-                                                    onClick={() => onCreateInStage(col.id)}
-                                                >
-                                                    <Plus
-                                                        aria-hidden="true"
-                                                        focusable="false"
-                                                        className="h-4 w-4"
-                                                    />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Add deal</TooltipContent>
-                                        </Tooltip>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn("rounded-full px-2 py-0.5 text-xs", stageTokenBg(getStageTheme(col.name).color), "text-muted-foreground")}>
+                                            {allDeals.length}
+                                        </div>
+                                        {onCreateInStage && (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        aria-label="Add deal"
+                                                        onClick={() => onCreateInStage(col.id)}
+                                                    >
+                                                        <Plus
+                                                            aria-hidden="true"
+                                                            focusable="false"
+                                                            className="h-4 w-4"
+                                                        />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Add deal</TooltipContent>
+                                            </Tooltip>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                            <SortableContext
-                                items={stageItems[col.id] ?? []}
-                                strategy={verticalListSortingStrategy}
-                            >
-                                <div className="flex flex-col gap-2 flex-1 min-h-[200px] p-2">
-                                    {(dealsByStage[col.id] ?? []).map((deal) => (
-                                        <DraggableDeal
-                                            key={deal.id}
-                                            id={deal.id}
-                                            deal={deal}
-                                            stageId={col.id}
-                                            stageName={col.name}
-                                            onOpen={onOpenEdit}
-                                        />
-                                    ))}
-                                    {/* Show placeholder when column is empty */}
-                                    {(dealsByStage[col.id] ?? []).length === 0 && (
-                                        <DropPlaceholder />
-                                    )}
-                                </div>
-                            </SortableContext>
-                        </KanbanDroppableColumn>
-                    </div>
-                ))}
+                                <SortableContext
+                                    items={stageItems[col.id] ?? []}
+                                    strategy={verticalListSortingStrategy}
+                                >
+                                    <div className="flex flex-col gap-2 flex-1 min-h-[200px] p-2">
+                                        {visibleDeals.map((deal) => (
+                                            <DraggableDeal
+                                                key={deal.id}
+                                                id={deal.id}
+                                                deal={deal}
+                                                stageId={col.id}
+                                                stageName={col.name}
+                                                onOpen={onOpenEdit}
+                                            />
+                                        ))}
+                                        
+                                        {/* Show "Show more" button if there are hidden deals */}
+                                        {hasMore && !isExpanded && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full text-xs text-muted-foreground hover:text-foreground"
+                                                onClick={() => toggleStageExpansion(col.id)}
+                                            >
+                                                <ChevronDown className="h-3 w-3 mr-1" />
+                                                Vis {hiddenCount} flere
+                                            </Button>
+                                        )}
+                                        
+                                        {/* Show "Show less" button if expanded */}
+                                        {isExpanded && isLimited && allDeals.length > limit && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full text-xs text-muted-foreground hover:text-foreground"
+                                                onClick={() => toggleStageExpansion(col.id)}
+                                            >
+                                                <ChevronUp className="h-3 w-3 mr-1" />
+                                                Vis færre
+                                            </Button>
+                                        )}
+                                        
+                                        {/* Show placeholder when column is empty */}
+                                        {allDeals.length === 0 && (
+                                            <DropPlaceholder />
+                                        )}
+                                    </div>
+                                </SortableContext>
+                            </KanbanDroppableColumn>
+                        </div>
+                    );
+                })}
             </div>
             <DragOverlay>
                 {activeDeal ? (

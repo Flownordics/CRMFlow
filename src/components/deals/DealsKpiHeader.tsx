@@ -1,8 +1,8 @@
 import { formatMoneyMinor } from "@/lib/money";
-import { Card } from "@/components/ui/card";
 import { Briefcase, CalendarClock, Coins, ChartLine, TrendingUp } from "lucide-react";
 import { useDealsBoardData, UseDealsBoardDataParams } from "@/hooks/useDealsBoardData";
 import { useMemo } from "react";
+import { EnhancedKpiCard, EnhancedKpiGrid } from "@/components/common/kpi/EnhancedKpiCard";
 
 export function DealsKpiHeader({
     params = {},
@@ -53,95 +53,64 @@ export function DealsKpiHeader({
             .reduce((total, deal) => total + (deal.expected_value_minor || 0), 0);
     }, [deals, stages]);
 
-    if (isLoading) {
+    if (isLoading || error) {
         return (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+            <EnhancedKpiGrid columns={5}>
                 {Array.from({ length: 5 }).map((_, i) => (
-                    <Card key={i} className="p-4">
-                        <div className="animate-pulse">
-                            <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                            <div className="h-8 bg-muted rounded w-1/2"></div>
-                        </div>
-                    </Card>
+                    <EnhancedKpiCard
+                        key={i}
+                        title="Loading..."
+                        value="..."
+                        isLoading={true}
+                    />
                 ))}
-            </div>
+            </EnhancedKpiGrid>
         );
     }
 
-    if (error) {
-        return (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-                <Card className="p-4 col-span-5">
-                    <div className="text-center text-muted-foreground">
-                        Error loading KPI data: {error.message}
-                    </div>
-                </Card>
-            </div>
-        );
-    }
+    const totalPipeline = Object.values(activeStageTotalsMinor).reduce((a, b) => a + b, 0);
 
     return (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Total pipeline</div>
-                        <div className="text-h2">{formatMoneyMinor(Object.values(activeStageTotalsMinor).reduce((a, b) => a + b, 0), currency)}</div>
-                    </div>
-                    <div className="rounded-full p-2 bg-primary/10">
-                        <Briefcase className="h-4 w-4 text-primary" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent" aria-hidden="true" />
-            </Card>
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Expected closing (this month)</div>
-                        <div className="text-h2">{counts.thisMonthExpected}</div>
-                    </div>
-                    <div className="rounded-full p-2 bg-accent/10">
-                        <CalendarClock className="h-4 w-4 text-accent" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-accent/5 to-transparent" aria-hidden="true" />
-            </Card>
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Total won by value (this month)</div>
-                        <div className="text-h2">{formatMoneyMinor(totalWonThisMonth, currency)}</div>
-                    </div>
-                    <div className="rounded-full p-2 bg-success/10">
-                        <Coins className="h-4 w-4 text-success" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-success/5 to-transparent" aria-hidden="true" />
-            </Card>
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Weighted pipeline</div>
-                        <div className="text-h2">{formatMoneyMinor(weightedMinor, currency)}</div>
-                    </div>
-                    <div className="rounded-full p-2 bg-warning/10">
-                        <ChartLine className="h-4 w-4 text-warning" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-warning/5 to-transparent" aria-hidden="true" />
-            </Card>
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Due soon ({counts.dueSoon})</div>
-                        <div className="text-h2">{counts.dueSoon}</div>
-                    </div>
-                    <div className="rounded-full p-2 bg-danger/10">
-                        <TrendingUp className="h-4 w-4 text-danger" aria-hidden="true" focusable="false" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-danger/5 to-transparent" aria-hidden="true" />
-            </Card>
-        </div>
+        <EnhancedKpiGrid columns={5}>
+            <EnhancedKpiCard
+                title="Total Pipeline"
+                value={formatMoneyMinor(totalPipeline, currency)}
+                icon={Briefcase}
+                iconColor="text-[#7a9db3]"
+            />
+
+            <EnhancedKpiCard
+                title="Expected Closing"
+                value={counts.thisMonthExpected}
+                subtitle="this month"
+                icon={CalendarClock}
+                iconColor="text-[#c89882]"
+            />
+
+            <EnhancedKpiCard
+                title="Won This Month"
+                value={formatMoneyMinor(totalWonThisMonth, currency)}
+                icon={Coins}
+                iconColor="text-[#6b7c5e]"
+                valueColor="text-[#6b7c5e]"
+            />
+
+            <EnhancedKpiCard
+                title="Weighted Pipeline"
+                value={formatMoneyMinor(weightedMinor, currency)}
+                subtitle="probability-adjusted"
+                icon={ChartLine}
+                iconColor="text-[#d4a574]"
+            />
+
+            <EnhancedKpiCard
+                title="Due Soon"
+                value={counts.dueSoon}
+                subtitle="needs attention"
+                icon={TrendingUp}
+                iconColor={counts.dueSoon > 0 ? "text-[#b8695f]" : "text-muted-foreground"}
+                valueColor={counts.dueSoon > 0 ? "text-[#b8695f]" : undefined}
+            />
+        </EnhancedKpiGrid>
     );
 }

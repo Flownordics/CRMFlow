@@ -301,6 +301,7 @@ export async function syncDealToOwnerCalendar(deal: Deal, companyName?: string):
     if (!recoverySuccess) {
       throw error;
     }
+    return null; // Recovery succeeded but no event ID
   }
 }
 
@@ -410,16 +411,28 @@ export async function rpcReorderDeal(dealId: string, newStageId: string, newInde
   }
 
   try {
+    logger.debug("[rpcReorderDeal] Calling API with params:", {
+      dealId,
+      newStageId,
+      newIndex
+    });
+
     const response = await apiClient.post("/rpc/reorder_deal", {
       p_deal: dealId,
       p_new_stage: newStageId,
       p_new_index: newIndex
     });
 
+    logger.debug("[rpcReorderDeal] API response:", {
+      status: response.status,
+      data: response.data
+    });
+
     if (response.status !== 200 && response.status !== 204) {
       throw new Error(`Failed to reorder deal: ${response.status}`);
     }
   } catch (error) {
+    logger.error("[rpcReorderDeal] Error:", error);
     throw handleError(error, `rpcReorderDeal(${dealId})`);
   }
 }
@@ -566,13 +579,19 @@ export function useMoveDeal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ dealId, stageId, index }: { dealId: string; stageId: string; index: number }) => {
+      logger.debug("[useMoveDeal] mutationFn called with:", { dealId, stageId, index });
       return rpcReorderDeal(dealId, stageId, index);
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      logger.debug("[useMoveDeal] Mutation succeeded, invalidating queries for deal:", variables.dealId);
       qc.invalidateQueries({ queryKey: qk.deals() });
       // Invalidate any stage summary hooks if they exist
       qc.invalidateQueries({ queryKey: qk.pipelines() });
     },
+    onError: (error: unknown, variables) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("[useMoveDeal] Mutation failed for deal:", variables.dealId, errorMessage);
+    }
   });
 }
 

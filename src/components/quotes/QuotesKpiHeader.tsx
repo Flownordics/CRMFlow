@@ -1,7 +1,7 @@
 import { formatMoneyMinor } from "@/lib/money";
-import { Card } from "@/components/ui/card";
-import { FileText, Send, TrendingUp } from "lucide-react";
+import { FileText, Send, TrendingUp, CheckCircle } from "lucide-react";
 import { Quote } from "@/services/quotes";
+import { EnhancedKpiCard, EnhancedKpiGrid } from "@/components/common/kpi/EnhancedKpiCard";
 
 interface QuotesKpiHeaderProps {
     quotes: Quote[];
@@ -18,74 +18,53 @@ export function QuotesKpiHeader({ quotes, currency = "DKK" }: QuotesKpiHeaderPro
     }, {} as Record<string, number>);
 
     const sentCount = byStatus.sent || 0;
+    const acceptedCount = byStatus.accepted || 0;
     const declinedCount = byStatus.declined || 0;
+    const draftCount = byStatus.draft || 0;
+    
     const hitRate = sentCount > 0 ? Math.round(((sentCount - declinedCount) / sentCount) * 100) : 0;
+    const conversionRate = sentCount > 0 ? ((acceptedCount / sentCount) * 100) : 0;
+    const sentPercentage = totalCount > 0 ? ((sentCount / totalCount) * 100) : 0;
 
     return (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Total quotes</div>
-                        <div className="text-h2">{totalCount}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            Value: {formatMoneyMinor(totalValueMinor, currency)}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-primary/10">
-                        <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-primary/5 to-transparent" aria-hidden="true" />
-            </Card>
+        <EnhancedKpiGrid columns={4}>
+            <EnhancedKpiCard
+                title="Total Quotes"
+                value={totalCount}
+                subtitle={formatMoneyMinor(totalValueMinor, currency)}
+                icon={FileText}
+            />
 
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Sent quotes</div>
-                        <div className="text-h2">{sentCount}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {sentCount > 0 ? `${Math.round((sentCount / totalCount) * 100)}% of total` : "No quotes sent"}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-info/10">
-                        <Send className="h-4 w-4 text-info" aria-hidden="true" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-info/5 to-transparent" aria-hidden="true" />
-            </Card>
+            <EnhancedKpiCard
+                title="Sent Quotes"
+                value={sentCount}
+                icon={Send}
+                progress={sentPercentage}
+                showProgress={true}
+                progressLabel="Sent"
+            />
 
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Draft quotes</div>
-                        <div className="text-h2">{byStatus.draft || 0}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {(byStatus.draft || 0) > 0 ? `${Math.round(((byStatus.draft || 0) / totalCount) * 100)}% of total` : "No draft quotes"}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-[hsl(210,5%,39%)]/15">
-                        <FileText className="h-4 w-4 text-[hsl(210,5%,35%)]" aria-hidden="true" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[hsl(210,5%,39%)]/10 to-transparent" aria-hidden="true" />
-            </Card>
+            <EnhancedKpiCard
+                title="Success Rate"
+                value={`${hitRate}%`}
+                icon={CheckCircle}
+                progress={hitRate}
+                showProgress={true}
+                progressLabel="Success"
+                target={`${sentCount - declinedCount} of ${sentCount}`}
+                valueColor={
+                    hitRate >= 70 ? "text-[#6b7c5e]" :
+                    hitRate >= 40 ? "text-[#d4a574]" :
+                    "text-[#b8695f]"
+                }
+            />
 
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Success rate</div>
-                        <div className="text-h2">{hitRate}%</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {sentCount > 0 ? `${sentCount - declinedCount} of ${sentCount} sent` : "No quotes sent yet"}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-accent/10">
-                        <TrendingUp className="h-4 w-4 text-accent" aria-hidden="true" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-accent/5 to-transparent" aria-hidden="true" />
-            </Card>
-        </div>
+            <EnhancedKpiCard
+                title="Draft Quotes"
+                value={draftCount}
+                subtitle={draftCount > 0 ? `${Math.round((draftCount / totalCount) * 100)}% of total` : "No drafts"}
+                icon={FileText}
+            />
+        </EnhancedKpiGrid>
     );
 }

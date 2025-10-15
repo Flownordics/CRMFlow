@@ -476,9 +476,21 @@ export function useCreateOrder() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: createOrder,
-        onSuccess: (order) => {
+        onSuccess: async (order) => {
             qc.invalidateQueries({ queryKey: qk.orders() });
             qc.setQueryData(qk.order(order.id), order);
+            
+            // Log to company activity if order has NO deal (standalone order)
+            if (!order.deal_id && order.company_id) {
+                try {
+                    const { logOrderCreated } = await import("@/services/activityLog");
+                    await logOrderCreated(order.company_id, order.id, order.number || 'Draft');
+                    logger.debug("[useCreateOrder] Logged order creation to company activity");
+                } catch (error) {
+                    logger.warn("[useCreateOrder] Failed to log company activity:", error);
+                    // Don't throw - order was created successfully
+                }
+            }
         },
     });
 }

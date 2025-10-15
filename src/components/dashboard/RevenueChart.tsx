@@ -1,47 +1,38 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
 import { useInvoices } from "@/services/invoices";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { ComposedChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { fromMinor } from "@/lib/money";
 import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, parseISO } from "date-fns";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AnalyticsCard } from "@/components/common/charts/AnalyticsCard";
+import { chartColors, chartTheme, animationDuration } from '@/components/analytics/charts/chartConfig';
 
 export function RevenueChart() {
   const { data: invoices, isLoading } = useInvoices({ limit: 5000 });
 
   if (isLoading) {
     return (
-      <Card className="rounded-2xl border shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Revenue Trend
-          </CardTitle>
-          <CardDescription>Monthly revenue over last 6 months</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-64 w-full" />
-        </CardContent>
-      </Card>
+      <AnalyticsCard
+        title="Revenue Trend"
+        description="Monthly revenue over last 6 months"
+        icon={TrendingUp}
+        isLoading={true}
+      >
+        <div />
+      </AnalyticsCard>
     );
   }
 
   if (!invoices?.data || invoices.data.length === 0) {
     return (
-      <Card className="rounded-2xl border shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Revenue Trend
-          </CardTitle>
-          <CardDescription>Monthly revenue over last 6 months</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 flex items-center justify-center text-muted-foreground">
-            No invoice data available
-          </div>
-        </CardContent>
-      </Card>
+      <AnalyticsCard
+        title="Revenue Trend"
+        description="Monthly revenue over last 6 months"
+        icon={TrendingUp}
+      >
+        <div className="h-64 flex items-center justify-center text-muted-foreground">
+          No invoice data available
+        </div>
+      </AnalyticsCard>
     );
   }
 
@@ -75,60 +66,81 @@ export function RevenueChart() {
   const totalRevenue = monthlyData.reduce((sum, m) => sum + m.revenue, 0);
   const avgRevenue = totalRevenue / monthlyData.length;
 
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const data = payload[0].payload;
+    return (
+      <div style={chartTheme.tooltipStyle} className="shadow-lg">
+        <p className="font-semibold mb-2">{data.month}</p>
+        <p className="text-sm">
+          <span className="font-medium">Revenue:</span> {data.revenueFormatted}
+        </p>
+        <p className="text-sm">
+          <span className="font-medium">Invoices:</span> {data.invoiceCount}
+        </p>
+      </div>
+    );
+  };
+
   return (
-    <Card className="rounded-2xl border shadow-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Revenue Trend
-        </CardTitle>
-        <CardDescription>
-          Monthly revenue • Avg: {fromMinor(Math.round(avgRevenue * 100), 'DKK')}/month
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={monthlyData}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis 
-              dataKey="month" 
-              tick={{ fontSize: 12 }}
-              className="text-muted-foreground"
-            />
-            <YAxis 
-              tick={{ fontSize: 12 }}
-              className="text-muted-foreground"
-              tickFormatter={(value) => `${Math.round(value / 1000)}K`}
-            />
-            <Tooltip 
-              content={({ active, payload }) => {
-                if (!active || !payload || !payload.length) return null;
-                const data = payload[0].payload;
-                return (
-                  <div className="bg-background border rounded-lg p-3 shadow-lg">
-                    <div className="font-medium mb-1">{data.month}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Revenue: <span className="font-medium text-foreground">{data.revenueFormatted}</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Invoices: <span className="font-medium text-foreground">{data.invoiceCount}</span>
-                    </div>
-                  </div>
-                );
-              }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="revenue" 
-              stroke="hsl(var(--primary))" 
-              strokeWidth={2}
-              dot={{ fill: "hsl(var(--primary))", r: 4 }}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+    <AnalyticsCard
+      title="Revenue Trend"
+      description={`Monthly revenue • Avg: ${fromMinor(Math.round(avgRevenue * 100), 'DKK')}/month`}
+      icon={TrendingUp}
+      chartName="Dashboard Revenue Trend"
+    >
+      <ResponsiveContainer width="100%" height={300}>
+        <ComposedChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="revenueGradientDashboard" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={chartColors.primary} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={chartColors.primary} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={chartTheme.gridStyle.stroke}
+            strokeOpacity={chartTheme.gridStyle.strokeOpacity}
+          />
+          <XAxis
+            dataKey="month"
+            style={chartTheme.axisStyle}
+            stroke={chartTheme.gridStyle.stroke}
+          />
+          <YAxis
+            style={chartTheme.axisStyle}
+            stroke={chartTheme.gridStyle.stroke}
+            tickFormatter={(value) => `${Math.round(value / 1000)}K`}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Area
+            type="monotone"
+            dataKey="revenue"
+            stroke={chartColors.primary}
+            strokeWidth={2}
+            fill="url(#revenueGradientDashboard)"
+            name="Revenue"
+            animationDuration={animationDuration}
+          />
+          <Bar
+            dataKey="invoiceCount"
+            fill={chartColors.accent}
+            fillOpacity={0.6}
+            name="Invoices"
+            radius={[4, 4, 0, 0]}
+            barSize={30}
+            yAxisId="right"
+            animationDuration={animationDuration}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            style={chartTheme.axisStyle}
+            stroke={chartTheme.gridStyle.stroke}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </AnalyticsCard>
   );
 }
 

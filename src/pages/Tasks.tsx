@@ -34,6 +34,10 @@ import { TaskCard } from "@/components/tasks/TaskCard";
 import { TaskForm } from "@/components/tasks/TaskForm";
 import { TaskDetailView } from "@/components/tasks/TaskDetailView";
 import { logger } from '@/lib/logger';
+import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
+import { TaskCompletionTimelineChart } from "@/components/tasks/TaskCompletionTimelineChart";
+import { TaskPriorityChart } from "@/components/tasks/TaskPriorityChart";
+import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon } from "lucide-react";
 
 export default function Tasks() {
     const [selectedTask, setSelectedTask] = useState<Task | undefined>();
@@ -107,46 +111,112 @@ export default function Tasks() {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <Card>
+                <Card className="rounded-2xl border shadow-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Pending</CardTitle>
                         <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{statusCounts.pending || 0}</div>
+                        <div className="mt-3">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                <span>Progress</span>
+                                <span>{tasks ? Math.round((statusCounts.pending / tasks.length) * 100) : 0}%</span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${tasks ? Math.min((statusCounts.pending / tasks.length) * 100, 100) : 0}%` }}
+                                />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="rounded-2xl border shadow-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">In Progress</CardTitle>
                         <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{statusCounts.in_progress || 0}</div>
+                        <div className="mt-3">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                <span>Progress</span>
+                                <span>{tasks ? Math.round((statusCounts.in_progress / tasks.length) * 100) : 0}%</span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${tasks ? Math.min((statusCounts.in_progress / tasks.length) * 100, 100) : 0}%` }}
+                                />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="rounded-2xl border shadow-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Completed</CardTitle>
                         <CheckCircle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{statusCounts.completed || 0}</div>
+                        <div className="text-2xl font-bold text-[#6b7c5e]">{statusCounts.completed || 0}</div>
+                        <div className="mt-3">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                <span>Progress</span>
+                                <span>{tasks ? Math.round((statusCounts.completed / tasks.length) * 100) : 0}%</span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${tasks ? Math.min((statusCounts.completed / tasks.length) * 100, 100) : 0}%` }}
+                                />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="rounded-2xl border shadow-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Overdue</CardTitle>
                         <AlertCircle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{overdueTasks?.length || 0}</div>
+                        <div className={cn("text-2xl font-bold", (overdueTasks?.length || 0) > 0 && "text-[#b8695f]")}>
+                            {overdueTasks?.length || 0}
+                        </div>
+                        {(overdueTasks?.length || 0) > 0 && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Needs immediate attention
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Analytics Charts */}
+            {tasks && tasks.length > 0 && (
+                <AnalyticsCardGrid columns={2}>
+                    <AnalyticsCard
+                        title="Completion Timeline"
+                        description="Tasks completed over time"
+                        icon={TrendingUpIcon}
+                        chartName="Task Completion Timeline"
+                    >
+                        <TaskCompletionTimelineChart tasks={tasks} />
+                    </AnalyticsCard>
+
+                    <AnalyticsCard
+                        title="Priority Distribution"
+                        description="Tasks by priority level"
+                        icon={PieChartIcon}
+                        chartName="Task Priority Distribution"
+                    >
+                        <TaskPriorityChart tasks={tasks} />
+                    </AnalyticsCard>
+                </AnalyticsCardGrid>
+            )}
 
             {/* Filters and Search */}
             <Card>

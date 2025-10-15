@@ -43,6 +43,10 @@ import {
   statusTokenText
 } from "@/components/quotes";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
+import { QuoteStatusChart } from "@/components/quotes/QuoteStatusChart";
+import { QuoteValueTrendChart } from "@/components/quotes/QuoteValueTrendChart";
+import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon } from "lucide-react";
 
 const Quotes: React.FC = () => {
   const navigate = useNavigate();
@@ -152,6 +156,27 @@ const Quotes: React.FC = () => {
 
       {/* KPI Header */}
       <QuotesKpiHeader quotes={quotes} currency="DKK" />
+
+      {/* Analytics Charts */}
+      <AnalyticsCardGrid columns={2}>
+        <AnalyticsCard
+          title="Quote Status Distribution"
+          description="Breakdown by status"
+          icon={PieChartIcon}
+          chartName="Quote Status Distribution"
+        >
+          <QuoteStatusChart quotes={quotes} />
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Quote Value Trend"
+          description="Monthly quote value over time"
+          icon={TrendingUpIcon}
+          chartName="Quote Value Trend"
+        >
+          <QuoteValueTrendChart quotes={quotes} />
+        </AnalyticsCard>
+      </AnalyticsCardGrid>
 
       {/* Search and Filters */}
       <div className="flex flex-col gap-4">

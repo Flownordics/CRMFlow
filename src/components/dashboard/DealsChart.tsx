@@ -1,10 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Handshake } from "lucide-react";
 import { useDeals } from "@/services/deals";
 import { useStageLookup } from "@/hooks/useStageLookup";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, parseISO } from "date-fns";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AnalyticsCard } from "@/components/common/charts/AnalyticsCard";
+import { chartColors, chartTheme, animationDuration } from '@/components/analytics/charts/chartConfig';
 
 export function DealsChart() {
   const { data: deals, isLoading } = useDeals({ limit: 5000 });
@@ -12,37 +12,28 @@ export function DealsChart() {
 
   if (isLoading) {
     return (
-      <Card className="rounded-2xl border shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Handshake className="h-5 w-5" />
-            Deals Won/Lost
-          </CardTitle>
-          <CardDescription>Monthly deal outcomes over last 6 months</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-64 w-full" />
-        </CardContent>
-      </Card>
+      <AnalyticsCard
+        title="Deals Won/Lost"
+        description="Monthly deal outcomes over last 6 months"
+        icon={Handshake}
+        isLoading={true}
+      >
+        <div />
+      </AnalyticsCard>
     );
   }
 
   if (!deals?.data || deals.data.length === 0) {
     return (
-      <Card className="rounded-2xl border shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Handshake className="h-5 w-5" />
-            Deals Won/Lost
-          </CardTitle>
-          <CardDescription>Monthly deal outcomes over last 6 months</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 flex items-center justify-center text-muted-foreground">
-            No deal data available
-          </div>
-        </CardContent>
-      </Card>
+      <AnalyticsCard
+        title="Deals Won/Lost"
+        description="Monthly deal outcomes over last 6 months"
+        icon={Handshake}
+      >
+        <div className="h-64 flex items-center justify-center text-muted-foreground">
+          No deal data available
+        </div>
+      </AnalyticsCard>
     );
   }
 
@@ -79,52 +70,68 @@ export function DealsChart() {
     };
   });
 
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const data = payload[0].payload;
+    return (
+      <div style={chartTheme.tooltipStyle} className="shadow-lg">
+        <p className="font-semibold mb-2">{data.month}</p>
+        <p className="text-sm">
+          <span className="font-medium">Won:</span> {data.won}
+        </p>
+        <p className="text-sm">
+          <span className="font-medium">Lost:</span> {data.lost}
+        </p>
+      </div>
+    );
+  };
+
   return (
-    <Card className="rounded-2xl border shadow-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Handshake className="h-5 w-5" />
-          Deals Won/Lost
-        </CardTitle>
-        <CardDescription>Monthly deal outcomes over last 6 months</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={monthlyData}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis 
-              dataKey="month" 
-              tick={{ fontSize: 12 }}
-              className="text-muted-foreground"
-            />
-            <YAxis 
-              tick={{ fontSize: 12 }}
-              className="text-muted-foreground"
-            />
-            <Tooltip 
-              content={({ active, payload }) => {
-                if (!active || !payload || !payload.length) return null;
-                const data = payload[0].payload;
-                return (
-                  <div className="bg-background border rounded-lg p-3 shadow-lg">
-                    <div className="font-medium mb-1">{data.month}</div>
-                    <div className="text-sm text-[#6b7c5e]">
-                      Won: <span className="font-medium">{data.won}</span>
-                    </div>
-                    <div className="text-sm text-[#b8695f]">
-                      Lost: <span className="font-medium">{data.lost}</span>
-                    </div>
-                  </div>
-                );
-              }}
-            />
-            <Legend />
-            <Bar dataKey="won" fill="#b5c69f" name="Won" />
-            <Bar dataKey="lost" fill="#fb8674" name="Lost" />
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+    <AnalyticsCard
+      title="Deals Won/Lost"
+      description="Monthly deal outcomes over last 6 months"
+      icon={Handshake}
+      chartName="Dashboard Deals Won Lost"
+    >
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={chartTheme.gridStyle.stroke}
+            strokeOpacity={chartTheme.gridStyle.strokeOpacity}
+          />
+          <XAxis
+            dataKey="month"
+            style={chartTheme.axisStyle}
+            stroke={chartTheme.gridStyle.stroke}
+          />
+          <YAxis
+            style={chartTheme.axisStyle}
+            stroke={chartTheme.gridStyle.stroke}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend
+            wrapperStyle={chartTheme.legendStyle}
+            iconType="rect"
+            iconSize={12}
+          />
+          <Bar
+            dataKey="won"
+            fill={chartColors.success}
+            name="Won"
+            radius={[4, 4, 0, 0]}
+            animationDuration={animationDuration}
+          />
+          <Bar
+            dataKey="lost"
+            fill={chartColors.danger}
+            name="Lost"
+            radius={[4, 4, 0, 0]}
+            animationDuration={animationDuration}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </AnalyticsCard>
   );
 }
 

@@ -627,10 +627,22 @@ export function useCreateQuote() {
   const qc = useQueryClient();
   return useMutation<QuoteUI, Error, Parameters<typeof createQuote>[0]>({
     mutationFn: createQuote,
-    onSuccess: (quote) => {
+    onSuccess: async (quote) => {
       qc.invalidateQueries({ queryKey: qk.quotes() });
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
       qc.setQueryData(qk.quote(quote.id), quote);
+      
+      // Log to company activity if quote has NO deal (standalone quote)
+      if (!quote.deal_id && quote.company_id) {
+        try {
+          const { logQuoteCreated } = await import("@/services/activityLog");
+          await logQuoteCreated(quote.company_id, quote.id, quote.number || 'Draft');
+          logger.debug("[useCreateQuote] Logged quote creation to company activity");
+        } catch (error) {
+          logger.warn("[useCreateQuote] Failed to log company activity:", error);
+          // Don't throw - quote was created successfully
+        }
+      }
     },
   });
 }

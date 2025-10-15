@@ -1,6 +1,6 @@
-import { Card } from "@/components/ui/card";
-import { Building2, Globe, Briefcase, Factory } from "lucide-react";
+import { Building2, Globe, Briefcase, Activity } from "lucide-react";
 import { Company } from "@/lib/schemas/company";
+import { EnhancedKpiCard, EnhancedKpiGrid } from "@/components/common/kpi/EnhancedKpiCard";
 
 interface CompaniesKpiHeaderProps {
     companies: Company[];
@@ -11,19 +11,16 @@ export function CompaniesKpiHeader({ companies }: CompaniesKpiHeaderProps) {
 
     if (companies.length === 0) {
         return (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {[1, 2, 3].map((i) => (
-                    <Card key={i} className="p-4 overflow-hidden relative">
-                        <div className="flex items-start justify-between">
-                            <div className="space-y-2 flex-1">
-                                <div className="h-3 bg-muted rounded w-20" />
-                                <div className="h-6 bg-muted rounded w-16" />
-                            </div>
-                            <div className="rounded-full p-2 bg-muted w-8 h-8" />
-                        </div>
-                    </Card>
+            <EnhancedKpiGrid columns={4}>
+                {[1, 2, 3, 4].map((i) => (
+                    <EnhancedKpiCard
+                        key={i}
+                        title="Loading..."
+                        value="..."
+                        isLoading={true}
+                    />
                 ))}
-            </div>
+            </EnhancedKpiGrid>
         );
     }
 
@@ -49,63 +46,54 @@ export function CompaniesKpiHeader({ companies }: CompaniesKpiHeaderProps) {
         .sort(([, a], [, b]) => b - a)
         .slice(0, 3);
 
+    // Calculate activity status counts
+    const greenCount = companies.filter((c) => c.activityStatus === 'green').length;
+    const yellowCount = companies.filter((c) => c.activityStatus === 'yellow').length;
+    const redCount = companies.filter((c) => c.activityStatus === 'red').length;
+    const activePercentage = totalCompanies > 0 ? (greenCount / totalCompanies) * 100 : 0;
+
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {/* Total Companies */}
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Total companies</div>
-                        <div className="text-h2">{totalCompanies}</div>
-                    </div>
-                    <div className="rounded-full p-2 bg-[hsl(212,30%,57%)]/15">
-                        <Building2 className="h-4 w-4 text-[hsl(212,30%,47%)]" aria-hidden="true" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-muted/50 to-transparent" aria-hidden="true" />
-            </Card>
+        <EnhancedKpiGrid columns={4}>
+            <EnhancedKpiCard
+                title="Total Companies"
+                value={totalCompanies}
+                icon={Building2}
+                iconColor="text-[#7a9db3]"
+            />
 
-            {/* By Country */}
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">By country</div>
-                        <div className="text-h2">{Object.keys(countryCounts).length}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {topCountries.map(([country, count]) => (
-                                <span key={country} className="inline-block mr-2">
-                                    {country}: {count}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-[hsl(150,7%,61%)]/15">
-                        <Globe className="h-4 w-4 text-[hsl(150,7%,45%)]" aria-hidden="true" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-muted/50 to-transparent" aria-hidden="true" />
-            </Card>
+            <EnhancedKpiCard
+                title="Countries"
+                value={Object.keys(countryCounts).length}
+                subtitle={topCountries.length > 0 ? `Top: ${topCountries[0][0]} (${topCountries[0][1]})` : ''}
+                icon={Globe}
+                iconColor="text-[#7fa39b]"
+            />
 
-            {/* By Industry */}
-            <Card className="p-4 overflow-hidden relative">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="text-xs text-muted-foreground">By industry</div>
-                        <div className="text-h2">{Object.keys(industryCounts).length}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {topIndustries.map(([industry, count]) => (
-                                <span key={industry} className="inline-block mr-2">
-                                    {industry}: {count}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="rounded-full p-2 bg-[hsl(28,62%,68%)]/15">
-                        <Briefcase className="h-4 w-4 text-[hsl(28,62%,55%)]" aria-hidden="true" />
-                    </div>
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-muted/50 to-transparent" aria-hidden="true" />
-            </Card>
-        </div>
+            <EnhancedKpiCard
+                title="Industries"
+                value={Object.keys(industryCounts).length}
+                subtitle={topIndustries.length > 0 ? `Top: ${topIndustries[0][0]} (${topIndustries[0][1]})` : ''}
+                icon={Briefcase}
+                iconColor="text-[#c89882]"
+            />
+
+            <EnhancedKpiCard
+                title="Active Engagement"
+                value={`${activePercentage.toFixed(0)}%`}
+                subtitle={`${greenCount} active companies`}
+                icon={Activity}
+                iconColor="text-[#6b7c5e]"
+                progress={activePercentage}
+                showProgress={true}
+                progressLabel="Active"
+                valueColor={
+                    activePercentage >= 70
+                        ? "text-[#6b7c5e]"
+                        : activePercentage >= 40
+                        ? "text-[#9d855e]"
+                        : "text-[#b8695f]"
+                }
+            />
+        </EnhancedKpiGrid>
     );
 }

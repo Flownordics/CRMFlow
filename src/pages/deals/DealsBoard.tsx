@@ -22,6 +22,11 @@ import { isIdempotent, markIdempotent, clearIdempotent, generateAutomationKey } 
 import { logActivity } from "@/services/activity";
 import { useRef } from "react";
 import { logger } from '@/lib/logger';
+import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
+import { DealValueDistributionChart } from "@/components/deals/DealValueDistributionChart";
+import { WinRateTrendChart } from "@/components/deals/WinRateTrendChart";
+import { DealVelocityCard } from "@/components/analytics/DealVelocityCard";
+import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon, Zap } from "lucide-react";
 
 interface LineItem {
   unitMinor: number;
@@ -333,6 +338,46 @@ export default function DealsBoard() {
           </Badge>
         </div>
       )}
+
+      {/* Analytics Charts */}
+      <AnalyticsCardGrid columns={3}>
+        <AnalyticsCard
+          title="Deal Value by Stage"
+          description="Pipeline distribution"
+          icon={PieChartIcon}
+          chartName="Deal Value Distribution"
+        >
+          <DealValueDistributionChart
+            data={kpiStages.map((stage) => ({
+              stageName: stage.name,
+              value: stageTotalsMinor[stage.id] || 0,
+            }))}
+          />
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Win Rate Trend"
+          description="Monthly win rate over time"
+          icon={TrendingUpIcon}
+          chartName="Win Rate Trend"
+        >
+          <WinRateTrendChart
+            deals={deals}
+            getStageName={(stageId) => stageById[stageId]?.name || 'Unknown'}
+          />
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Deal Velocity"
+          description="Time in each stage"
+          icon={Zap}
+          chartName="Deal Velocity"
+        >
+          <div className="h-[300px] overflow-y-auto">
+            <DealVelocityCard />
+          </div>
+        </AnalyticsCard>
+      </AnalyticsCardGrid>
 
       <div className="w-full overflow-hidden">
         <KanbanBoard
