@@ -34,9 +34,9 @@ Bruger: Marie@flownordics.com
 ```
 
 **Rolle Assignment**:
-- `andreas@flownordics.com` → **admin** (hardcoded)
-- Alle andre `@flownordics.com` → **sales** (default)
-- Andre email domains → **viewer** (begrænseret adgang)
+- `andreas@flownordics.com` → **admin** (auto-approved)
+- Alle andre `@flownordics.com` → **sales** (auto-approved)
+- Andre email domains → **REJECTED** (kan kun oprette med invitation)
 
 ### **Scenario 2: Ekstern Bruger Invitation**
 
