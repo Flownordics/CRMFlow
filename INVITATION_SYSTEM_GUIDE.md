@@ -258,7 +258,8 @@ if (authData.user && invitationToken) {
 ### **Email Domain Whitelist**
 
 ✅ **@flownordics.com** → Auto-approved, gets 'sales' role  
-⚠️ **Other domains** → Gets 'viewer' role (restricted)  
+❌ **Other domains WITHOUT invitation** → REJECTED (cannot sign up)  
+✅ **Other domains WITH invitation** → Gets role from invitation  
 🎯 **andreas@flownordics.com** → Auto-assigned 'admin'
 
 ### **Invitation Security**
