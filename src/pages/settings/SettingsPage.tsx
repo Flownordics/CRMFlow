@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConnectedAccounts } from '@/components/settings/ConnectedAccounts';
+import { UserInvitations } from '@/components/settings/UserInvitations';
+import { Can } from '@/components/auth/Can';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 
@@ -76,6 +78,9 @@ export function SettingsPage() {
           <TabsList>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
+            <Can role="admin">
+              <TabsTrigger value="users">Users</TabsTrigger>
+            </Can>
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
@@ -98,6 +103,12 @@ export function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <Can role="admin">
+            <TabsContent value="users" className="space-y-6">
+              <UserInvitations />
+            </TabsContent>
+          </Can>
 
           <TabsContent value="security" className="space-y-6">
             <Card>
