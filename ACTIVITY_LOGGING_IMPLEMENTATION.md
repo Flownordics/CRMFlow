@@ -294,3 +294,4 @@ export const ACTIVITY_CONFIG = {
 **Systemet logger nu ALT der sker på en virksomhed - både automatisk og manuelt!** 🎉
 
 
+
