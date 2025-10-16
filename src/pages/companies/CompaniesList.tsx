@@ -14,7 +14,8 @@ import { DEBUG_UI } from "@/lib/debug";
 import { CompaniesKpiHeader } from "@/components/companies/CompaniesKpiHeader";
 import { CompanyCard } from "@/components/companies/CompanyCard";
 import { cn } from "@/lib/utils";
-import { getIndustryTheme, industryTokenText } from "@/components/companies/industryTheme";
+import { getIndustryTheme } from "@/components/companies/industryTheme";
+import { getIndustryColor } from "@/lib/chartUtils";
 import { ActivityStatusBadge } from "@/components/companies/ActivityStatusBadge";
 import { ActivityStatus } from "@/lib/schemas/callList";
 import { AddToCallListDialog } from "@/components/call-lists/AddToCallListDialog";
@@ -155,9 +156,14 @@ export default function CompaniesList() {
             cell: (r: any) => {
                 const theme = getIndustryTheme(r.industry);
                 const Icon = theme.icon;
+                const industryColor = getIndustryColor(r.industry);
                 return (
                     <div className="flex items-center gap-2">
-                        <Icon className={cn("h-4 w-4", industryTokenText(theme.color))} aria-hidden="true" />
+                        <Icon 
+                            className="h-4 w-4" 
+                            style={{ color: industryColor }}
+                            aria-hidden="true" 
+                        />
                         <a className="font-medium hover:underline" href={`/companies/${r.id}`}>
                             {r.name}
                         </a>
@@ -169,13 +175,21 @@ export default function CompaniesList() {
         {
             header: "Industry",
             accessorKey: "industry",
-            cell: (r: any) => r.industry ? (
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted/10 text-muted-foreground text-xs">
-                    {r.industry}
-                </span>
-            ) : (
-                <span className="text-muted-foreground">—</span>
-            ),
+            cell: (r: any) => {
+                if (!r.industry) return <span className="text-muted-foreground">—</span>;
+                const industryColor = getIndustryColor(r.industry);
+                return (
+                    <span 
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs"
+                        style={{ 
+                            backgroundColor: `${industryColor}20`,
+                            color: industryColor
+                        }}
+                    >
+                        {r.industry}
+                    </span>
+                );
+            },
             meta: { sortable: true }
         },
         {
@@ -318,59 +332,74 @@ export default function CompaniesList() {
 
             {/* Search and Filters */}
             <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex max-w-md gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
-                            <Input
-                                placeholder="Search companies…"
-                                value={q}
-                                onChange={(e) => handleSearch(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
+                {/* Search Bar - Full Width on Mobile */}
+                <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
+                    <Input
+                        placeholder="Search companies…"
+                        value={q}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+
+                {/* Actions Row - Responsive */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    {/* Left Actions */}
+                    <div className="flex items-center gap-2 overflow-x-auto">
                         {companies.length > 0 && (
-                            <div className="flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-accent cursor-pointer" onClick={toggleSelectAll}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={toggleSelectAll}
+                                className="touch-manipulation whitespace-nowrap"
+                            >
                                 <Checkbox
                                     checked={selectedCompanyIds.length === companies.length}
                                     onCheckedChange={toggleSelectAll}
+                                    className="mr-2"
                                 />
-                                <span className="text-sm font-medium">Select All</span>
-                            </div>
+                                Select All
+                            </Button>
                         )}
                         <Button 
-                            variant="outline" 
+                            variant="outline"
+                            size="sm"
                             onClick={() => exportCompaniesToCSV(companies)}
+                            className="touch-manipulation whitespace-nowrap"
                         >
                             <Filter className="mr-2 h-4 w-4" />
-                            Export All
+                            Export
                         </Button>
                     </div>
 
-                    {/* View Toggle */}
-                    <div className="flex items-center gap-2">
+                    {/* View Toggle - Hidden on Mobile */}
+                    <div className="hidden sm:flex items-center gap-2">
                         <Button
                             variant={viewMode === "table" ? "default" : "outline"}
                             size="sm"
                             onClick={() => setViewMode("table")}
+                            className="touch-manipulation"
                         >
-                            <List className="h-4 w-4 mr-2" />
-                            Table
+                            <List className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Table</span>
                         </Button>
                         <Button
                             variant={viewMode === "grid" ? "default" : "outline"}
                             size="sm"
                             onClick={() => setViewMode("grid")}
+                            className="touch-manipulation"
                         >
-                            <Grid3X3 className="h-4 w-4 mr-2" />
-                            Grid
+                            <Grid3X3 className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Grid</span>
                         </Button>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
+                {/* Filters - Stacked on Mobile, Inline on Desktop */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     <Select value={activityStatus} onValueChange={setActivityStatus}>
-                        <SelectTrigger className="w-[180px]">
+                        <SelectTrigger className="w-full touch-manipulation">
                             <SelectValue placeholder="Activity Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -397,7 +426,7 @@ export default function CompaniesList() {
                     </Select>
 
                     <Select value={industry} onValueChange={setIndustry}>
-                        <SelectTrigger className="w-[180px]">
+                        <SelectTrigger className="w-full touch-manipulation">
                             <SelectValue placeholder="Industry" />
                         </SelectTrigger>
                         <SelectContent>
@@ -411,7 +440,7 @@ export default function CompaniesList() {
                     </Select>
 
                     <Select value={country} onValueChange={setCountry}>
-                        <SelectTrigger className="w-[180px]">
+                        <SelectTrigger className="w-full touch-manipulation">
                             <SelectValue placeholder="Country" />
                         </SelectTrigger>
                         <SelectContent>

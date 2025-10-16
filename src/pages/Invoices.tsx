@@ -57,7 +57,11 @@ import { InvoiceAgingChart } from "@/components/invoices/InvoiceAgingChart";
 import { InvoiceValueTrendChart } from "@/components/invoices/InvoiceValueTrendChart";
 import { PieChart as PieChartIcon, BarChart3, TrendingUp as TrendingUpIcon } from "lucide-react";
 
-const Invoices: React.FC = () => {
+interface InvoicesProps {
+  embedded?: boolean;
+}
+
+const Invoices: React.FC<InvoicesProps> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -218,19 +222,23 @@ const Invoices: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header with subtitle and gradient separator */}
-      <PageHeader
-        title="Invoices"
-        subtitle="Track billing, payments and overdue balances."
-        actions={
-          <Button>
-            <Plus aria-hidden="true" className="mr-2 h-4 w-4" />
-            New Invoice
-          </Button>
-        }
-      />
-      <div className="h-0.5 w-full bg-gradient-to-r from-accent/30 via-primary/30 to-transparent rounded-full" aria-hidden="true" />
+    <div className="space-y-6">
+      {/* Header with subtitle and gradient separator - only show when not embedded */}
+      {!embedded && (
+        <>
+          <PageHeader
+            title="Invoices"
+            subtitle="Track billing, payments and overdue balances."
+            actions={
+              <Button>
+                <Plus aria-hidden="true" className="mr-2 h-4 w-4" />
+                New Invoice
+              </Button>
+            }
+          />
+          <div className="h-0.5 w-full bg-gradient-to-r from-accent/30 via-primary/30 to-transparent rounded-full" aria-hidden="true" />
+        </>
+      )}
 
       {/* KPI Cards */}
       <InvoicesKpiHeader invoices={invoices} currency="DKK" />

@@ -9,7 +9,8 @@ interface CalendarFiltersProps {
     onCalendarChange: (calendar: string) => void;
     onTypeToggle: (type: string) => void;
     availableCalendars: string[];
-    // Google integration removed - starting fresh
+    showGoogleLayer?: boolean;
+    isGoogleConnected?: boolean;
 }
 
 export function CalendarFilters({
@@ -18,7 +19,8 @@ export function CalendarFilters({
     onCalendarChange,
     onTypeToggle,
     availableCalendars,
-    // Google integration removed - starting fresh
+    showGoogleLayer,
+    isGoogleConnected,
 }: CalendarFiltersProps) {
     const { t } = useI18n();
     const eventTypes = Object.keys(eventTypeTheme);

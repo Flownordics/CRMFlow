@@ -24,7 +24,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    
+    /* Prevent auto-discovery of unwanted @types packages */
+    "types": []
   },
   "include": ["src"]
 }

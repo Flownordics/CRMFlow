@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConnectedAccounts } from '@/components/settings/ConnectedAccounts';
 import { UserInvitations } from '@/components/settings/UserInvitations';
+import { TrashBinSettings } from '@/components/settings/TrashBinSettings';
 import { Can } from '@/components/auth/Can';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
@@ -82,6 +83,7 @@ export function SettingsPage() {
               <TabsTrigger value="users">Users</TabsTrigger>
             </Can>
             <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="trash">Trash Bin</TabsTrigger>
           </TabsList>
 
           <TabsContent value="integrations" className="space-y-6">
@@ -124,6 +126,10 @@ export function SettingsPage() {
                 </p>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="trash" className="space-y-6">
+            <TrashBinSettings />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { useEvents, useCreateEvent } from "@/services/events";
-import { useCalendarEvents, useCalendarConnection, useSetupCalendarSync } from "@/services/calendar";
-import { useUserSettings, useUpdateUserSettings } from "@/services/settings";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Calendar as CalendarIcon, CheckSquare } from "lucide-react";
+import { useEvents } from "@/services/events";
+import { useCalendarConnection, useSetupCalendarSync } from "@/services/calendar";
 import { useTasks } from "@/services/tasks";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -19,25 +19,25 @@ import {
   CalendarDayView
 } from "@/components/calendar";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
-import { filterEventsByKind, getEventsForToday, getEventsForThisWeek, nativeEventToMerged, googleEventToMerged, mergeEvents } from "@/lib/calendar-utils";
-import { useI18n } from "@/lib/i18n";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
+import { filterEventsByKind, getEventsForToday, getEventsForThisWeek, mergeEvents, type MergedEvent } from "@/lib/calendar-utils";
 import { toastBus } from "@/lib/toastBus";
 import { logger } from '@/lib/logger';
+
+// Import Tasks page components
+import TasksView from "@/pages/Tasks";
+import { TaskForm } from "@/components/tasks/TaskForm";
 
 type CalendarView = 'list' | 'month' | 'week' | 'day';
 
 export default function CalendarView() {
-  const { t } = useI18n();
+  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks'>('calendar');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<CalendarView>('month');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
   const [selectedCalendar, setSelectedCalendar] = useState('primary');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-
-  // User settings for calendar preferences
-  const { data: userSettings } = useUserSettings();
-  const updateUserSettings = useUpdateUserSettings();
 
   // Check Google Calendar connection status
   const { data: calendarConnection, isLoading: connectionLoading } = useCalendarConnection();
@@ -74,9 +74,6 @@ export default function CalendarView() {
     enabled: isGoogleConnected && !isLocalhost,
     retry: 1,
   });
-
-  // Event creation hooks
-  const createNativeEvent = useCreateEvent();
 
   // Set up calendar sync when Google Calendar is connected (but not in localhost)
   useEffect(() => {
@@ -217,18 +214,43 @@ export default function CalendarView() {
   const todayEvents = getEventsForToday(filteredEvents);
   const weekEvents = getEventsForThisWeek(filteredEvents);
 
+  // Handle create button click based on active tab
+  const handleCreateClick = () => {
+    if (activeTab === 'calendar') {
+      setShowCreateDialog(true);
+    } else {
+      setShowTaskForm(true);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <PageHeader
-        title={t('calendar')}
-        subtitle={t('calendar_description')}
+        title={activeTab === 'calendar' ? 'Calendar' : 'Tasks'}
+        subtitle={activeTab === 'calendar' ? 'Your events, meetings and tasks in one place' : 'Manage your tasks and calendar events'}
         actions={
-          <Button onClick={() => setShowCreateDialog(true)}>
+          <Button onClick={handleCreateClick}>
             <Plus className="h-4 w-4 mr-2" />
-            {t('create_event')}
+            {activeTab === 'calendar' ? 'Create Event' : 'New Task'}
           </Button>
         }
       />
+
+      {/* Tabs for switching between Calendar and Tasks */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'calendar' | 'tasks')} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4" />
+            Calendar
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="flex items-center gap-2">
+            <CheckSquare className="h-4 w-4" />
+            Tasks
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Calendar Tab Content */}
+        <TabsContent value="calendar" className="space-y-6 mt-6">
 
       {/* Calendar KPIs */}
       <CalendarKpis
@@ -354,6 +376,19 @@ export default function CalendarView() {
         onEventCreated={handleCreateEvent}
         showGoogleLayer={!isLocalhost}
         isGoogleConnected={isGoogleConnected && !isLocalhost}
+      />
+        </TabsContent>
+
+        {/* Tasks Tab Content */}
+        <TabsContent value="tasks" className="mt-6">
+          <TasksView embedded={true} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Task Form Dialog (for creating/editing tasks from Calendar view) */}
+      <TaskForm
+        open={showTaskForm}
+        onOpenChange={setShowTaskForm}
       />
     </div>
   );

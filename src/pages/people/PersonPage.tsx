@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { usePerson } from "@/services/people";
 import { useI18n } from "@/lib/i18n";
-import { Edit, Trash2, Plus, Upload } from "lucide-react";
+import { Edit, Trash2, Plus } from "lucide-react";
 import { PersonOverview } from "@/components/people/PersonOverview";
 import { PersonDeals } from "@/components/people/PersonDeals";
 import { PersonDocuments } from "@/components/people/PersonDocuments";
@@ -104,15 +104,6 @@ export default function PersonPage() {
                         >
                             <Plus className="h-4 w-4 mr-2" />
                             {t("people.addDeal")}
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/documents?personId=${person.id}`)}
-                            aria-label={t("people.upload")}
-                        >
-                            <Upload className="h-4 w-4 mr-2" />
-                            {t("people.upload")}
                         </Button>
                         <Button
                             variant="destructive"

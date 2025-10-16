@@ -126,85 +126,87 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 md:space-y-6 p-4 md:p-6">
       {/* Welcome Header */}
       <PageHeader
         title={`Welcome back, ${user?.name || 'User'}`}
         actions={
-          <DateRangeSelector value={dateRange} onChange={setDateRange} />
+          <div className="hidden sm:block">
+            <DateRangeSelector value={dateRange} onChange={setDateRange} />
+          </div>
         }
       />
 
       {/* Quick Actions - Top Row */}
       <Card className="rounded-2xl border shadow-card">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks and shortcuts</CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base md:text-lg">Quick Actions</CardTitle>
+          <CardDescription className="text-xs md:text-sm">Common tasks and shortcuts</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-7">
+          <div className="grid grid-cols-2 gap-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7">
             <Button
               variant="outline"
-              className="h-20 flex-col gap-2"
+              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
               onClick={() => handleQuickAction('deal')}
             >
-              <Plus aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">New Deal</span>
+              <Plus aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="text-xs">New Deal</span>
             </Button>
             <Button
               variant="outline"
-              className="h-20 flex-col gap-2"
+              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
               onClick={() => handleQuickAction('company')}
             >
-              <Building2 aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">Add Company</span>
+              <Building2 aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="text-xs">Company</span>
             </Button>
             <Button
               variant="outline"
-              className="h-20 flex-col gap-2"
+              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
               onClick={() => handleQuickAction('contact')}
             >
-              <Users aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">Add Contact</span>
+              <Users aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="text-xs">Contact</span>
             </Button>
             <Button
               variant="outline"
-              className="h-20 flex-col gap-2"
+              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
               onClick={() => handleQuickAction('quote')}
             >
-              <FileText aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">Create Quote</span>
+              <FileText aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="text-xs">Quote</span>
             </Button>
             <Button
               variant="outline"
-              className="h-20 flex-col gap-2"
+              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
               onClick={() => handleQuickAction('order')}
             >
-              <ShoppingCart aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">New Order</span>
+              <ShoppingCart aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="text-xs">Order</span>
             </Button>
             <Button
               variant="outline"
-              className="h-20 flex-col gap-2"
+              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
               onClick={() => handleQuickAction('invoice')}
             >
-              <Receipt aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">New Invoice</span>
+              <Receipt aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="text-xs">Invoice</span>
             </Button>
             <Button
               variant="outline"
-              className="h-20 flex-col gap-2"
+              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
               onClick={() => handleQuickAction('task')}
             >
-              <Calendar aria-hidden="true" className="h-6 w-6" />
-              <span className="text-sm">New Task</span>
+              <Calendar aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
+              <span className="text-xs">Task</span>
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Second Row: Alerts, Forecast, Companies */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
         <AlertsPanel />
         <ForecastWidget />
         <CompaniesWidget />
@@ -217,13 +219,13 @@ export default function Dashboard() {
       <PipelineSummary />
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
         <RevenueChart />
         <DealsChart />
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2 xl:grid-cols-5">
         {/* Recent Deals */}
         <Card className="rounded-2xl border shadow-card">
           <CardHeader>

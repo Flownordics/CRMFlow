@@ -5,18 +5,14 @@ import {
   Handshake,
   FileText,
   ShoppingCart,
-  Receipt,
   Calendar,
-  FolderOpen,
   Calculator,
   BarChart3,
-  CheckSquare,
   Settings,
   ChevronLeft,
   Menu,
   Home,
   Phone,
-  Trash2,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -29,13 +25,9 @@ const navigationItems = [
   { title: "Call Lists", url: "/call-lists", icon: Phone },
   { title: "Quotes", url: "/quotes", icon: FileText },
   { title: "Orders", url: "/orders", icon: ShoppingCart },
-  { title: "Invoices", url: "/invoices", icon: Receipt },
-  { title: "Tasks", url: "/tasks", icon: CheckSquare },
   { title: "Calendar", url: "/calendar", icon: Calendar },
-  { title: "Documents", url: "/documents", icon: FolderOpen },
   { title: "Accounting", url: "/accounting", icon: Calculator },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Papirkurv", url: "/trash", icon: Trash2 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -98,7 +90,7 @@ export function AppSidebar() {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 px-4 py-6">
+      <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-6">
         <div className="mb-4">
           {!isCollapsed && (
             <div className="mb-4 text-xs uppercase tracking-wider text-white/60 px-3">
@@ -142,7 +134,7 @@ export function AppSidebar() {
             alt="FlowNordics Logo"
             className={cn(
               "transition-all duration-300 object-contain",
-              isCollapsed ? "h-10 w-10 rotate-90" : "h-12 w-auto rotate-0"
+              isCollapsed ? "h-16 w-16 rotate-90" : "h-12 w-auto rotate-0"
             )}
             style={{ transformOrigin: "center" }}
           />

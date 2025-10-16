@@ -15,6 +15,7 @@ import { Plus, X, Check, Tag } from "lucide-react";
 import { useCompanyTags, useCompanyTagsForCompany, useAssignTagToCompany, useRemoveTagFromCompany } from "@/services/companyTags";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getTagColor } from "@/lib/chartUtils";
 
 interface CompanyTagsManagerProps {
   companyId: string;
@@ -52,27 +53,30 @@ export function CompanyTagsManager({ companyId }: CompanyTagsManagerProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {companyTags && companyTags.length > 0 ? (
-        companyTags.map((tag) => (
-          <Badge
-            key={tag.id}
-            variant="secondary"
-            style={{ 
-              backgroundColor: `${tag.color}15`, 
-              color: `${tag.color}CC`, 
-              borderColor: `${tag.color}30` 
-            }}
-            className="flex items-center gap-1 pr-1 border"
-          >
-            {tag.name}
-            <button
-              onClick={() => handleRemoveTag(tag.id)}
-              className="ml-1 rounded-full hover:bg-background/50 p-0.5"
-              aria-label={`Remove ${tag.name} tag`}
+        companyTags.map((tag) => {
+          const tagColor = getTagColor(tag.name);
+          return (
+            <Badge
+              key={tag.id}
+              variant="secondary"
+              style={{ 
+                backgroundColor: `${tagColor}20`, 
+                color: tagColor, 
+                borderColor: `${tagColor}40` 
+              }}
+              className="flex items-center gap-1 pr-1 border"
             >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        ))
+              {tag.name}
+              <button
+                onClick={() => handleRemoveTag(tag.id)}
+                className="ml-1 rounded-full hover:bg-background/50 p-0.5"
+                aria-label={`Remove ${tag.name} tag`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          );
+        })
       ) : (
         <span className="text-sm text-muted-foreground">No tags</span>
       )}
@@ -89,21 +93,24 @@ export function CompanyTagsManager({ companyId }: CompanyTagsManagerProps) {
             <CommandInput placeholder="Search tags..." />
             <CommandEmpty>No tags found.</CommandEmpty>
             <CommandGroup className="max-h-64 overflow-auto">
-              {availableTags.map((tag) => (
-                <CommandItem
-                  key={tag.id}
-                  onSelect={() => handleAssignTag(tag.id)}
-                  className="cursor-pointer"
-                >
-                  <div className="flex items-center gap-2 flex-1">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    <span>{tag.name}</span>
-                  </div>
-                </CommandItem>
-              ))}
+              {availableTags.map((tag) => {
+                const tagColor = getTagColor(tag.name);
+                return (
+                  <CommandItem
+                    key={tag.id}
+                    onSelect={() => handleAssignTag(tag.id)}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 flex-1">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: tagColor }}
+                      />
+                      <span>{tag.name}</span>
+                    </div>
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </Command>
         </PopoverContent>
@@ -122,20 +129,23 @@ export function CompanyTagsBadges({ companyId }: { companyId: string }) {
 
   return (
     <div className="flex flex-wrap gap-1">
-      {companyTags.map((tag) => (
-        <Badge
-          key={tag.id}
-          variant="secondary"
-          style={{ 
-            backgroundColor: `${tag.color}15`, 
-            color: `${tag.color}CC`, 
-            borderColor: `${tag.color}30` 
-          }}
-          className="text-xs px-1.5 py-0 border"
-        >
-          {tag.name}
-        </Badge>
-      ))}
+      {companyTags.map((tag) => {
+        const tagColor = getTagColor(tag.name);
+        return (
+          <Badge
+            key={tag.id}
+            variant="secondary"
+            style={{ 
+              backgroundColor: `${tagColor}20`, 
+              color: tagColor, 
+              borderColor: `${tagColor}40` 
+            }}
+            className="text-xs px-1.5 py-0 border"
+          >
+            {tag.name}
+          </Badge>
+        );
+      })}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { Card } from "@/components/ui/card";
 import { Company } from "@/lib/schemas/company";
-import { getIndustryTheme, industryTokenBg, industryTokenText, industryTokenRing } from "./industryTheme";
+import { getIndustryTheme } from "./industryTheme";
 import { cn } from "@/lib/utils";
 import { ActivityStatusBadge } from "./ActivityStatusBadge";
 import { ActivityStatus } from "@/lib/schemas/callList";
+import { getIndustryColor } from "@/lib/chartUtils";
 
 interface CompanyCardProps {
     company: Company;
@@ -14,24 +15,27 @@ interface CompanyCardProps {
 export function CompanyCard({ company, onClick, className }: CompanyCardProps) {
     const theme = getIndustryTheme(company.industry);
     const Icon = theme.icon;
+    const industryColor = getIndustryColor(company.industry);
 
     return (
         <Card
             className={cn(
                 "p-4 rounded-2xl border bg-card shadow-card hover:shadow-hover transition-all duration-200 cursor-pointer group",
-                industryTokenRing(theme.color),
                 "hover:scale-[1.02] hover:-translate-y-1",
                 className
             )}
+            style={{ borderColor: `${industryColor}30` }}
             onClick={onClick}
         >
             <div className="flex items-center gap-2 mb-3">
                 <div
-                    className={cn("w-1.5 h-8 rounded-sm", industryTokenBg(theme.color))}
+                    className="w-1.5 h-8 rounded-sm"
+                    style={{ backgroundColor: industryColor }}
                     aria-hidden="true"
                 />
                 <Icon
-                    className={cn("h-4 w-4", industryTokenText(theme.color))}
+                    className="h-4 w-4"
+                    style={{ color: industryColor }}
                     aria-hidden="true"
                 />
                 <h3 className="font-medium truncate flex-1">{company.name}</h3>

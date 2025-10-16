@@ -4,8 +4,8 @@
  */
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { chartTheme, animationDuration, getChartColor } from '@/components/analytics/charts/chartConfig';
-import { calculateDistribution } from '@/lib/chartUtils';
+import { chartTheme, animationDuration } from '@/components/analytics/charts/chartConfig';
+import { calculateDistribution, getIndustryColor } from '@/lib/chartUtils';
 
 interface IndustryDistributionChartProps {
   companies: Array<{ industry?: string | null }>;
@@ -76,8 +76,8 @@ export function IndustryDistributionChart({ companies, height = 300 }: IndustryD
           radius={[4, 4, 0, 0]}
           animationDuration={animationDuration}
         >
-          {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={getChartColor(index)} />
+          {chartData.map((entry) => (
+            <Cell key={`cell-${entry.name}`} fill={getIndustryColor(entry.name)} />
           ))}
         </Bar>
       </BarChart>

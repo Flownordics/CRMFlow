@@ -15,7 +15,6 @@ import {
   Package 
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { da } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { 
   fetchDeletedCompanies, 
@@ -26,7 +25,6 @@ import {
 import { fetchDeletedPeople, restorePerson } from '@/services/people';
 import { fetchDeletedDeals, restoreDeal } from '@/services/deals';
 import { fetchDeletedInvoices, restoreInvoice } from '@/services/invoices';
-import { apiClient } from '@/lib/api';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +38,7 @@ import {
 
 type DeletedItemType = 'companies' | 'people' | 'deals' | 'quotes' | 'orders' | 'invoices';
 
-export default function TrashBin() {
+export function TrashBinSettings() {
   const [activeTab, setActiveTab] = useState<DeletedItemType>('companies');
   const [confirmRestore, setConfirmRestore] = useState<{ id: string; name: string; type: DeletedItemType } | null>(null);
   const { toast } = useToast();
@@ -91,14 +89,14 @@ export default function TrashBin() {
       queryClient.invalidateQueries({ queryKey: [`deleted-${type}`] });
       queryClient.invalidateQueries({ queryKey: [type] });
       toast({
-        title: 'Gendannet!',
-        description: 'Objektet er blevet gendannet fra papirkurven.',
+        title: 'Restored!',
+        description: 'The item has been restored from trash.',
       });
     },
     onError: () => {
       toast({
-        title: 'Fejl',
-        description: 'Kunne ikke gendanne objektet. Prøv igen.',
+        title: 'Error',
+        description: 'Failed to restore the item. Please try again.',
         variant: 'destructive',
       });
     }
@@ -130,17 +128,17 @@ export default function TrashBin() {
   };
 
   const getEmptyMessage = (type: DeletedItemType) => {
-    return `Ingen slettede ${type === 'companies' ? 'virksomheder' : 
-      type === 'people' ? 'personer' :
+    return `No deleted ${type === 'companies' ? 'companies' : 
+      type === 'people' ? 'people' :
       type === 'deals' ? 'deals' :
-      type === 'quotes' ? 'tilbud' :
-      type === 'orders' ? 'ordrer' : 'fakturaer'} fundet.`;
+      type === 'quotes' ? 'quotes' :
+      type === 'orders' ? 'orders' : 'invoices'} found.`;
   };
 
   const renderDeletedItem = (item: any, type: DeletedItemType) => {
     const name = type === 'people' 
       ? `${item.first_name} ${item.last_name}` 
-      : item.name || item.title || item.number || 'Unavngivet';
+      : item.name || item.title || item.number || 'Unnamed';
     
     const deletedAt = item.deleted_at || item.deletedAt;
 
@@ -154,9 +152,8 @@ export default function TrashBin() {
             <div>
               <h3 className="font-semibold">{name}</h3>
               <p className="text-sm text-muted-foreground">
-                Slettet {formatDistanceToNow(new Date(deletedAt), { 
-                  addSuffix: true, 
-                  locale: da 
+                Deleted {formatDistanceToNow(new Date(deletedAt), { 
+                  addSuffix: true
                 })}
               </p>
               {item.email && (
@@ -171,7 +168,7 @@ export default function TrashBin() {
             disabled={restoreMutation.isPending}
           >
             <RotateCcw className="mr-2 h-4 w-4" />
-            Gendan
+            Restore
           </Button>
         </CardContent>
       </Card>
@@ -179,118 +176,121 @@ export default function TrashBin() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Trash2 className="h-8 w-8" />
-          Papirkurv
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Slettede elementer gemmes i 90 dage. Derefter slettes de permanent.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trash2 className="h-5 w-5" />
+            Trash Bin
+          </CardTitle>
+          <CardDescription>
+            Deleted items are stored for 90 days. After that, they are permanently deleted.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DeletedItemType)}>
+            <TabsList className="w-full grid grid-cols-6">
+              <TabsTrigger value="companies" className="flex items-center gap-1">
+                <Building2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Companies</span>
+              </TabsTrigger>
+              <TabsTrigger value="people" className="flex items-center gap-1">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">People</span>
+              </TabsTrigger>
+              <TabsTrigger value="deals" className="flex items-center gap-1">
+                <Briefcase className="h-4 w-4" />
+                <span className="hidden sm:inline">Deals</span>
+              </TabsTrigger>
+              <TabsTrigger value="quotes" className="flex items-center gap-1" disabled>
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Quotes</span>
+              </TabsTrigger>
+              <TabsTrigger value="orders" className="flex items-center gap-1" disabled>
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Orders</span>
+              </TabsTrigger>
+              <TabsTrigger value="invoices" className="flex items-center gap-1">
+                <Receipt className="h-4 w-4" />
+                <span className="hidden sm:inline">Invoices</span>
+              </TabsTrigger>
+            </TabsList>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DeletedItemType)}>
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="companies" className="flex items-center gap-1">
-            <Building2 className="h-4 w-4" />
-            Virksomheder
-          </TabsTrigger>
-          <TabsTrigger value="people" className="flex items-center gap-1">
-            <Users className="h-4 w-4" />
-            Personer
-          </TabsTrigger>
-          <TabsTrigger value="deals" className="flex items-center gap-1">
-            <Briefcase className="h-4 w-4" />
-            Deals
-          </TabsTrigger>
-          <TabsTrigger value="quotes" className="flex items-center gap-1" disabled>
-            <FileText className="h-4 w-4" />
-            Tilbud
-          </TabsTrigger>
-          <TabsTrigger value="orders" className="flex items-center gap-1" disabled>
-            <Package className="h-4 w-4" />
-            Ordrer
-          </TabsTrigger>
-          <TabsTrigger value="invoices" className="flex items-center gap-1">
-            <Receipt className="h-4 w-4" />
-            Fakturaer
-          </TabsTrigger>
-        </TabsList>
+            <TabsContent value="companies" className="mt-6">
+              {loadingCompanies ? (
+                <p className="text-center text-muted-foreground">Loading...</p>
+              ) : deletedCompanies && deletedCompanies.length > 0 ? (
+                deletedCompanies.map(company => renderDeletedItem(company, 'companies'))
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    {getEmptyMessage('companies')}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-        <TabsContent value="companies" className="mt-6">
-          {loadingCompanies ? (
-            <p className="text-center text-muted-foreground">Indlæser...</p>
-          ) : deletedCompanies && deletedCompanies.length > 0 ? (
-            deletedCompanies.map(company => renderDeletedItem(company, 'companies'))
-          ) : (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                {getEmptyMessage('companies')}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+            <TabsContent value="people" className="mt-6">
+              {loadingPeople ? (
+                <p className="text-center text-muted-foreground">Loading...</p>
+              ) : deletedPeople && deletedPeople.length > 0 ? (
+                deletedPeople.map(person => renderDeletedItem(person, 'people'))
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    {getEmptyMessage('people')}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-        <TabsContent value="people" className="mt-6">
-          {loadingPeople ? (
-            <p className="text-center text-muted-foreground">Indlæser...</p>
-          ) : deletedPeople && deletedPeople.length > 0 ? (
-            deletedPeople.map(person => renderDeletedItem(person, 'people'))
-          ) : (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                {getEmptyMessage('people')}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+            <TabsContent value="deals" className="mt-6">
+              {loadingDeals ? (
+                <p className="text-center text-muted-foreground">Loading...</p>
+              ) : deletedDeals && deletedDeals.length > 0 ? (
+                deletedDeals.map(deal => renderDeletedItem(deal, 'deals'))
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    {getEmptyMessage('deals')}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-        <TabsContent value="deals" className="mt-6">
-          {loadingDeals ? (
-            <p className="text-center text-muted-foreground">Indlæser...</p>
-          ) : deletedDeals && deletedDeals.length > 0 ? (
-            deletedDeals.map(deal => renderDeletedItem(deal, 'deals'))
-          ) : (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                {getEmptyMessage('deals')}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="invoices" className="mt-6">
-          {loadingInvoices ? (
-            <p className="text-center text-muted-foreground">Indlæser...</p>
-          ) : deletedInvoices && deletedInvoices.length > 0 ? (
-            deletedInvoices.map(invoice => renderDeletedItem(invoice, 'invoices'))
-          ) : (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                {getEmptyMessage('invoices')}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="invoices" className="mt-6">
+              {loadingInvoices ? (
+                <p className="text-center text-muted-foreground">Loading...</p>
+              ) : deletedInvoices && deletedInvoices.length > 0 ? (
+                deletedInvoices.map(invoice => renderDeletedItem(invoice, 'invoices'))
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    {getEmptyMessage('invoices')}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Confirmation Dialog */}
       <AlertDialog open={!!confirmRestore} onOpenChange={() => setConfirmRestore(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Gendan fra papirkurv?</AlertDialogTitle>
+            <AlertDialogTitle>Restore from trash?</AlertDialogTitle>
             <AlertDialogDescription>
-              Er du sikker på at du vil gendanne "{confirmRestore?.name}"?
+              Are you sure you want to restore "{confirmRestore?.name}"?
               <br />
-              Objektet vil blive gendannet og være tilgængeligt igen.
+              The item will be restored and available again.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmRestoreAction}>
               <RotateCcw className="mr-2 h-4 w-4" />
-              Gendan
+              Restore
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

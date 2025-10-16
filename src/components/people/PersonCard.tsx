@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { getRoleTheme, roleTokenBg, roleTokenText } from "./roleTheme";
+import { getRoleColor } from "@/lib/chartUtils";
 import { Mail, Phone } from "lucide-react";
 import { Person } from "@/lib/schemas/person";
 import { z } from "zod";
@@ -13,25 +13,36 @@ interface PersonCardProps {
 }
 
 export function PersonCard({ person, onClick, className }: PersonCardProps) {
-    const theme = getRoleTheme(person.title || undefined);
+    const roleColor = getRoleColor(person.title || undefined);
     const initials = (person.first_name?.[0] || "") + (person.last_name?.[0] || "");
 
     return (
         <Card
             className={cn(
                 "p-4 rounded-2xl border bg-card shadow-card hover:shadow-hover transition cursor-pointer",
-                roleTokenText(theme.color),
                 className
             )}
             onClick={onClick}
         >
             <div className="flex items-center gap-3 mb-3">
                 {/* Role color stripe */}
-                <div className={cn("w-1.5 h-10 rounded-sm", roleTokenBg(theme.color))} aria-hidden="true" />
+                <div 
+                    className="w-1.5 h-10 rounded-sm" 
+                    style={{ backgroundColor: roleColor }}
+                    aria-hidden="true" 
+                />
 
                 {/* Avatar */}
-                <Avatar className="h-10 w-10 ring-2 ring-border">
-                    <AvatarFallback className={cn(roleTokenBg(theme.color), roleTokenText(theme.color))}>
+                <Avatar 
+                    className="h-10 w-10 ring-2"
+                    style={{ borderColor: roleColor }}
+                >
+                    <AvatarFallback 
+                        style={{ 
+                            backgroundColor: `${roleColor}20`,
+                            color: roleColor
+                        }}
+                    >
                         {initials || "?"}
                     </AvatarFallback>
                 </Avatar>

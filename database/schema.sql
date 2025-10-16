@@ -80,6 +80,9 @@ begin
   if not exists (select 1 from pg_type where typname = 'quote_status') then
     create type quote_status as enum ('draft','sent','accepted','declined','expired');
   end if;
+  if not exists (select 1 from pg_type where typname = 'order_status') then
+    create type order_status as enum ('draft','accepted','cancelled','backorder','invoiced');
+  end if;
   if not exists (select 1 from pg_type where typname = 'invoice_status') then
     create type invoice_status as enum ('draft','sent','paid','overdue');
   end if;
@@ -293,6 +296,7 @@ create index if not exists idx_quotes_updated_at on public.quotes (updated_at de
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   number text unique,
+  status order_status not null default 'draft',
   currency text not null default 'DKK',
   order_date date,
   notes text,
@@ -311,6 +315,7 @@ before update on public.orders
 for each row execute procedure set_updated_at();
 
 create index if not exists idx_orders_deal on public.orders (deal_id);
+create index if not exists idx_orders_status on public.orders (status);
 create index if not exists idx_orders_company on public.orders (company_id);
 create index if not exists idx_orders_updated_at on public.orders (updated_at desc);
 
@@ -326,6 +331,7 @@ create table if not exists public.invoices (
   company_id uuid references public.companies(id) on delete set null,
   contact_id uuid references public.people(id) on delete set null,
   deal_id uuid references public.deals(id) on delete set null,
+  order_id uuid references public.orders(id) on delete set null,
   subtotal_minor int not null default 0 check (subtotal_minor >= 0),
   tax_minor int not null default 0 check (tax_minor >= 0),
   total_minor int not null default 0 check (total_minor >= 0),
@@ -338,6 +344,7 @@ before update on public.invoices
 for each row execute procedure set_updated_at();
 
 create index if not exists idx_invoices_deal on public.invoices (deal_id);
+create index if not exists idx_invoices_order on public.invoices (order_id);
 create index if not exists idx_invoices_company on public.invoices (company_id);
 create index if not exists idx_invoices_status on public.invoices (status);
 create index if not exists idx_invoices_due on public.invoices (due_date);

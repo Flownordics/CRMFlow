@@ -308,7 +308,7 @@ export default function Analytics() {
 
             {/* Tabbed Navigation */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
+                <TabsList className="w-full lg:w-auto">
                     <TabsTrigger value="overview">
                         <BarChart3 className="h-4 w-4 mr-2" />
                         Overview

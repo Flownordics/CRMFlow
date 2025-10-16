@@ -4,9 +4,9 @@
  */
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { chartTheme, getChartColor } from '@/components/analytics/charts/chartConfig';
+import { chartTheme } from '@/components/analytics/charts/chartConfig';
 import { formatPercentage } from '@/services/analytics';
-import { calculateDistribution } from '@/lib/chartUtils';
+import { calculateDistribution, getRoleColor } from '@/lib/chartUtils';
 
 interface RoleDistributionChartProps {
   people: Array<{ title?: string | null }>;
@@ -19,7 +19,7 @@ export function RoleDistributionChart({ people, height = 300 }: RoleDistribution
     'title'
   );
 
-  // Take top 8 roles
+  // Take top 8 roles for display
   const topRoles = distribution.slice(0, 8);
 
   if (topRoles.length === 0) {
@@ -31,9 +31,10 @@ export function RoleDistributionChart({ people, height = 300 }: RoleDistribution
   }
 
   const total = topRoles.reduce((sum, item) => sum + item.value, 0);
-  const chartData = topRoles.map((item, index) => ({
+  // Assign colors using getRoleColor for consistent coloring across pie chart and table
+  const chartData = topRoles.map((item) => ({
     ...item,
-    color: getChartColor(index),
+    color: getRoleColor(item.name),
   }));
 
   const CustomTooltip = ({ active, payload }: any) => {

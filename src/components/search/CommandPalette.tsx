@@ -13,7 +13,6 @@ const items = [
   { label: "Orders", path: "/orders" },
   { label: "Invoices", path: "/invoices" },
   { label: "Calendar", path: "/calendar" },
-  { label: "Documents", path: "/documents" },
   { label: "Accounting", path: "/accounting" },
   { label: "Settings", path: "/settings" },
 ];

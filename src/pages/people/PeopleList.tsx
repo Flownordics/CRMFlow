@@ -23,13 +23,13 @@ import { PeopleKpiHeader } from "@/components/people/PeopleKpiHeader";
 import { PeopleFilters } from "@/components/people/PeopleFilters";
 import { PersonCard } from "@/components/people/PersonCard";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getRoleTheme, roleTokenBg, roleTokenText, roleTokenRing } from "@/components/people/roleTheme";
 import { Mail, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
 import { RoleDistributionChart } from "@/components/people/RoleDistributionChart";
 import { ContactGrowthChart } from "@/components/people/ContactGrowthChart";
 import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon } from "lucide-react";
+import { getRoleColor } from "@/lib/chartUtils";
 
 export default function PeopleList() {
     const { t } = useI18n();
@@ -132,12 +132,20 @@ export default function PeopleList() {
             header: "Name",
             accessorKey: "firstName",
             cell: (r: any) => {
-                const theme = getRoleTheme(r.title);
+                const roleColor = getRoleColor(r.title);
                 const initials = (r.first_name?.[0] || "") + (r.last_name?.[0] || "");
                 return (
                     <div className="flex items-center gap-3">
-                        <Avatar className={cn("h-8 w-8 ring-2", roleTokenRing(theme.color))}>
-                            <AvatarFallback className={cn(roleTokenBg(theme.color), roleTokenText(theme.color))}>
+                        <Avatar 
+                            className="h-8 w-8 ring-2" 
+                            style={{ borderColor: roleColor }}
+                        >
+                            <AvatarFallback 
+                                style={{ 
+                                    backgroundColor: `${roleColor}20`,
+                                    color: roleColor
+                                }}
+                            >
                                 {initials || "?"}
                             </AvatarFallback>
                         </Avatar>
@@ -153,7 +161,13 @@ export default function PeopleList() {
                                     </Link>
                                 </div>
                                 {r.title && (
-                                    <span className={cn("text-xs rounded-full px-2 py-0.5", roleTokenBg(theme.color), roleTokenText(theme.color))}>
+                                    <span 
+                                        className="text-xs rounded-full px-2 py-0.5"
+                                        style={{ 
+                                            backgroundColor: `${roleColor}20`,
+                                            color: roleColor
+                                        }}
+                                    >
                                         {r.title}
                                     </span>
                                 )}

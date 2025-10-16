@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -10,6 +10,8 @@ import { CRMLayout } from "@/components/layout/CRMLayout";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ErrorBoundary } from "@/components/fallbacks/ErrorBoundary";
+import { PWAInstallPrompt } from "@/components/common/PWAInstallPrompt";
+import { OfflineIndicator } from "@/components/common/OfflineIndicator";
 import { queryClient } from "@/lib/queryClients";
 import { pingApi } from "@/lib/api";
 import { toastBus } from "@/lib/toastBus";
@@ -34,10 +36,8 @@ const PeopleList = lazy(() => import("@/pages/people/PeopleList"));
 const PeoplePage = lazy(() => import("@/pages/people/PeoplePage"));
 const PersonPage = lazy(() => import("@/pages/people/PersonPage"));
 const Calendar = lazy(() => import("@/pages/calendar/CalendarView"));
-const Documents = lazy(() => import("@/pages/documents/DocumentsPage"));
 const Accounting = lazy(() => import("@/pages/accounting/AccountingPage"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
-const Tasks = lazy(() => import("@/pages/Tasks"));
 const Settings = lazy(() => import("@/pages/settings/SettingsPage"));
 const Login = lazy(() => import("@/pages/auth/LoginPage"));
 const Register = lazy(() => import("@/pages/auth/RegisterPage"));
@@ -46,7 +46,6 @@ const OAuthComplete = lazy(() => import("@/pages/oauth/OAuthComplete"));
 const OAuthCallback = lazy(() => import("@/pages/oauth/OAuthCallback"));
 const CallLists = lazy(() => import("@/pages/CallLists"));
 const CallListDetail = lazy(() => import("@/pages/CallListDetail"));
-const TrashBin = lazy(() => import("@/pages/TrashBin"));
 
 const App = () => {
   // Health check effect
@@ -74,6 +73,8 @@ const App = () => {
           <Toaster />
           <Sonner />
           <ToastBridge />
+          <OfflineIndicator />
+          <PWAInstallPrompt />
           <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
             <AuthGate>
               <ErrorBoundary>
@@ -108,22 +109,21 @@ const App = () => {
                         <Route path=":id" element={<OrderEditor />} />
                         <Route path=":id/detail" element={<OrderDetail />} />
                       </Route>
-                      <Route path="invoices">
-                        <Route index element={<Invoices />} />
-                        <Route path=":id" element={<InvoiceDetail />} />
-                      </Route>
+                      {/* Invoice detail pages still need their own route */}
+                      <Route path="invoices/:id" element={<InvoiceDetail />} />
+                      {/* Redirect /invoices to /accounting since invoices are now integrated into accounting */}
+                      <Route path="invoices" element={<Navigate to="/accounting" replace />} />
                       <Route path="people" element={<PeopleList />} />
                       <Route path="people/:id" element={<PersonPage />} />
                       <Route path="calendar" element={<Calendar />} />
-                      <Route path="documents" element={<Documents />} />
                       <Route path="accounting" element={<Accounting />} />
                       <Route path="analytics" element={<Analytics />} />
-                      <Route path="tasks" element={<Tasks />} />
+                      {/* Redirect /tasks to /calendar since tasks are now integrated into calendar */}
+                      <Route path="tasks" element={<Navigate to="/calendar" replace />} />
                       <Route path="call-lists">
                         <Route index element={<CallLists />} />
                         <Route path=":id" element={<CallListDetail />} />
                       </Route>
-                      <Route path="trash" element={<TrashBin />} />
                       <Route path="settings" element={<Settings />} />
                       <Route path="*" element={<NotFound />} />
                     </Route>

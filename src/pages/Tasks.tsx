@@ -39,7 +39,11 @@ import { TaskCompletionTimelineChart } from "@/components/tasks/TaskCompletionTi
 import { TaskPriorityChart } from "@/components/tasks/TaskPriorityChart";
 import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon } from "lucide-react";
 
-export default function Tasks() {
+interface TasksProps {
+    embedded?: boolean;
+}
+
+export default function Tasks({ embedded = false }: TasksProps) {
     const [selectedTask, setSelectedTask] = useState<Task | undefined>();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
@@ -97,17 +101,19 @@ export default function Tasks() {
     const statusCounts = getStatusCounts();
 
     return (
-        <div className="space-y-6 p-6">
-            {/* Header */}
-            <PageHeader
-                title="Tasks"
-                actions={
-                    <Button onClick={handleCreateTask}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Task
-                    </Button>
-                }
-            />
+        <div className="space-y-6">
+            {/* Header - only show when not embedded */}
+            {!embedded && (
+                <PageHeader
+                    title="Tasks"
+                    actions={
+                        <Button onClick={handleCreateTask}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            New Task
+                        </Button>
+                    }
+                />
+            )}
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4">

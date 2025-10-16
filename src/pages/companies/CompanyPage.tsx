@@ -85,26 +85,31 @@ export default function CompanyPage() {
       />
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="w-full md:grid md:grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            {t("companies.overview")}
+            <Building2 className="h-4 w-4 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">{t("companies.overview")}</span>
+            <span className="sm:hidden">Overview</span>
           </TabsTrigger>
           <TabsTrigger value="people" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            {t("companies.people")}
+            <Users className="h-4 w-4 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">{t("companies.people")}</span>
+            <span className="sm:hidden">People</span>
           </TabsTrigger>
           <TabsTrigger value="deals" className="flex items-center gap-2">
-            <Handshake className="h-4 w-4" />
-            {t("companies.deals")}
+            <Handshake className="h-4 w-4 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">{t("companies.deals")}</span>
+            <span className="sm:hidden">Deals</span>
           </TabsTrigger>
           <TabsTrigger value="documents" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            {t("companies.documents")}
+            <FileText className="h-4 w-4 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">{t("companies.documents")}</span>
+            <span className="sm:hidden">Docs</span>
           </TabsTrigger>
           <TabsTrigger value="activity" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            {t("companies.activity")}
+            <Activity className="h-4 w-4 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">{t("companies.activity")}</span>
+            <span className="sm:hidden">Activity</span>
           </TabsTrigger>
         </TabsList>
 

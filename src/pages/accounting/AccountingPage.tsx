@@ -14,7 +14,8 @@ import { useWorkspaceSettings } from "@/hooks/useSettings";
 import { usePayments } from "@/services/payments";
 import { useInvoices } from "@/services/invoices";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Download, Calculator, Receipt } from "lucide-react";
 import {
   exportInvoicesToCSV,
   exportPaymentsToCSV,
@@ -24,9 +25,13 @@ import {
 import { useCompanyLookup } from "@/hooks/useCompanyLookup";
 import { useToast } from "@/hooks/use-toast";
 
+// Import Invoices page
+import InvoicesView from "@/pages/Invoices";
+
 export default function AccountingPage() {
   const { toast } = useToast();
   const { getCompanyName, companies } = useCompanyLookup();
+  const [activeTab, setActiveTab] = useState<'overview' | 'invoices'>('overview');
   
   // Get currency from workspace settings
   const { data: settings } = useWorkspaceSettings();
@@ -175,21 +180,41 @@ export default function AccountingPage() {
   return (
     <div className="space-y-6 p-6">
       <PageHeader
-        title="Accounting"
-        subtitle="Overview of receivables and payments."
+        title={activeTab === 'overview' ? 'Accounting' : 'Invoices'}
+        subtitle={activeTab === 'overview' ? 'Overview of receivables and payments' : 'Track billing, payments and overdue balances'}
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportSummary}>
-              <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-              Export Summary
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportInvoices}>
-              <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-              Export Invoices
-            </Button>
+            {activeTab === 'overview' ? (
+              <>
+                <Button variant="outline" size="sm" onClick={handleExportSummary}>
+                  <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Export Summary
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportInvoices}>
+                  <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Export Invoices
+                </Button>
+              </>
+            ) : null}
           </div>
         }
       />
+      
+      {/* Tabs for switching between Overview and Invoices */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'invoices')} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="invoices" className="flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            Invoices
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab Content */}
+        <TabsContent value="overview" className="space-y-6 mt-6">
       
       <div className="h-0.5 w-full bg-gradient-to-r from-primary/30 via-accent/30 to-transparent rounded-full" aria-hidden="true" />
 
@@ -224,6 +249,13 @@ export default function AccountingPage() {
           currency={currency} 
         />
       </div>
+        </TabsContent>
+
+        {/* Invoices Tab Content */}
+        <TabsContent value="invoices" className="mt-6">
+          <InvoicesView embedded={true} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

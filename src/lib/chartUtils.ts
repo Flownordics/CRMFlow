@@ -119,6 +119,92 @@ export function calculatePercentageDistribution<T>(
 export { getChartColor as getColorByIndex } from '@/components/analytics/charts/chartConfig';
 
 /**
+ * Get consistent color for a role title
+ * Uses the role name to map to a specific color from the chart palette
+ * Uses a simple character sum with prime number multiplication for better distribution
+ */
+export function getRoleColor(title: string | null | undefined): string {
+  // Original chart palette colors from chartConfig.ts
+  const palette = [
+    '#7a9db3', // muted blue-grey
+    '#9d94af', // muted purple
+    '#b5c69f', // sage green
+    '#d4a574', // muted gold
+    '#fb8674', // muted coral
+    '#7fa39b', // muted teal
+    '#c89882', // soft terracotta
+    '#95a39c', // grey-green
+  ];
+  
+  if (!title) return palette[7]; // grey-green for unknown
+  
+  // Simple but effective: sum all character codes and multiply by position
+  // This gives better distribution than hash functions for short strings
+  let sum = 0;
+  for (let i = 0; i < title.length; i++) {
+    sum += title.charCodeAt(i) * (i + 1);
+  }
+  
+  return palette[sum % palette.length];
+}
+
+/**
+ * Get consistent color for an industry
+ * Uses the industry name to map to a specific color from the chart palette
+ */
+export function getIndustryColor(industry: string | null | undefined): string {
+  // Original chart palette colors from chartConfig.ts
+  const palette = [
+    '#7a9db3', // muted blue-grey
+    '#9d94af', // muted purple
+    '#b5c69f', // sage green
+    '#d4a574', // muted gold
+    '#fb8674', // muted coral
+    '#7fa39b', // muted teal
+    '#c89882', // soft terracotta
+    '#95a39c', // grey-green
+  ];
+  
+  if (!industry) return palette[7]; // grey-green for unknown
+  
+  // Use same hashing approach as role colors for consistency
+  let sum = 0;
+  for (let i = 0; i < industry.length; i++) {
+    sum += industry.charCodeAt(i) * (i + 1);
+  }
+  
+  return palette[sum % palette.length];
+}
+
+/**
+ * Get consistent color for a tag
+ * Uses the tag name to map to a specific color from the chart palette
+ */
+export function getTagColor(tagName: string | null | undefined): string {
+  // Original chart palette colors from chartConfig.ts
+  const palette = [
+    '#7a9db3', // muted blue-grey
+    '#9d94af', // muted purple
+    '#b5c69f', // sage green
+    '#d4a574', // muted gold
+    '#fb8674', // muted coral
+    '#7fa39b', // muted teal
+    '#c89882', // soft terracotta
+    '#95a39c', // grey-green
+  ];
+  
+  if (!tagName) return palette[7]; // grey-green for unknown
+  
+  // Use same hashing approach as role and industry colors for consistency
+  let sum = 0;
+  for (let i = 0; i < tagName.length; i++) {
+    sum += tagName.charCodeAt(i) * (i + 1);
+  }
+  
+  return palette[sum % palette.length];
+}
+
+/**
  * Format number with abbreviations (K, M, B)
  */
 export function formatNumberAbbreviated(value: number): string {
