@@ -227,13 +227,15 @@ export function EventItem({ event, className, onEventUpdated }: EventItemProps) 
                 )}
             </div>
 
-            {/* Edit Event Dialog */}
-            <EditEventDialog
-                event={event}
-                open={showEditDialog}
-                onOpenChange={setShowEditDialog}
-                onEventUpdated={onEventUpdated}
-            />
+            {/* Edit Event Dialog - Only render for native events */}
+            {event.source === 'native' && (
+                <EditEventDialog
+                    event={event}
+                    open={showEditDialog}
+                    onOpenChange={setShowEditDialog}
+                    onEventUpdated={onEventUpdated}
+                />
+            )}
         </div>
     );
 }

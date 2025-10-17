@@ -18,6 +18,9 @@ export interface MergedEvent {
     color?: string;
     kind?: string;
     source: 'native' | 'google' | 'task';
+    // Google sync fields (for native events)
+    google_event_id?: string | null;
+    sync_state?: 'none' | 'pending' | 'synced' | 'error';
     // CRM links (only for native events)
     deal_id?: string;
     company_id?: string;
@@ -49,6 +52,8 @@ export function nativeEventToMerged(event: EventRow): MergedEvent {
         color: event.color || undefined,
         kind: event.kind || undefined,
         source: 'native',
+        google_event_id: event.google_event_id,
+        sync_state: event.sync_state,
         deal_id: event.deal_id || undefined,
         company_id: event.company_id || undefined,
         quote_id: event.quote_id || undefined,
