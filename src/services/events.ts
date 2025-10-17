@@ -390,11 +390,10 @@ export function useCreateEvent() {
         onSuccess: () => {
             // Invalidate events queries
             queryClient.invalidateQueries({ queryKey: qk.events() });
-            toastBus.success("Event created successfully");
         },
         onError: (error) => {
-            toastBus.error("Failed to create event");
             logger.error('Create event error:', error);
+            // Error handling is done in the component
         },
     });
 }
