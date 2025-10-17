@@ -60,9 +60,10 @@ const Orders: React.FC = () => {
   const { getCompanyName } = useCompanyLookup();
   const queryClient = useQueryClient();
 
-  // Fetch orders from API
+  // Fetch ALL orders for accurate KPI calculations (no pagination needed)
   const { data: ordersData, isLoading, error, refetch } = useOrders({
     q: searchTerm,
+    limit: 9999  // Fetch all orders for KPIs and charts
   });
 
   const orders = ordersData?.data || [];

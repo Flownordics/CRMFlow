@@ -59,10 +59,11 @@ const Quotes: React.FC = () => {
   const { toast } = useToast();
   const { getCompanyName } = useCompanyLookup();
 
-  // Fetch quotes from API
+  // Fetch ALL quotes for accurate KPI calculations (no pagination needed for quotes)
   const { data: quotesData, isLoading, error, refetch } = useQuotes({
     q: searchTerm,
     status: statusFilter !== "all" ? statusFilter : undefined,
+    limit: 9999  // Fetch all quotes for KPIs and charts
   });
 
   // Fetch status counts for filter buttons (excluding accepted quotes since they become orders)

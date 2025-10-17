@@ -75,10 +75,11 @@ const Invoices: React.FC<InvoicesProps> = ({ embedded = false }) => {
   const { getCompanyName } = useCompanyLookup();
   const deleteInvoice = useDeleteInvoice();
 
-  // Fetch invoices from API
+  // Fetch ALL invoices for accurate KPI calculations (no pagination needed)
   const { data: invoicesData, isLoading, error } = useInvoices({
     q: searchTerm,
     status: statusFilter !== "all" ? statusFilter : undefined,
+    limit: 9999  // Fetch all invoices for KPIs and charts
   });
 
   const invoices = invoicesData?.data || [];

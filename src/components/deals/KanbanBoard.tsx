@@ -14,7 +14,7 @@ import {
     useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useMemo, useState, useCallback, memo } from "react";
+import { useMemo, useState, useCallback, memo, useRef } from "react";
 import { Stage } from "@/services/pipelines";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -88,6 +88,9 @@ export function KanbanBoard({
     
     // Track which stages are expanded (for Won/Lost with many deals)
     const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
+    
+    // Prevent duplicate move operations
+    const movingRef = useRef(false);
 
     // Filter out "Qualified" stage and sort by order
     const columns = useMemo(
@@ -159,6 +162,15 @@ export function KanbanBoard({
 
     const onDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event;
+        
+        logger.warn("[KanbanBoard] 🎯 onDragEnd CALLED with active.id:", active.id);
+        
+        // Prevent duplicate calls
+        if (movingRef.current) {
+            logger.error("[KanbanBoard] ⛔ BLOCKED duplicate onDragEnd call - already moving!");
+            return;
+        }
+        
         if (!over) {
             logger.debug("[KanbanBoard] Drag ended without a drop target");
             setActiveDeal(null);
@@ -166,7 +178,7 @@ export function KanbanBoard({
         }
 
         const dealId = String(active.id);
-        logger.debug("[KanbanBoard] onDragEnd - dealId extracted:", dealId);
+        logger.warn("[KanbanBoard] onDragEnd - dealId extracted:", dealId);
         let toStageId: string;
 
         // Handle different types of drop targets
@@ -243,6 +255,13 @@ export function KanbanBoard({
             return;
         }
 
+        // Calculate the correct index: append to end of target stage
+        // Use -1 to signal backend to append (backend will auto-calculate)
+        const targetIndex = fromStageId === toStageId ? 0 : -1;
+        
+        // Mark as moving
+        movingRef.current = true;
+        
         // Persist to backend
         logger.debug("[KanbanBoard] About to call moveMutation.mutate with:", {
             dealId,
@@ -250,11 +269,11 @@ export function KanbanBoard({
             fromStageId,
             toStageId,
             toStageName,
-            index: 0
+            index: targetIndex
         });
 
         moveMutation.mutate(
-            { dealId, stageId: toStageId, index: 0 },
+            { dealId, stageId: toStageId, index: targetIndex },
             {
                 onSuccess: () => {
                     logger.debug("[KanbanBoard] Move mutation succeeded for deal:", dealId);
@@ -262,6 +281,8 @@ export function KanbanBoard({
                     if (onStageChange) {
                         onStageChange({ deal, fromStageId, toStageId, toStageName });
                     }
+                    // Reset moving flag
+                    movingRef.current = false;
                 },
                 onError: (error) => {
                     logger.error("[KanbanBoard] Move mutation failed:", error);
@@ -269,6 +290,8 @@ export function KanbanBoard({
                         title: "Unable to move deal",
                         description: "Try again"
                     });
+                    // Reset moving flag
+                    movingRef.current = false;
                 },
             }
         );

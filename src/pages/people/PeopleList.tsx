@@ -9,7 +9,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { usePeople } from "@/services/people";
+import { usePeople, usePeopleStats } from "@/services/people";
 import { useCompanies } from "@/services/companies";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -56,6 +56,9 @@ export default function PeopleList() {
         companyId: companyId === "all" ? undefined : companyId,
         title: title === "all" ? undefined : title
     });
+    
+    // Fetch all people stats for accurate KPI calculations
+    const { data: peopleStats } = usePeopleStats();
 
     if (isLoading) {
         return (
@@ -77,10 +80,11 @@ export default function PeopleList() {
     const total = peopleResponse?.total || 0;
     const totalPages = peopleResponse?.totalPages || 1;
 
-    // Calculate KPI metrics
-    const withEmail = people.filter(p => p.email).length;
-    const withPhone = people.filter(p => p.phone).length;
-    const newThisMonth = people.filter(p => {
+    // Calculate KPI metrics from ALL people (not just current page)
+    const statsData = peopleStats || people;
+    const withEmail = statsData.filter(p => p.email).length;
+    const withPhone = statsData.filter(p => p.phone).length;
+    const newThisMonth = statsData.filter(p => {
         const createdAt = new Date(p.created_at);
         const now = new Date();
         return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
@@ -244,7 +248,7 @@ export default function PeopleList() {
                         icon={PieChartIcon}
                         chartName="Role Distribution"
                     >
-                        <RoleDistributionChart people={people} />
+                        <RoleDistributionChart people={statsData} />
                     </AnalyticsCard>
 
                     <AnalyticsCard
@@ -253,7 +257,7 @@ export default function PeopleList() {
                         icon={TrendingUpIcon}
                         chartName="Contact Growth"
                     >
-                        <ContactGrowthChart people={people} />
+                        <ContactGrowthChart people={statsData} />
                     </AnalyticsCard>
                 </AnalyticsCardGrid>
             )}

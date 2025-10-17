@@ -50,8 +50,12 @@ function isActiveStage(stageName: string): boolean {
 export function useDealsBoardData(params: UseDealsBoardDataParams = {}): DealsBoardData {
   const { now = new Date(), ...dealParams } = params;
 
-  // Fetch deals with the same filters as the board
-  const { data: dealsData, isLoading: dealsLoading, error: dealsError } = useDeals(dealParams);
+  // Fetch ALL deals for accurate KPI calculations (no pagination)
+  // Override limit to get all deals
+  const { data: dealsData, isLoading: dealsLoading, error: dealsError } = useDeals({
+    ...dealParams,
+    limit: 9999  // Fetch all deals for KPI calculations
+  });
 
   // Fetch stages and probabilities
   const { data: pipelines = [], isLoading: pipelinesLoading } = usePipelines();

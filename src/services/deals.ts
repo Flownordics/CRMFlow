@@ -411,10 +411,11 @@ export async function rpcReorderDeal(dealId: string, newStageId: string, newInde
   }
 
   try {
-    logger.debug("[rpcReorderDeal] Calling API with params:", {
+    logger.warn("[rpcReorderDeal] 🚀 MOVING DEAL:", {
       dealId,
       newStageId,
-      newIndex
+      newIndex,
+      note: newIndex === -1 ? "⬇️ Will append to END of target stage" : `📍 Will insert at position ${newIndex}`
     });
 
     const response = await apiClient.post("/rpc/reorder_deal", {
@@ -423,7 +424,7 @@ export async function rpcReorderDeal(dealId: string, newStageId: string, newInde
       p_new_index: newIndex
     });
 
-    logger.debug("[rpcReorderDeal] API response:", {
+    logger.warn("[rpcReorderDeal] ✅ Move completed successfully:", {
       status: response.status,
       data: response.data
     });
@@ -432,7 +433,7 @@ export async function rpcReorderDeal(dealId: string, newStageId: string, newInde
       throw new Error(`Failed to reorder deal: ${response.status}`);
     }
   } catch (error) {
-    logger.error("[rpcReorderDeal] Error:", error);
+    logger.error("[rpcReorderDeal] ❌ Move FAILED:", error);
     throw handleError(error, `rpcReorderDeal(${dealId})`);
   }
 }

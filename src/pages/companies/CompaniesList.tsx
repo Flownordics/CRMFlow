@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCompanies } from "@/services/companies";
+import { useCompanies, useCompaniesStats } from "@/services/companies";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable } from "@/components/tables/DataTable";
@@ -51,6 +51,9 @@ export default function CompaniesList() {
         country: country === "all" ? undefined : country,
         activityStatus: activityStatus === "all" ? undefined : activityStatus
     });
+    
+    // Fetch all companies stats for accurate KPI calculations
+    const { data: companiesStats } = useCompaniesStats();
 
     if (isLoading) {
         return (
@@ -284,7 +287,7 @@ export default function CompaniesList() {
             <div className="h-0.5 w-full bg-gradient-to-r from-accent/30 via-primary/30 to-transparent rounded-full" aria-hidden="true" />
 
             {/* KPI Header */}
-            <CompaniesKpiHeader companies={companies} />
+            <CompaniesKpiHeader companies={companies} total={total} />
 
             {/* Analytics Charts */}
             <AnalyticsCardGrid columns={3}>
@@ -296,9 +299,9 @@ export default function CompaniesList() {
                 >
                     <CompanyHealthChart
                         data={{
-                            green: companies.filter((c) => c.activityStatus === 'green').length,
-                            yellow: companies.filter((c) => c.activityStatus === 'yellow').length,
-                            red: companies.filter((c) => c.activityStatus === 'red').length,
+                            green: (companiesStats || companies).filter((c) => c.activityStatus === 'green').length,
+                            yellow: (companiesStats || companies).filter((c) => c.activityStatus === 'yellow').length,
+                            red: (companiesStats || companies).filter((c) => c.activityStatus === 'red').length,
                         }}
                     />
                 </AnalyticsCard>
@@ -318,7 +321,7 @@ export default function CompaniesList() {
                     icon={BarChart3}
                     chartName="Industry Distribution"
                 >
-                    <IndustryDistributionChart companies={companies} />
+                    <IndustryDistributionChart companies={companiesStats || companies} />
                 </AnalyticsCard>
             </AnalyticsCardGrid>
 

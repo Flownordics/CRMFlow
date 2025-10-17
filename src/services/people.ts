@@ -453,6 +453,39 @@ export function usePeople(params: {
     });
 }
 
+/**
+ * Fetch lightweight people stats for KPI calculations
+ * Only fetches necessary fields, no pagination
+ */
+export async function fetchPeopleStats() {
+    if (USE_MOCKS) {
+        const { data } = await api.get("/people");
+        return data;
+    }
+
+    try {
+        const queryParams = new URLSearchParams();
+        queryParams.append('select', 'id,email,phone,created_at,title');
+        queryParams.append('deleted_at', 'is.null');
+        
+        const url = `/people?${queryParams.toString()}`;
+        const response = await apiClient.get(url);
+        
+        return response.data || [];
+    } catch (error) {
+        logger.error("Failed to fetch people stats:", error);
+        return [];
+    }
+}
+
+export function usePeopleStats() {
+    return useQuery({
+        queryKey: ['people', 'stats'],
+        queryFn: fetchPeopleStats,
+        staleTime: 30000 // Cache for 30 seconds
+    });
+}
+
 export function usePerson(id: string) {
     return useQuery({
         queryKey: qk.person(id),

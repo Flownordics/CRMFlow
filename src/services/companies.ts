@@ -575,6 +575,39 @@ export function useCompanies(params: {
   });
 }
 
+/**
+ * Fetch lightweight company stats for KPI calculations
+ * Only fetches necessary fields, no pagination
+ */
+export async function fetchCompaniesStats() {
+  if (USE_MOCKS) {
+    const { data } = await api.get("/companies");
+    return data;
+  }
+
+  try {
+    const queryParams = new URLSearchParams();
+    queryParams.append('select', 'id,country,industry,activity_status');
+    queryParams.append('deleted_at', 'is.null');
+    
+    const url = `/companies?${queryParams.toString()}`;
+    const response = await apiClient.get(url);
+    
+    return response.data || [];
+  } catch (error) {
+    logger.error("Failed to fetch companies stats:", error);
+    return [];
+  }
+}
+
+export function useCompaniesStats() {
+  return useQuery({
+    queryKey: ['companies', 'stats'],
+    queryFn: fetchCompaniesStats,
+    staleTime: 30000 // Cache for 30 seconds
+  });
+}
+
 export function useCompany(id: string) {
   return useQuery({
     queryKey: qk.company(id),
