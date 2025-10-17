@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { getEventTheme, tokenBg, tokenText, tokenRing } from "./eventTheme";
 import { MergedEvent } from "@/lib/calendar-utils";
 import { format, parseISO } from "date-fns";
-import { MapPin, Clock, Calendar, Database, Edit, Trash2, MoreVertical, CheckSquare } from "lucide-react";
+import { MapPin, Clock, Calendar, CalendarCheck, Edit, Trash2, MoreVertical, CheckSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { useState } from "react";
@@ -102,7 +102,7 @@ export function EventItem({ event, className, onEventUpdated }: EventItemProps) 
                                 : "bg-[#f0f4ec] text-[#6b7c5e] dark:bg-[#6b7c5e]/30 dark:text-[#b5c69f]"
                     )}>
                         {event.source === 'native' ? (
-                            <Database className="h-3 w-3" aria-hidden="true" />
+                            <CalendarCheck className="h-3 w-3" aria-hidden="true" />
                         ) : event.source === 'task' ? (
                             <CheckSquare className="h-3 w-3" aria-hidden="true" />
                         ) : (

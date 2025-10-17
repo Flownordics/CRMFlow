@@ -16,7 +16,7 @@ import { useCreateEvent, CreateEventPayload } from "@/services/events";
 // Google integration removed - starting fresh
 import { toastBus } from "@/lib/toastBus";
 import { logEventActivity } from "@/services/activity";
-import { MapPin, User, Database } from "lucide-react";
+import { MapPin, User, CalendarPlus } from "lucide-react";
 import { CompanySelect } from "@/components/selects/CompanySelect";
 import { SearchSelect } from "@/components/selects/SearchSelect";
 import { useI18n } from "@/lib/i18n";
@@ -470,7 +470,7 @@ export function CreateEventDialog({
                                 </>
                             ) : (
                                 <>
-                                    <Database className="h-4 w-4" />
+                                    <CalendarPlus className="h-4 w-4" />
                                     {t('create_event')}
                                 </>
                             )}

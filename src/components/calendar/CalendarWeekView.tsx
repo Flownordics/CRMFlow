@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MergedEvent } from "@/lib/calendar-utils";
 import { getEventTheme, tokenBg, tokenText } from "./eventTheme";
-import { CheckSquare, Calendar, Database } from "lucide-react";
+import { CheckSquare, Calendar, CalendarCheck } from "lucide-react";
 
 interface CalendarWeekViewProps {
     currentDate: Date;
@@ -116,7 +116,7 @@ export function CalendarWeekView({
                                     {dayEvents.map((event) => {
                                         const theme = getEventTheme(event.kind);
                                         const Icon = event.source === 'task' ? CheckSquare :
-                                            event.source === 'google' ? Calendar : Database;
+                                            event.source === 'google' ? Calendar : CalendarCheck;
 
                                         return (
                                             <div

@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MergedEvent } from "@/lib/calendar-utils";
 import { getEventTheme, tokenBg, tokenText } from "./eventTheme";
-import { CheckSquare, Calendar, Database, Clock } from "lucide-react";
+import { CheckSquare, Calendar, CalendarCheck, Clock } from "lucide-react";
 
 interface CalendarDayViewProps {
     currentDate: Date;
@@ -107,7 +107,7 @@ export function CalendarDayView({
                                             {hourEvents.map((event) => {
                                                 const theme = getEventTheme(event.kind);
                                                 const Icon = event.source === 'task' ? CheckSquare :
-                                                    event.source === 'google' ? Calendar : Database;
+                                                    event.source === 'google' ? Calendar : CalendarCheck;
 
                                                 return (
                                                     <div

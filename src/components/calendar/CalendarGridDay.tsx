@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { MergedEvent } from "@/lib/calendar-utils";
 import { getEventTheme, tokenBg, tokenText } from "./eventTheme";
-import { CheckSquare, Calendar, Database } from "lucide-react";
+import { CheckSquare, Calendar, CalendarCheck } from "lucide-react";
 
 interface CalendarGridDayProps {
     date: Date;
@@ -51,7 +51,7 @@ export function CalendarGridDay({
                 {events.slice(0, 3).map((event) => {
                     const theme = getEventTheme(event.kind);
                     const Icon = event.source === 'task' ? CheckSquare :
-                        event.source === 'google' ? Calendar : Database;
+                        event.source === 'google' ? Calendar : CalendarCheck;
 
                     return (
                         <div

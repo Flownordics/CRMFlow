@@ -8,6 +8,7 @@ import { useTasks } from "@/services/tasks";
 import { useQuery } from "@tanstack/react-query";
 import {
   CreateEventDialog,
+  EditEventDialog,
   CalendarKpis,
   CalendarToolbar,
   EventItem,
@@ -36,6 +37,8 @@ export default function CalendarView() {
   const [view, setView] = useState<CalendarView>('month');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<MergedEvent | null>(null);
   const [selectedCalendar, setSelectedCalendar] = useState('primary');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
 
@@ -182,8 +185,18 @@ export default function CalendarView() {
   };
 
   const handleEventClick = (event: MergedEvent) => {
-    // Handle event click - could open event details or navigate
-    logger.debug('Event clicked:', event);
+    // Only allow editing of native events
+    if (event.source === 'native') {
+      setSelectedEvent(event);
+      setShowEditDialog(true);
+    } else {
+      // For Google-only events, show info toast
+      toastBus.emit({
+        title: "Google Calendar Event",
+        description: "This event can only be edited in Google Calendar",
+        variant: "default"
+      });
+    }
   };
 
   // Handle type filtering
@@ -377,6 +390,20 @@ export default function CalendarView() {
         showGoogleLayer={!isLocalhost}
         isGoogleConnected={isGoogleConnected && !isLocalhost}
       />
+
+      {/* Edit Event Dialog */}
+      {selectedEvent && selectedEvent.source === 'native' && (
+        <EditEventDialog
+          event={selectedEvent}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          onEventUpdated={() => {
+            refetchNativeEvents();
+            refetchGoogleEvents();
+            refetchTasks();
+          }}
+        />
+      )}
         </TabsContent>
 
         {/* Tasks Tab Content */}
