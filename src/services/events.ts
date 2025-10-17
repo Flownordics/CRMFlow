@@ -30,7 +30,6 @@ export const EventRowSchema = z.object({
     // Google sync fields (optional)
     google_event_id: z.string().nullable(),
     sync_state: z.enum(['none', 'pending', 'synced', 'error']).default('none'),
-    google_sync_enabled: z.boolean().default(true),
     // Ownership
     created_by: z.string().uuid(),
     // Audit
@@ -138,12 +137,15 @@ export async function createEvent(payload: CreateEventPayload): Promise<EventRow
         // Validate payload
         const validatedPayload = CreateEventPayloadSchema.parse(payload);
         const shouldSyncToGoogle = validatedPayload.google_sync_enabled !== false; // Default to true
+        
+        // Destructure to exclude google_sync_enabled from database insert
+        const { google_sync_enabled, ...dbPayload } = validatedPayload;
 
         // Create event in CRM database
         const { data, error } = await supabase
             .from('events')
             .insert({
-                ...validatedPayload,
+                ...dbPayload,
                 created_by: user.id,
                 sync_state: shouldSyncToGoogle ? 'pending' : 'none',
             })
@@ -243,12 +245,15 @@ export async function updateEvent(id: string, payload: UpdateEventPayload): Prom
 
         // Validate payload
         const validatedPayload = UpdateEventPayloadSchema.parse(payload);
+        
+        // Destructure to exclude google_sync_enabled from database update
+        const { google_sync_enabled, ...dbPayload } = validatedPayload;
 
         // Update event in CRM database
         const { data, error } = await supabase
             .from('events')
             .update({
-                ...validatedPayload,
+                ...dbPayload,
                 sync_state: currentEvent.google_event_id ? 'pending' : 'none',
             })
             .eq('id', id)

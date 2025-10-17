@@ -51,7 +51,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
     const [eventKind, setEventKind] = useState(event.kind || "meeting");
     const [eventColor, setEventColor] = useState(event.color || "primary");
     const [attendees, setAttendees] = useState(event.attendees?.map(a => a.email).join(", ") || "");
-    const [syncToGoogle, setSyncToGoogle] = useState(event.google_sync_enabled !== false);
+    const [syncToGoogle, setSyncToGoogle] = useState(event.sync_state !== 'none');
 
     // CRM relations
     const [selectedCompanyId, setSelectedCompanyId] = useState(event.company_id || "");
@@ -69,7 +69,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
             setEventKind(event.kind || "meeting");
             setEventColor(event.color || "primary");
             setAttendees(event.attendees?.map(a => a.email).join(", ") || "");
-            setSyncToGoogle(event.google_sync_enabled !== false);
+            setSyncToGoogle(event.sync_state !== 'none');
             setSelectedCompanyId(event.company_id || "");
             setSelectedDealId(event.deal_id || "");
             setSelectedQuoteId(event.quote_id || "");
