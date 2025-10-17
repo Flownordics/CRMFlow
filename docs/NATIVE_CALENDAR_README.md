@@ -223,15 +223,23 @@ Ensure RLS policies allow users to:
 - Read/write their own user settings
 - Read CRM entities they have access to
 
-## Future Enhancements
+## Implemented Enhancements
+
+### ✅ Recurring Events (October 2025)
+- Full support for recurring event patterns (DAILY, WEEKLY, MONTHLY, YEARLY)
+- RRULE format compatibility with Google Calendar
+- Exception dates support
+- Parent-child relationship for series management
+- See `src/lib/recurrence.ts` for implementation details
+
+### Future Enhancements
 
 ### Planned Features
-1. **Two-way sync** - Sync changes between native and Google events
-2. **Recurring events** - Support for recurring event patterns
-3. **Event templates** - Predefined event templates
-4. **Calendar views** - Month, week, day view options
-5. **Event reminders** - Native notification system
-6. **Calendar sharing** - Share calendars with team members
+1. **Two-way sync** - Sync changes between native and Google events (webhook foundation laid)
+2. **Event templates** - Predefined event templates
+3. **Calendar views** - Month, week, day view options (basic views exist)
+4. **Event reminders** - Native notification system
+5. **Calendar sharing** - Share calendars with team members
 
 ### Sync Improvements
 1. **Conflict resolution** - Handle sync conflicts gracefully

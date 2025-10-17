@@ -166,13 +166,15 @@ const result = await sendQuoteEmail({
 - [x] Feature flag for email availability
 - [x] Comprehensive testing
 
+### ✅ Implemented Features (October 2025)
+- [x] **Email Templates** - Customizable templates with variable replacement
+- [x] **PDF Attachments** - Full PDF attachment support for quotes, orders, invoices
+
 ### 🔄 Future Enhancements
-- [ ] SMTP provider implementation
-- [ ] Email templates
-- [ ] Attachment handling (currently links to PDF page)
-- [ ] Email tracking
+- [ ] Template UI management in Settings
+- [ ] Email tracking (open/click rates)
 - [ ] Bulk sending
-- [ ] Email history
+- [ ] Advanced email history
 
 ## Testing
 

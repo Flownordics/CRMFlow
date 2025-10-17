@@ -24,6 +24,8 @@ import {
 } from '@/services/companies';
 import { fetchDeletedPeople, restorePerson } from '@/services/people';
 import { fetchDeletedDeals, restoreDeal } from '@/services/deals';
+import { fetchDeletedQuotes, restoreQuote } from '@/services/quotes';
+import { fetchDeletedOrders, restoreOrder } from '@/services/orders';
 import { fetchDeletedInvoices, restoreInvoice } from '@/services/invoices';
 import {
   AlertDialog,
@@ -63,6 +65,18 @@ export function TrashBinSettings() {
     enabled: activeTab === 'deals'
   });
 
+  const { data: deletedQuotes, isLoading: loadingQuotes } = useQuery({
+    queryKey: ['deleted-quotes'],
+    queryFn: () => fetchDeletedQuotes(50),
+    enabled: activeTab === 'quotes'
+  });
+
+  const { data: deletedOrders, isLoading: loadingOrders } = useQuery({
+    queryKey: ['deleted-orders'],
+    queryFn: () => fetchDeletedOrders(50),
+    enabled: activeTab === 'orders'
+  });
+
   const { data: deletedInvoices, isLoading: loadingInvoices } = useQuery({
     queryKey: ['deleted-invoices'],
     queryFn: () => fetchDeletedInvoices(50),
@@ -79,6 +93,10 @@ export function TrashBinSettings() {
           return restorePerson(id);
         case 'deals':
           return restoreDeal(id);
+        case 'quotes':
+          return restoreQuote(id);
+        case 'orders':
+          return restoreOrder(id);
         case 'invoices':
           return restoreInvoice(id);
         default:
@@ -202,11 +220,11 @@ export function TrashBinSettings() {
                 <Briefcase className="h-4 w-4" />
                 <span className="hidden sm:inline">Deals</span>
               </TabsTrigger>
-              <TabsTrigger value="quotes" className="flex items-center gap-1" disabled>
+              <TabsTrigger value="quotes" className="flex items-center gap-1">
                 <FileText className="h-4 w-4" />
                 <span className="hidden sm:inline">Quotes</span>
               </TabsTrigger>
-              <TabsTrigger value="orders" className="flex items-center gap-1" disabled>
+              <TabsTrigger value="orders" className="flex items-center gap-1">
                 <Package className="h-4 w-4" />
                 <span className="hidden sm:inline">Orders</span>
               </TabsTrigger>
@@ -253,6 +271,34 @@ export function TrashBinSettings() {
                 <Card>
                   <CardContent className="p-8 text-center text-muted-foreground">
                     {getEmptyMessage('deals')}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="quotes" className="mt-6">
+              {loadingQuotes ? (
+                <p className="text-center text-muted-foreground">Loading...</p>
+              ) : deletedQuotes && deletedQuotes.length > 0 ? (
+                deletedQuotes.map(quote => renderDeletedItem(quote, 'quotes'))
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    {getEmptyMessage('quotes')}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="orders" className="mt-6">
+              {loadingOrders ? (
+                <p className="text-center text-muted-foreground">Loading...</p>
+              ) : deletedOrders && deletedOrders.length > 0 ? (
+                deletedOrders.map(order => renderDeletedItem(order, 'orders'))
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    {getEmptyMessage('orders')}
                   </CardContent>
                 </Card>
               )}

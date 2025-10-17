@@ -73,7 +73,7 @@ export default async function handler(request) {
             global: { headers: { Authorization: `Bearer ${accessToken}` } },
         });
 
-        // Get document info
+        // Get document info (with updated column names)
         const { data: document, error: documentError } = await supabase
             .from('documents')
             .select('*')
@@ -90,10 +90,10 @@ export default async function handler(request) {
             );
         }
 
-        // Get file from storage
+        // Get file from storage using storage_path
         const { data: fileData, error: fileError } = await supabase.storage
             .from('documents')
-            .download(document.file_path);
+            .download(document.storage_path);
 
         if (fileError || !fileData) {
             return new Response(
@@ -114,7 +114,7 @@ export default async function handler(request) {
             headers: {
                 ...corsHeaders,
                 'Content-Type': document.mime_type || 'application/octet-stream',
-                'Content-Disposition': `attachment; filename="${document.filename || 'document'}"`,
+                'Content-Disposition': `attachment; filename="${document.file_name || 'document'}"`,
                 'Content-Length': blob.size.toString(),
             },
         });

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { USE_MOCKS } from "@/lib/debug";
 import { toastBus } from "@/lib/toastBus";
 import { logger } from '@/lib/logger';
+import { supabase } from "@/integrations/supabase/client";
 
 // Document schema matching the database
 export const Document = z.object({
@@ -120,14 +121,34 @@ export async function getPresignedUpload({ fileName, mimeType }: { fileName: str
     }
 
     try {
-        const response = await apiClient.post("/documents/presign-upload", {
-            fileName,
-            mimeType,
-        });
+        // Call Supabase Edge Function for presigned upload URL
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error("User not authenticated");
+        }
 
+        const response = await fetch(
+            `${supabase.supabaseUrl}/functions/v1/document-upload`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ fileName, mimeType }),
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to get upload URL');
+        }
+
+        const data = await response.json();
         return {
-            url: response.data.url,
-            path: response.data.path,
+            url: data.url,
+            path: data.path,
+            token: data.token,
         };
     } catch (error) {
         logger.error("Failed to get presigned upload URL:", error);
@@ -162,40 +183,58 @@ export async function uploadDocument(file: File, meta: {
 
     try {
         // Step 1: Get presigned upload URL
-        const { url, path } = await getPresignedUpload({
+        const { url, path, token } = await getPresignedUpload({
             fileName: file.name,
             mimeType: file.type,
         });
 
-        // Step 2: Upload file to storage
+        // Step 2: Upload file to Supabase Storage using signed URL
         const uploadResponse = await fetch(url, {
             method: 'PUT',
             body: file,
             headers: {
                 'Content-Type': file.type,
+                'x-upsert': 'true', // Supabase Storage header
             },
         });
 
         if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text();
+            logger.error("Storage upload failed:", errorText);
             throw new Error("Failed to upload file to storage");
         }
 
-        // Step 3: Insert document record
-        const documentData: DocumentCreate = {
-            file_name: file.name,
-            storage_path: path,
-            mime_type: file.type,
-            size_bytes: file.size,
-            company_id: meta.companyId || null,
-            deal_id: meta.dealId || null,
-            person_id: meta.personId || null,
-        };
+        // Step 3: Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            throw new Error("User not authenticated");
+        }
 
-        const response = await apiClient.post("/documents", documentData);
-        return Document.parse(response.data || response);
+        // Step 4: Insert document record in database
+        const { data, error } = await supabase
+            .from('documents')
+            .insert({
+                file_name: file.name,
+                storage_path: path,
+                mime_type: file.type,
+                size_bytes: file.size,
+                company_id: meta.companyId || null,
+                deal_id: meta.dealId || null,
+                person_id: meta.personId || null,
+                created_by: user.id,
+            })
+            .select('*, company:company_id(name), deal:deal_id(title), person:person_id(full_name)')
+            .single();
+
+        if (error) {
+            logger.error("Failed to create document record:", error);
+            throw new Error("Failed to create document record");
+        }
+
+        return Document.parse(data);
     } catch (error) {
         logger.error("Failed to upload document:", error);
-        throw new Error("Failed to upload document");
+        throw new Error(error instanceof Error ? error.message : "Failed to upload document");
     }
 }
 
@@ -209,20 +248,35 @@ export async function getDownloadUrl(id: string) {
     }
 
     try {
-        const response = await apiClient.post(`/documents?id=eq.${id}&action=download`);
-        const raw = normalizeApiData(response);
+        // Get document record
+        const { data: document, error: docError } = await supabase
+            .from('documents')
+            .select('file_name, storage_path')
+            .eq('id', id)
+            .single();
 
-        if (typeof raw === "string") {
-            throw new Error("[documents] Non-JSON response. Tjek Network: status/content-type/om der er redirect.");
+        if (docError || !document) {
+            logger.error("Failed to find document:", docError);
+            throw new Error("Document not found");
+        }
+
+        // Generate signed download URL (valid for 60 seconds)
+        const { data: signedUrl, error: urlError } = await supabase.storage
+            .from('documents')
+            .createSignedUrl(document.storage_path, 60);
+
+        if (urlError || !signedUrl) {
+            logger.error("Failed to generate download URL:", urlError);
+            throw new Error("Failed to generate download URL");
         }
 
         return {
-            url: raw.url,
-            filename: raw.filename,
+            url: signedUrl.signedUrl,
+            filename: document.file_name,
         };
     } catch (error) {
         logger.error("Failed to get download URL:", error);
-        throw new Error("Failed to get download URL");
+        throw new Error(error instanceof Error ? error.message : "Failed to get download URL");
     }
 }
 

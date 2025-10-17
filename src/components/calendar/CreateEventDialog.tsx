@@ -78,14 +78,30 @@ export function CreateEventDialog({
             return;
         }
 
-        try {
-            const startDateTime = allDay || !startTime
-                ? `${startDate}T00:00:00Z`
-                : `${startDate}T${startTime}:00Z`;
+        // Prevent double submission
+        if (createNativeEvent.isPending) {
+            return;
+        }
 
-            const endDateTime = allDay || !endTime
-                ? `${endDate}T23:59:59Z`
-                : `${endDate}T${endTime}:00Z`;
+        try {
+            // Convert Danish time to UTC for storage
+            // Denmark is UTC+1 (winter) or UTC+2 (summer)
+            const convertToUTC = (date: string, time?: string): string => {
+                if (allDay || !time) {
+                    // For all-day events, use midnight in Danish time
+                    const localDate = new Date(`${date}T00:00:00`);
+                    return localDate.toISOString();
+                } else {
+                    // For timed events, convert Danish time to UTC
+                    const localDate = new Date(`${date}T${time}:00`);
+                    return localDate.toISOString();
+                }
+            };
+
+            const startDateTime = convertToUTC(startDate, startTime);
+            const endDateTime = allDay && !endTime
+                ? convertToUTC(endDate, '23:59')
+                : convertToUTC(endDate, endTime);
 
             // Parse attendees
             const attendeesList = attendees.trim()
@@ -145,7 +161,13 @@ export function CreateEventDialog({
                 variant: "success"
             });
         } catch (error) {
-            // Error handling is done in the mutation hook
+            logger.error('Error creating event:', error);
+            toastBus.emit({
+                title: "Error",
+                description: error instanceof Error ? error.message : "Failed to create event",
+                variant: "destructive"
+            });
+            // Don't close dialog on error so user can retry
         }
     };
 

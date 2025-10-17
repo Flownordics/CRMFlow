@@ -685,3 +685,69 @@ export function useSendOrderEmail() {
         },
     });
 }
+
+// Soft delete order
+export async function deleteOrder(id: string): Promise<void> {
+    try {
+        // Soft delete by setting deleted_at timestamp
+        await apiClient.patch(`/orders?id=eq.${id}`, {
+            deleted_at: new Date().toISOString()
+        });
+    } catch (error) {
+        logger.error("Failed to delete order:", error);
+        throw new Error("Failed to delete order");
+    }
+}
+
+// Restore soft-deleted order
+export async function restoreOrder(id: string): Promise<void> {
+    try {
+        await apiClient.patch(`/orders?id=eq.${id}`, {
+            deleted_at: null
+        });
+    } catch (error) {
+        logger.error("Failed to restore order:", error);
+        throw new Error("Failed to restore order");
+    }
+}
+
+// Fetch deleted orders
+export async function fetchDeletedOrders(limit: number = 50): Promise<OrderUI[]> {
+    try {
+        const response = await apiClient.get(
+            `/orders?deleted_at=not.is.null&select=*&order=deleted_at.desc&limit=${limit}`
+        );
+        const raw = normalizeApiData(response);
+
+        if (typeof raw === "string") {
+            throw new Error("[orders] Non-JSON response.");
+        }
+
+        const orders = Array.isArray(raw) ? raw : [raw];
+        return orders.map(orderDbToUi);
+    } catch (error) {
+        logger.error("Failed to fetch deleted orders", { error }, 'DeletedOrders');
+        throw new Error("Failed to fetch deleted orders");
+    }
+}
+
+// React Query hooks for delete/restore
+export function useDeleteOrder() {
+    const qc = useQueryClient();
+    return useMutation<void, Error, string>({
+        mutationFn: deleteOrder,
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: qk.orders() });
+        },
+    });
+}
+
+export function useRestoreOrder() {
+    const qc = useQueryClient();
+    return useMutation<void, Error, string>({
+        mutationFn: restoreOrder,
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: qk.orders() });
+        },
+    });
+}

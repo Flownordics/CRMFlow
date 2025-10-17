@@ -75,16 +75,29 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
             setSelectedQuoteId(event.quote_id || "");
             setSelectedOrderId(event.order_id || "");
 
-            // Parse dates
+            // Parse dates - convert from UTC to local Danish time for display
             const startDate = new Date(event.start_at);
             const endDate = new Date(event.end_at);
 
-            setStartDate(startDate.toISOString().split('T')[0]);
-            setEndDate(endDate.toISOString().split('T')[0]);
+            // Format date as YYYY-MM-DD in local time
+            const formatDateLocal = (date: Date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            setStartDate(formatDateLocal(startDate));
+            setEndDate(formatDateLocal(endDate));
 
             if (!event.all_day) {
-                setStartTime(startDate.toTimeString().slice(0, 5));
-                setEndTime(endDate.toTimeString().slice(0, 5));
+                const formatTimeLocal = (date: Date) => {
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    return `${hours}:${minutes}`;
+                };
+                setStartTime(formatTimeLocal(startDate));
+                setEndTime(formatTimeLocal(endDate));
             }
         }
     }, [event]);
@@ -101,15 +114,29 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
             return;
         }
 
-        try {
-            // Calculate start and end times
-            const startDateTime = allDay
-                ? new Date(startDate + "T00:00:00.000Z").toISOString()
-                : new Date(startDate + "T" + startTime + ":00.000Z").toISOString();
+        // Prevent double submission
+        if (updateEvent.isPending) {
+            return;
+        }
 
-            const endDateTime = allDay
-                ? new Date(endDate + "T23:59:59.999Z").toISOString()
-                : new Date(endDate + "T" + endTime + ":00.000Z").toISOString();
+        try {
+            // Convert Danish time to UTC for storage
+            const convertToUTC = (date: string, time?: string): string => {
+                if (allDay || !time) {
+                    // For all-day events, use midnight in Danish time
+                    const localDate = new Date(`${date}T00:00:00`);
+                    return localDate.toISOString();
+                } else {
+                    // For timed events, convert Danish time to UTC
+                    const localDate = new Date(`${date}T${time}:00`);
+                    return localDate.toISOString();
+                }
+            };
+
+            const startDateTime = convertToUTC(startDate, startTime);
+            const endDateTime = allDay && !endTime
+                ? convertToUTC(endDate, '23:59')
+                : convertToUTC(endDate, endTime);
 
             // Parse attendees
             const attendeesList = attendees.trim()

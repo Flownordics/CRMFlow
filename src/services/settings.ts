@@ -48,6 +48,7 @@ export const UserSettingsSchema = z.object({
     theme: z.enum(["light", "dark", "system"]).default("system"),
     calendar_show_google: z.boolean().default(false),
     calendar_default_sync: z.boolean().default(false),
+    timezone: z.string().default('Europe/Copenhagen'),
     created_at: z.string(),
     updated_at: z.string(),
 });
@@ -60,6 +61,7 @@ export const UpdateUserSettingsPayloadSchema = z.object({
     theme: z.enum(["light", "dark", "system"]).optional(),
     calendar_show_google: z.boolean().optional(),
     calendar_default_sync: z.boolean().optional(),
+    timezone: z.string().optional(),
 });
 
 export type UpdateUserSettingsPayload = z.infer<typeof UpdateUserSettingsPayloadSchema>;

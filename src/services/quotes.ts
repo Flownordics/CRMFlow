@@ -647,10 +647,66 @@ export function useCreateQuote() {
   });
 }
 
+// Soft delete quote
+export async function deleteQuote(id: string): Promise<void> {
+  try {
+    // Soft delete by setting deleted_at timestamp
+    await apiClient.patch(`/quotes?id=eq.${id}`, {
+      deleted_at: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Failed to delete quote:", error);
+    throw new Error("Failed to delete quote");
+  }
+}
+
+// Restore soft-deleted quote
+export async function restoreQuote(id: string): Promise<void> {
+  try {
+    await apiClient.patch(`/quotes?id=eq.${id}`, {
+      deleted_at: null
+    });
+  } catch (error) {
+    logger.error("Failed to restore quote:", error);
+    throw new Error("Failed to restore quote");
+  }
+}
+
+// Fetch deleted quotes
+export async function fetchDeletedQuotes(limit: number = 50): Promise<QuoteUI[]> {
+  try {
+    const response = await apiClient.get(
+      `/quotes?deleted_at=not.is.null&select=*&order=deleted_at.desc&limit=${limit}`
+    );
+    const raw = normalizeApiData(response);
+
+    if (typeof raw === "string") {
+      throw new Error("[quotes] Non-JSON response.");
+    }
+
+    const quotes = Array.isArray(raw) ? raw : [raw];
+    return quotes.map(quoteDbToUi);
+  } catch (error) {
+    logger.error("Failed to fetch deleted quotes", { error }, 'DeletedQuotes');
+    throw new Error("Failed to fetch deleted quotes");
+  }
+}
+
 export function useDeleteQuote() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: (id: string) => apiClient.delete(`/quotes?id=eq.${id}`),
+    mutationFn: deleteQuote,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.quotes() });
+      qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
+    },
+  });
+}
+
+export function useRestoreQuote() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: restoreQuote,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.quotes() });
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });

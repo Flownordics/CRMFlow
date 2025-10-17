@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConnectedAccounts } from '@/components/settings/ConnectedAccounts';
+import { CalendarSyncSettings } from '@/components/settings/CalendarSyncSettings';
 import { UserInvitations } from '@/components/settings/UserInvitations';
 import { TrashBinSettings } from '@/components/settings/TrashBinSettings';
 import { Can } from '@/components/auth/Can';
@@ -88,6 +89,7 @@ export function SettingsPage() {
 
           <TabsContent value="integrations" className="space-y-6">
             <ConnectedAccounts />
+            <CalendarSyncSettings />
           </TabsContent>
 
           <TabsContent value="general" className="space-y-6">

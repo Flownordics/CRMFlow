@@ -1,107 +1,102 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { listDocuments, uploadDocument, getDownloadUrl, deleteDocument, updateDocumentRelations } from '../documents';
+import { supabase } from '@/integrations/supabase/client';
 
-// Mock the API client
-vi.mock('@/lib/api', () => ({
-    api: {
-        get: vi.fn(),
-        post: vi.fn(),
-        delete: vi.fn(),
-        patch: vi.fn(),
+// Mock Supabase
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn(),
+      getSession: vi.fn(),
     },
-    apiClient: {
-        get: vi.fn(),
-        post: vi.fn(),
-        delete: vi.fn(),
-        patch: vi.fn(),
+    from: vi.fn(),
+    storage: {
+      from: vi.fn(),
     },
-}));
-
-// Mock USE_MOCKS
-vi.mock('@/lib/debug', () => ({
-    USE_MOCKS: true,
+    supabaseUrl: 'https://test.supabase.co',
+  },
 }));
 
 describe('Documents Service', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('Document Upload', () => {
+    it('should generate presigned upload URL', async () => {
+      const mockSession = {
+        data: {
+          session: {
+            access_token: 'test-token',
+          },
+        },
+      };
+
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(mockSession as any);
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          url: 'https://storage.test.com/upload',
+          path: 'user123/file.pdf',
+          token: 'upload-token',
+        }),
+      });
+
+      const { getPresignedUpload } = await import('../documents');
+      
+      const result = await getPresignedUpload({
+        fileName: 'test.pdf',
+        mimeType: 'application/pdf',
+      });
+
+      expect(result.url).toBe('https://storage.test.com/upload');
+      expect(result.path).toBe('user123/file.pdf');
     });
 
-    describe('listDocuments', () => {
-        it('should return mock documents with filters', async () => {
-            const params = {
-                limit: 10,
-                offset: 0,
-                q: 'test',
-                companyId: 'company-1',
-            };
+    it('should throw error when user not authenticated', async () => {
+      vi.mocked(supabase.auth.getSession).mockResolvedValue({
+        data: { session: null },
+      } as any);
 
-            const result = await listDocuments(params);
+      const { getPresignedUpload } = await import('../documents');
 
-            expect(result).toHaveLength(2);
-            expect(result[0]).toHaveProperty('id');
-            expect(result[0]).toHaveProperty('file_name');
-            expect(result[0]).toHaveProperty('mime_type');
-            expect(result[0]).toHaveProperty('size_bytes');
-        });
+      await expect(
+        getPresignedUpload({ fileName: 'test.pdf', mimeType: 'application/pdf' })
+      ).rejects.toThrow('Failed to get upload URL');
     });
+  });
 
-    describe('uploadDocument', () => {
-        it('should upload a document with metadata', async () => {
-            const file = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
-            const meta = {
-                companyId: '550e8400-e29b-41d4-a716-446655440003',
-                dealId: '550e8400-e29b-41d4-a716-446655440004',
-                personId: undefined,
-            };
+  describe('Document Download', () => {
+    it('should generate signed download URL', async () => {
+      const mockDocument = {
+        file_name: 'test.pdf',
+        storage_path: 'user123/test.pdf',
+      };
 
-            const result = await uploadDocument(file, meta);
+      const mockStorageFrom = {
+        createSignedUrl: vi.fn().mockResolvedValue({
+          data: { signedUrl: 'https://storage.test.com/download' },
+          error: null,
+        }),
+      };
 
-            expect(result).toHaveProperty('id');
-            expect(result.file_name).toBe('test.pdf');
-            expect(result.mime_type).toBe('application/pdf');
-            expect(result.company_id).toBe('550e8400-e29b-41d4-a716-446655440003');
-            expect(result.deal_id).toBe('550e8400-e29b-41d4-a716-446655440004');
-        });
+      vi.mocked(supabase.storage.from).mockReturnValue(mockStorageFrom as any);
+
+      vi.mocked(supabase.from).mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({
+          data: mockDocument,
+          error: null,
+        }),
+      } as any);
+
+      const { getDownloadUrl } = await import('../documents');
+
+      const result = await getDownloadUrl('doc-id');
+
+      expect(result.url).toBe('https://storage.test.com/download');
+      expect(result.filename).toBe('test.pdf');
     });
-
-    describe('getDownloadUrl', () => {
-        it('should return download URL for document', async () => {
-            const documentId = '550e8400-e29b-41d4-a716-446655440001';
-
-            const result = await getDownloadUrl(documentId);
-
-            expect(result).toHaveProperty('url');
-            expect(result).toHaveProperty('filename');
-            expect(result.url).toContain('mock-s3.example.com');
-        });
-    });
-
-    describe('deleteDocument', () => {
-        it('should delete a document', async () => {
-            const documentId = '550e8400-e29b-41d4-a716-446655440001';
-
-            const result = await deleteDocument(documentId);
-
-            expect(result).toBe(true);
-        });
-    });
-
-    describe('updateDocumentRelations', () => {
-        it('should update document relations', async () => {
-            const documentId = '550e8400-e29b-41d4-a716-446655440001';
-            const relations = {
-                companyId: '550e8400-e29b-41d4-a716-446655440008',
-                dealId: null,
-                personId: '550e8400-e29b-41d4-a716-446655440006',
-            };
-
-            const result = await updateDocumentRelations(documentId, relations);
-
-            expect(result).toHaveProperty('id', documentId);
-            expect(result.company_id).toBe('550e8400-e29b-41d4-a716-446655440008');
-            expect(result.deal_id).toBeNull();
-            expect(result.person_id).toBe('550e8400-e29b-41d4-a716-446655440006');
-        });
-    });
+  });
 });

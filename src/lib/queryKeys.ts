@@ -138,4 +138,9 @@ export const qk = {
   
   // Company Notes
   companyNotes: (companyId: string) => ["company", companyId, "notes"] as const,
+  
+  // Email Templates
+  emailTemplates: (type?: string) => ["emailTemplates", type ?? "all"] as const,
+  emailTemplate: (id: string) => ["emailTemplate", id] as const,
+  defaultEmailTemplate: (type: string) => ["emailTemplate", "default", type] as const,
 };
