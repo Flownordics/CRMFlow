@@ -361,7 +361,7 @@ create table if not exists public.events (
   location text,
   attendees jsonb default '[]'::jsonb, -- [{email,name,optional}]
   color text, -- "primary|accent|warning|success|muted"
-  kind text, -- "meeting|call|deadline|other"
+  kind text not null default 'meeting' check (kind in ('meeting', 'call', 'deadline', 'other')),
   -- CRM-links (nullable)
   deal_id uuid references public.deals(id) on delete set null,
   company_id uuid references public.companies(id) on delete set null,
