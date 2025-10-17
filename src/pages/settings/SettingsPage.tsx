@@ -95,15 +95,26 @@ export function SettingsPage() {
           <TabsContent value="general" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>General Settings</CardTitle>
+                <CardTitle>Regional Settings</CardTitle>
                 <CardDescription>
-                  Configure general application settings
+                  Configure timezone and regional preferences
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  General settings will be available here in future updates.
-                </p>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="timezone" className="text-sm font-medium">
+                      Timezone
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      Currently: Europe/Copenhagen (Danish Time)
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Note: Your browser automatically uses your local timezone. 
+                      All events are stored in UTC and displayed in your local time.
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

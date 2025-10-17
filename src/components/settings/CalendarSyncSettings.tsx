@@ -3,8 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Calendar, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw, Calendar, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getCalendarSyncStatus, enableCalendarSync, disableCalendarSync, type CalendarSyncStatus } from '@/services/calendarSync';
 import { formatDistanceToNow } from 'date-fns';
@@ -71,13 +70,6 @@ export function CalendarSyncSettings() {
     }
   };
 
-  const isExpiringSoon = () => {
-    if (!syncStatus?.expiresAt) return false;
-    const expiresAt = new Date(syncStatus.expiresAt);
-    const now = new Date();
-    const hoursUntilExpiry = (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60);
-    return hoursUntilExpiry < 24;
-  };
 
   return (
     <Card>
@@ -130,27 +122,6 @@ export function CalendarSyncSettings() {
                 Last synced: {formatDistanceToNow(new Date(syncStatus.lastSyncAt), { addSuffix: true })}
               </div>
             )}
-
-            {syncStatus.expiresAt && (
-              <div className="flex items-center gap-2">
-                {isExpiringSoon() ? (
-                  <>
-                    <AlertCircle className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm text-muted-foreground">
-                      Expires {formatDistanceToNow(new Date(syncStatus.expiresAt), { addSuffix: true })}
-                    </span>
-                    <Badge variant="outline" className="ml-auto">Renewing soon</Badge>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-muted-foreground">
-                      Expires {formatDistanceToNow(new Date(syncStatus.expiresAt), { addSuffix: true })}
-                    </span>
-                  </>
-                )}
-              </div>
-            )}
           </div>
         )}
 
@@ -167,7 +138,7 @@ export function CalendarSyncSettings() {
             <li>CRMFlow → Google: Always enabled (one-way sync)</li>
             <li>Google → CRMFlow: Enable two-way sync to get Google changes</li>
             <li>Events are matched by Google Calendar ID</li>
-            <li>Sync subscription renews automatically every 7 days</li>
+            <li>Toggle off to disconnect anytime</li>
           </ul>
         </div>
       </CardContent>

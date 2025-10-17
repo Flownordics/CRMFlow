@@ -123,11 +123,10 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
             // Convert Danish time to UTC for storage
             const convertToUTC = (date: string, time?: string): string => {
                 if (allDay || !time) {
-                    // For all-day events, use midnight in Danish time
-                    const localDate = new Date(`${date}T00:00:00`);
-                    return localDate.toISOString();
+                    // For all-day events, store as UTC midnight
+                    return `${date}T00:00:00.000Z`;
                 } else {
-                    // For timed events, convert Danish time to UTC
+                    // Parse as local (Danish) time and convert to UTC
                     const localDate = new Date(`${date}T${time}:00`);
                     return localDate.toISOString();
                 }

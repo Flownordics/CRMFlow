@@ -85,15 +85,16 @@ export function CreateEventDialog({
 
         try {
             // Convert Danish time to UTC for storage
-            // Denmark is UTC+1 (winter) or UTC+2 (summer)
+            // Create ISO string with explicit timezone offset for Danish time
             const convertToUTC = (date: string, time?: string): string => {
                 if (allDay || !time) {
-                    // For all-day events, use midnight in Danish time
-                    const localDate = new Date(`${date}T00:00:00`);
-                    return localDate.toISOString();
+                    // For all-day events, store as UTC midnight
+                    return `${date}T00:00:00.000Z`;
                 } else {
-                    // For timed events, convert Danish time to UTC
+                    // Parse as local (Danish) time and convert to UTC
+                    // new Date() automatically parses as local time
                     const localDate = new Date(`${date}T${time}:00`);
+                    // toISOString() automatically converts to UTC
                     return localDate.toISOString();
                 }
             };
@@ -279,51 +280,46 @@ export function CreateEventDialog({
                         <Label htmlFor="allDay">{t('all_day')}</Label>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="startDate">Start Date *</Label>
-                            <Input
-                                id="startDate"
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="startTime">Start Time</Label>
-                            <Input
-                                id="startTime"
-                                type="time"
-                                value={startTime}
-                                onChange={(e) => setStartTime(e.target.value)}
-                                disabled={allDay}
-                            />
-                        </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="eventDate">Date *</Label>
+                        <Input
+                            id="eventDate"
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => {
+                                setStartDate(e.target.value);
+                                setEndDate(e.target.value);
+                            }}
+                            required
+                        />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="endDate">End Date *</Label>
-                            <Input
-                                id="endDate"
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                required
-                            />
+                    {!allDay && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="startTime">Start Time</Label>
+                                <Input
+                                    id="startTime"
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                    step="300"
+                                />
+                                <p className="text-xs text-muted-foreground">5 minute intervals</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="endTime">End Time</Label>
+                                <Input
+                                    id="endTime"
+                                    type="time"
+                                    value={endTime}
+                                    onChange={(e) => setEndTime(e.target.value)}
+                                    step="300"
+                                />
+                                <p className="text-xs text-muted-foreground">5 minute intervals</p>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="endTime">End Time</Label>
-                            <Input
-                                id="endTime"
-                                type="time"
-                                value={endTime}
-                                onChange={(e) => setEndTime(e.target.value)}
-                                disabled={allDay}
-                            />
-                        </div>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
                         <Label htmlFor="attendees">{t('attendees')}</Label>
