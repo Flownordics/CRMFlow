@@ -68,11 +68,12 @@ export function EventItem({ event, className, onEventUpdated }: EventItemProps) 
     return (
         <div
             className={cn(
-                "rounded-xl border bg-card p-3 shadow-card hover:shadow-hover transition-all duration-200 focus-visible:ring-2 focus-visible:ring-offset-2",
+                "rounded-xl border bg-card p-3 shadow-card hover:shadow-hover transition-all duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 cursor-pointer",
                 tokenRing(theme.color),
                 event.all_day && "bg-muted/50",
                 className
             )}
+            onClick={() => event.source === 'native' && setShowEditDialog(true)}
         >
             {/* Event Header */}
             <div className="flex items-start justify-between gap-2 mb-2">
@@ -114,18 +115,41 @@ export function EventItem({ event, className, onEventUpdated }: EventItemProps) 
                     {event.source === 'native' && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 w-6 p-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     <MoreVertical className="h-3 w-3" />
                                     <span className="sr-only">Open menu</span>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                                <DropdownMenuItem 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowEditDialog(true);
+                                    }}
+                                >
                                     <Edit className="mr-2 h-4 w-4" />
-                                    Edit
+                                    Edit Event
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
+                    )}
+                    
+                    {/* Info for Google-only events */}
+                    {event.source === 'google' && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 px-2 text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                            disabled
+                        >
+                            View in Google
+                        </Button>
                     )}
                 </div>
             </div>
