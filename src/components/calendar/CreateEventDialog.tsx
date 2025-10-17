@@ -200,13 +200,27 @@ export function CreateEventDialog({
     useEffect(() => {
         if (open) {
             const now = new Date();
-            const tomorrow = new Date(now);
-            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            // Round to next half hour
+            const minutes = now.getMinutes();
+            const roundedMinutes = minutes < 30 ? 30 : 60;
+            if (roundedMinutes === 60) {
+                now.setHours(now.getHours() + 1);
+                now.setMinutes(0);
+            } else {
+                now.setMinutes(roundedMinutes);
+            }
+            now.setSeconds(0);
+            now.setMilliseconds(0);
+            
+            // End time is 1 hour after start
+            const endTime = new Date(now);
+            endTime.setHours(endTime.getHours() + 1);
 
             setStartDate(now.toISOString().split('T')[0]);
             setStartTime(now.toTimeString().slice(0, 5));
-            setEndDate(tomorrow.toISOString().split('T')[0]);
-            setEndTime(now.toTimeString().slice(0, 5));
+            setEndDate(endTime.toISOString().split('T')[0]);
+            setEndTime(endTime.toTimeString().slice(0, 5));
             
             // Set default values from props
             if (defaultCompanyId) {

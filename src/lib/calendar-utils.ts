@@ -142,10 +142,23 @@ function getTaskColor(task: Task): string {
 
 /**
  * Merge native events, Google events, and tasks, sorted by start time
+ * IMPORTANT: Filters out Google events that are already synced as native events to prevent duplicates
  */
 export function mergeEvents(nativeEvents: EventRow[], googleEvents: GoogleCalendarEvent[], tasks: Task[] = []): MergedEvent[] {
     const nativeMerged = nativeEvents.map(nativeEventToMerged);
-    const googleMerged = googleEvents.map(googleEventToMerged);
+    
+    // Get all Google event IDs that are already in native events (synced events)
+    const syncedGoogleEventIds = new Set(
+        nativeEvents
+            .filter(e => e.google_event_id)
+            .map(e => e.google_event_id)
+    );
+    
+    // Filter out Google events that are already synced to CRM (prevent duplicates!)
+    const uniqueGoogleEvents = googleEvents.filter(
+        gEvent => !syncedGoogleEventIds.has(gEvent.id)
+    );
+    const googleMerged = uniqueGoogleEvents.map(googleEventToMerged);
 
     // Convert tasks with due dates to events
     const taskMerged = tasks

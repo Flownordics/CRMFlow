@@ -106,9 +106,18 @@ export function SettingsPage() {
                     <label htmlFor="timezone" className="text-sm font-medium">
                       Timezone
                     </label>
-                    <p className="text-sm text-muted-foreground">
-                      Currently: Europe/Copenhagen (Danish Time)
-                    </p>
+                    <select
+                      id="timezone"
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                      defaultValue="Europe/Copenhagen"
+                    >
+                      <option value="Europe/Copenhagen">Europe/Copenhagen (Danish Time)</option>
+                      <option value="Europe/London">Europe/London (UK Time)</option>
+                      <option value="Europe/Paris">Europe/Paris (Central European Time)</option>
+                      <option value="America/New_York">America/New York (EST)</option>
+                      <option value="America/Los_Angeles">America/Los Angeles (PST)</option>
+                      <option value="Asia/Tokyo">Asia/Tokyo (Japan Time)</option>
+                    </select>
                     <p className="text-xs text-muted-foreground">
                       Note: Your browser automatically uses your local timezone. 
                       All events are stored in UTC and displayed in your local time.
