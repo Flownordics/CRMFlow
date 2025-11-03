@@ -74,7 +74,31 @@ export async function sendQuoteEmail(request: SendQuoteEmailRequest): Promise<Se
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      
+      // Extract detailed error message
+      let errorMessage = errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+      
+      // If there are details with Google error, include them
+      if (errorData.details?.googleError?.error_description) {
+        errorMessage = `${errorMessage}: ${errorData.details.googleError.error_description}`;
+      } else if (errorData.details?.googleError?.error) {
+        errorMessage = `${errorMessage}: ${errorData.details.googleError.error}`;
+      }
+      
+      // Log full error details
+      logger.error('Send quote email error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData: errorData,
+        details: errorData.details,
+        googleError: errorData.details?.googleError
+      });
+      
+      // Create more detailed error
+      const detailedError = new Error(errorMessage);
+      (detailedError as any).details = errorData.details;
+      (detailedError as any).errorData = errorData;
+      throw detailedError;
     }
 
     const result = await response.json();

@@ -16,20 +16,21 @@ Deno.serve(async (req) => {
 
   // Only allow POST requests
   if (req.method !== 'POST') {
-    const appUrl = getEnvVarSafe('APP_URL', 'https://crmflow-app.netlify.app');
-    return errorJson(405, 'Method not allowed', appUrl);
+    const origin = req.headers.get('origin') || getEnvVarSafe('APP_URL', 'https://crmflow-app.netlify.app');
+    return errorJson(405, 'Method not allowed', origin);
   }
 
   try {
     console.log('[google-oauth-start] Processing POST request...');
     
     const appUrl = getEnvVarSafe('APP_URL', 'https://crmflow-app.netlify.app');
+    const origin = req.headers.get('origin') || appUrl;
     
     // Get authorization header
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('[google-oauth-start] Missing or invalid authorization header');
-      return errorJson(401, 'Missing or invalid authorization header', appUrl);
+      return errorJson(401, 'Missing or invalid authorization header', origin);
     }
 
     const accessToken = authHeader.slice('Bearer '.length);
@@ -42,7 +43,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
     if (userError || !user) {
       console.error('[google-oauth-start] Invalid user token:', userError?.message);
-      return errorJson(401, 'Invalid access token', appUrl);
+      return errorJson(401, 'Invalid access token', origin);
     }
     
     console.log('[google-oauth-start] User authenticated:', user.id);
@@ -55,7 +56,7 @@ Deno.serve(async (req) => {
 
     if (!kind || !['gmail', 'calendar'].includes(kind)) {
       console.error('[google-oauth-start] Invalid kind parameter:', kind);
-      return errorJson(400, 'Invalid kind parameter. Must be "gmail" or "calendar"', appUrl);
+      return errorJson(400, 'Invalid kind parameter. Must be "gmail" or "calendar"', origin);
     }
 
     // Get workspace ID from workspace_settings (single-tenant)
@@ -67,7 +68,7 @@ Deno.serve(async (req) => {
 
     if (workspaceError || !workspaceSettings) {
       console.error('[google-oauth-start] Workspace not configured:', workspaceError?.message);
-      return errorJson(500, 'Workspace not configured', appUrl);
+      return errorJson(500, 'Workspace not configured', origin);
     }
     
     console.log('[google-oauth-start] Workspace ID:', workspaceSettings.id);
@@ -116,7 +117,7 @@ Deno.serve(async (req) => {
     console.log('[google-oauth-start] Redirect URI:', credentials.redirect_uri);
     console.log('[google-oauth-start] Scopes:', scopes);
 
-    return okJson({ authUrl }, appUrl);
+    return okJson({ authUrl }, origin);
 
   } catch (error) {
     console.error('[google-oauth-start] ERROR:', error);
@@ -125,9 +126,9 @@ Deno.serve(async (req) => {
       stack: error instanceof Error ? error.stack : undefined,
     });
     
-    const appUrl = getEnvVarSafe('APP_URL', 'https://crmflow-app.netlify.app');
+    const origin = req.headers.get('origin') || getEnvVarSafe('APP_URL', 'https://crmflow-app.netlify.app');
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     
-    return errorJson(500, `OAuth start failed: ${errorMessage}`, appUrl);
+    return errorJson(500, `OAuth start failed: ${errorMessage}`, origin);
   }
 });

@@ -146,15 +146,10 @@ export async function disconnectIntegration(kind: 'gmail' | 'calendar'): Promise
       throw new Error("User not authenticated");
     }
 
+    // Delete the integration record since access_token has NOT NULL constraint
     const { error } = await supabase
       .from('user_integrations')
-      .update({
-        access_token: null,
-        refresh_token: null,
-        expires_at: null,
-        scopes: null,
-        last_synced_at: new Date().toISOString(),
-      })
+      .delete()
       .eq('user_id', user.id)
       .eq('provider', 'google')
       .eq('kind', kind);

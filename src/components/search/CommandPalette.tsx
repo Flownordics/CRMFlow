@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogTitle, DialogHeader, DialogDescription } from "@/components/ui/dialog";
 import { AccessibleDialogContent } from "@/components/ui/accessible-dialog";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";

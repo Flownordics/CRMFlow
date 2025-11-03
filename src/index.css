@@ -418,10 +418,52 @@
     inset: 0 !important;
   }
 
-  /* Ensure modals are always visible and centered on desktop */
+  /* Ensure dialog content never causes horizontal scroll */
   [role="dialog"] {
     position: fixed !important;
     z-index: 9999 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Ensure dialog content respects container width */
+  [role="dialog"] > *,
+  [role="dialog"] form,
+  [role="dialog"] .grid,
+  [role="dialog"] .flex {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Ensure inputs and textareas respect container width */
+  /* Focus rings (ring-2 + ring-offset-2 = 2px + 8px = 10px per side) need space */
+  [role="dialog"] input,
+  [role="dialog"] textarea,
+  [role="dialog"] select {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    /* Ensure focus rings aren't clipped - use negative margin to allow overflow within padding */
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Prevent child elements from causing overflow, but allow focus states */
+  [role="dialog"] * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Ensure focus rings are visible - they use ring-offset-2 which needs space */
+  [role="dialog"] input:focus-visible,
+  [role="dialog"] textarea:focus-visible,
+  [role="dialog"] select:focus-visible,
+  [role="dialog"] button:focus-visible {
+    /* Focus rings should be visible within padding area */
+    position: relative;
+    z-index: 1;
   }
 
   @media (min-width: 768px) {

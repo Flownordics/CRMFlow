@@ -12,11 +12,14 @@ export default defineConfig(({ mode }: { mode: string }) => ({
   server: {
     host: "::",
     port: 8080,
+    strictPort: false,
     proxy: {
       '/.netlify/functions': {
         target: 'http://localhost:8888',
         changeOrigin: true,
         secure: false,
+        timeout: 30000, // 30 second timeout
+        proxyTimeout: 30000,
         configure: (proxy: any, _options: any) => {
           proxy.on('error', (err: Error, _req: any, _res: any) => {
             console.log('[Vite Proxy] Error: Netlify functions not available. Run "npm run dev:netlify" to enable PDF generation.');

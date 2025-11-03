@@ -37,6 +37,8 @@ export function corsHeaders(origin?: string) {
     'https://crmflow-app.netlify.app',
     'http://localhost:5173',
     'http://localhost:3000',
+    'http://localhost:8080',
+    'http://localhost:8888',
   ];
   
   // If specific origin provided and it's in allowed list, use it

@@ -34,7 +34,25 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        "fixed z-[9999] grid w-full gap-4 border bg-background shadow-lg duration-200 max-h-[100dvh] overflow-y-auto overflow-x-hidden",
+        "box-border",
+        // Mobile: fullscreen with safe area
+        // Extra padding to accommodate focus rings (ring-2 + ring-offset-2 = 10px per side needed)
+        "inset-0 p-5 sm:p-6",
+        "pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)]",
+        "sm:pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] sm:pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]",
+        "max-w-[100vw]",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+        // Desktop: centered modal
+        "md:left-[50%] md:top-[50%] md:translate-x-[-50%] md:translate-y-[-50%]",
+        "md:max-w-lg md:p-6 md:rounded-lg md:max-h-[90vh]",
+        "md:pt-6 md:pb-6 md:inset-auto",
+        // Ensure dialog never exceeds viewport width
+        "md:max-w-[min(100vw-2rem,32rem)]",
+        "md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95",
+        "md:data-[state=closed]:slide-out-to-left-1/2 md:data-[state=closed]:slide-out-to-top-[48%]",
+        "md:data-[state=open]:slide-in-from-left-1/2 md:data-[state=open]:slide-in-from-top-[48%]",
         className,
       )}
       {...props}

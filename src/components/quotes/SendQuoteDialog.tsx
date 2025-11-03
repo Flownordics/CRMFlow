@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogHeader, DialogFooter } from "@/components/ui/dialog";
-import { AccessibleDialogContent, AccessibleDialogTitle, AccessibleDialogDescription } from "@/components/ui/accessible-dialog";
+import { Dialog, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AccessibleDialogContent } from "@/components/ui/accessible-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useSendQuoteEmail } from "@/services/email";
@@ -19,7 +19,7 @@ import { logEmailSent } from "@/services/activity";
 import { isGmailAvailable } from "@/services/email";
 import { toastBus } from "@/lib/toastBus";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Send, CheckCircle, Download, Copy, Mail } from "lucide-react";
+import { AlertTriangle, Send, CheckCircle, Download, Mail } from "lucide-react";
 import { logger } from '@/lib/logger';
 
 interface SendQuoteDialogProps {
@@ -133,7 +133,33 @@ Your Sales Team`);
             if (error.name === 'EmailNotConnectedError') {
                 setError('EMAIL_NOT_CONNECTED');
             } else {
-                setError(error.message || 'Failed to send email');
+                // Extract detailed error message
+                let errorMessage = error.message || 'Failed to send email';
+                
+                // Include Google OAuth error details if available
+                const googleError = error.details?.googleError || error.errorData?.details?.googleError;
+                if (googleError) {
+                    if (googleError.error === 'invalid_grant') {
+                        errorMessage = 'Gmail refresh token is invalid or expired. Please reconnect your Gmail account in Settings > Integrations.';
+                    } else if (googleError.error_description) {
+                        errorMessage = `${errorMessage}: ${googleError.error_description}`;
+                    } else if (googleError.error) {
+                        errorMessage = `${errorMessage}: ${googleError.error}`;
+                    }
+                }
+                
+                // Check if requires reconnect
+                if (error.errorData?.requiresReconnect || googleError?.error === 'invalid_grant') {
+                    errorMessage = 'Gmail refresh token is invalid. Please reconnect your Gmail account in Settings > Integrations.';
+                }
+                
+                logger.error('Send quote error details:', {
+                    error: error.message,
+                    details: error.details,
+                    errorData: error.errorData
+                });
+                
+                setError(errorMessage);
             }
         }
     };
@@ -151,26 +177,6 @@ Your Sales Team`);
         }
     };
 
-    const handleCopyEmail = async () => {
-        const emailContent = `Subject: ${subject || `Your quote ${quote?.number || quoteId}`}
-
-${body || 'Please find attached your quote.'}`;
-
-        try {
-            await navigator.clipboard.writeText(emailContent);
-            toastBus.emit({
-                title: "Email copied",
-                description: "Email content copied to clipboard",
-                variant: "success"
-            });
-        } catch (error) {
-            toastBus.emit({
-                title: "Failed to copy",
-                description: "Please copy manually",
-                variant: "destructive"
-            });
-        }
-    };
 
     // Google integration removed - starting fresh
 
@@ -180,10 +186,10 @@ ${body || 'Please find attached your quote.'}`;
         <Dialog open={open} onOpenChange={onOpenChange}>
             <AccessibleDialogContent className="sm:max-w-[600px]" data-testid="send-quote-dialog">
                 <DialogHeader>
-                    <AccessibleDialogTitle id="send-quote-title">Send tilbud</AccessibleDialogTitle>
-                    <AccessibleDialogDescription id="send-quote-desc">
+                    <DialogTitle id="send-quote-title">Send tilbud</DialogTitle>
+                    <DialogDescription id="send-quote-desc">
                         Send tilbuddet til kunden. Du kan downloade PDF og sende manuelt.
-                    </AccessibleDialogDescription>
+                    </DialogDescription>
                 </DialogHeader>
 
                 {/* Google integration removed - starting fresh */}
@@ -327,17 +333,6 @@ ${body || 'Please find attached your quote.'}`;
                         >
                             <Download className="h-4 w-4" aria-hidden="true" />
                             Download PDF
-                        </Button>
-
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleCopyEmail}
-                            disabled={sendEmail.isPending}
-                            className="flex items-center gap-2"
-                        >
-                            <Copy className="h-4 w-4" aria-hidden="true" />
-                            Copy email
                         </Button>
 
                         <Button

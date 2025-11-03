@@ -87,7 +87,6 @@ export const handler = async (event, context) => {
         const accessToken = authHeader.slice('Bearer '.length);
 
         // Create Supabase client with user's access token
-        const { createClient } = require('@supabase/supabase-js');
         const supabase = createClient(supabaseUrl, supabaseServiceKey, {
             global: {
                 headers: {
@@ -106,11 +105,11 @@ export const handler = async (event, context) => {
             };
         }
 
-        // Get user's Gmail integration
+        // Get user's Gmail integration (including workspace_id if available)
         console.log('Looking for Gmail integration for user:', user.id);
         const { data: integration, error: integrationError } = await supabase
             .from('user_integrations')
-            .select('*')
+            .select('*, workspace_id')
             .eq('user_id', user.id)
             .eq('provider', 'google')
             .eq('kind', 'gmail')
@@ -150,26 +149,79 @@ export const handler = async (event, context) => {
             };
         }
 
-        // Use centralized Google OAuth credentials from environment variables
-        console.log('Using centralized Google OAuth credentials from environment');
-        const workspaceCredentials = {
-            client_id: process.env.GOOGLE_CLIENT_ID,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET
+        // Get workspace OAuth credentials from workspace_integrations table
+        const workspaceId = integration.workspace_id;
+        console.log('Integration details:', {
+            hasWorkspaceId: !!workspaceId,
+            workspaceId: workspaceId,
+            hasAccessToken: !!integration.access_token,
+            hasRefreshToken: !!integration.refresh_token,
+            expiresAt: integration.expires_at
+        });
+        
+        let workspaceCredentials = {
+            client_id: null,
+            client_secret: null
         };
 
-        console.log('Centralized credentials check:', {
-            hasClientId: !!workspaceCredentials.client_id,
-            hasClientSecret: !!workspaceCredentials.client_secret
+        if (workspaceId) {
+            // Try to get credentials from workspace_integrations table (BYOG model)
+            console.log('Querying workspace_integrations for workspace:', workspaceId);
+            const { data: workspaceIntegration, error: workspaceError } = await supabase
+                .from('workspace_integrations')
+                .select('client_id, client_secret')
+                .eq('workspace_id', workspaceId)
+                .eq('provider', 'google')
+                .eq('kind', 'gmail')
+                .single();
+
+            console.log('Workspace integration query result:', {
+                found: !!workspaceIntegration,
+                error: workspaceError,
+                hasClientId: !!workspaceIntegration?.client_id,
+                hasClientSecret: !!workspaceIntegration?.client_secret
+            });
+
+            if (!workspaceError && workspaceIntegration) {
+                console.log('Found workspace OAuth credentials in database');
+                workspaceCredentials = {
+                    client_id: workspaceIntegration.client_id,
+                    client_secret: workspaceIntegration.client_secret
+                };
+            } else {
+                console.log('Workspace integration not found in database:', workspaceError?.message || 'No record found');
+            }
+        } else {
+            console.log('No workspace_id in user_integration record');
+        }
+
+        // Fallback to environment variables if workspace credentials not found
+        if (!workspaceCredentials.client_id || !workspaceCredentials.client_secret) {
+            console.log('Using Google OAuth credentials from environment variables as fallback');
+            workspaceCredentials = {
+                client_id: process.env.GOOGLE_CLIENT_ID,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET
+            };
+        }
+
+        console.log('OAuth credentials check:', {
+            hasWorkspaceId: !!workspaceId,
+            hasWorkspaceClientId: !!workspaceCredentials.client_id,
+            hasWorkspaceClientSecret: !!workspaceCredentials.client_secret,
+            hasEnvClientId: !!process.env.GOOGLE_CLIENT_ID,
+            hasEnvClientSecret: !!process.env.GOOGLE_CLIENT_SECRET
         });
 
         if (!workspaceCredentials.client_id || !workspaceCredentials.client_secret) {
-            console.error('Missing Google OAuth credentials in Netlify environment');
+            console.error('Missing Google OAuth credentials');
             return {
                 statusCode: 500,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     error: 'Google OAuth credentials not configured',
-                    details: 'Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Netlify environment variables'
+                    details: workspaceId 
+                        ? 'Please configure Google OAuth credentials in Settings > Integrations for your workspace, or set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Netlify environment variables'
+                        : 'Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Netlify environment variables'
                 })
             };
         }
@@ -189,21 +241,8 @@ export const handler = async (event, context) => {
         if (expiresAt && expiresAt <= now) {
             console.log('Token expired, attempting refresh...');
 
-            // Use workspace Google OAuth credentials
-            const googleClientId = workspaceCredentials.client_id || process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
-            const googleClientSecret = workspaceCredentials.client_secret || process.env.GOOGLE_CLIENT_SECRET || process.env.VITE_GOOGLE_CLIENT_SECRET;
-
-            console.log('Google OAuth credentials check:', {
-                hasWorkspaceClientId: !!workspaceCredentials.client_id,
-                hasWorkspaceClientSecret: !!workspaceCredentials.client_secret,
-                hasEnvClientId: !!process.env.GOOGLE_CLIENT_ID,
-                hasEnvClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-                hasRefreshToken: !!integration.refresh_token,
-                finalClientId: !!googleClientId,
-                finalClientSecret: !!googleClientSecret
-            });
-
-            if (!googleClientId || !googleClientSecret || !integration.refresh_token) {
+            // Verify we have credentials and refresh token
+            if (!workspaceCredentials.client_id || !workspaceCredentials.client_secret) {
                 return {
                     statusCode: 400,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -212,46 +251,82 @@ export const handler = async (event, context) => {
                         details: {
                             hasWorkspaceClientId: !!workspaceCredentials.client_id,
                             hasWorkspaceClientSecret: !!workspaceCredentials.client_secret,
-                            hasEnvClientId: !!process.env.GOOGLE_CLIENT_ID,
-                            hasEnvClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
                             hasRefreshToken: !!integration.refresh_token,
-                            finalClientId: !!googleClientId,
-                            finalClientSecret: !!googleClientSecret
+                            workspaceId: workspaceId
                         }
                     })
                 };
             }
 
-            // Token expired, refresh it
+            if (!integration.refresh_token) {
+                return {
+                    statusCode: 400,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        error: 'Missing refresh token',
+                        details: 'Please reconnect your Gmail account to get a new refresh token'
+                    })
+                };
+            }
+
+            // Token expired, refresh it using workspace credentials
             const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: new URLSearchParams({
-                    client_id: googleClientId,
-                    client_secret: googleClientSecret,
+                    client_id: workspaceCredentials.client_id,
+                    client_secret: workspaceCredentials.client_secret,
                     refresh_token: integration.refresh_token,
                     grant_type: 'refresh_token',
                 }),
             });
 
             if (!refreshResponse.ok) {
-                const errorText = await refreshResponse.text();
+                let errorText;
+                let errorJson;
+                try {
+                    errorText = await refreshResponse.text();
+                    try {
+                        errorJson = JSON.parse(errorText);
+                    } catch {
+                        // If not JSON, use text as is
+                    }
+                } catch (e) {
+                    errorText = 'Failed to read error response';
+                }
+
                 console.error('Token refresh failed:', {
                     status: refreshResponse.status,
                     statusText: refreshResponse.statusText,
-                    error: errorText
+                    error: errorText,
+                    errorJson: errorJson,
+                    hasCredentials: !!workspaceCredentials.client_id && !!workspaceCredentials.client_secret,
+                    hasRefreshToken: !!integration.refresh_token,
+                    workspaceId: workspaceId
                 });
+
+                const errorDetails = errorJson || { message: errorText };
+                const isInvalidGrant = errorJson?.error === 'invalid_grant';
+                const errorMessage = isInvalidGrant 
+                    ? 'Gmail refresh token is invalid or expired. Please reconnect your Gmail account in Settings > Integrations.'
+                    : (errorJson?.error_description || errorJson?.error || errorText);
+                
                 return {
                     statusCode: 400,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         error: 'Failed to refresh Gmail access token',
+                        message: errorMessage,
+                        requiresReconnect: isInvalidGrant,
                         details: {
                             status: refreshResponse.status,
                             statusText: refreshResponse.statusText,
-                            error: errorText
+                            googleError: errorJson,
+                            hasCredentials: !!workspaceCredentials.client_id && !!workspaceCredentials.client_secret,
+                            hasRefreshToken: !!integration.refresh_token,
+                            workspaceId: workspaceId || null
                         }
                     })
                 };
@@ -502,12 +577,18 @@ Your Sales Team
 
     } catch (error) {
         console.error('Send quote error:', error);
+        console.error('Error stack:', error.stack);
         return {
             statusCode: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: 'Internal server error' })
+            body: JSON.stringify({ 
+                error: 'Internal server error',
+                message: error.message || 'Unknown error',
+                details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            })
         };
     }
 };
+
 
 
