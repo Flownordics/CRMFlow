@@ -5,7 +5,7 @@ import { z } from "zod";
 import { USE_MOCKS } from "@/lib/debug";
 import { toastBus } from "@/lib/toastBus";
 import { logActivity } from "./activity";
-import { useCompanies } from "./companies";
+import { useCompanies, fetchCompany } from "./companies";
 import { usePeople } from "./people";
 import { createOrder, fetchOrder } from "./orders";
 import { fetchQuote } from "./quotes";
@@ -130,11 +130,27 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{ id: stri
     const order = await fetchOrder(orderId);
     logger.debug(`[ensureInvoiceForOrder] Fetched order ${orderId}:`, order);
 
+    // 2.5) Fetch company to get payment_days (if company_id exists)
+    let paymentDays = 14; // Default payment terms
+    if (order.company_id) {
+      try {
+        const company = await fetchCompany(order.company_id);
+        paymentDays = company.paymentDays || 14;
+        logger.debug(`[ensureInvoiceForOrder] Using payment_days from company: ${paymentDays}`);
+      } catch (error) {
+        logger.warn(`[ensureInvoiceForOrder] Failed to fetch company ${order.company_id}, using default 14 days:`, error);
+      }
+    }
+
     // 3) Build invoice payload
+    const issueDate = new Date();
+    const dueDate = new Date(issueDate);
+    dueDate.setDate(dueDate.getDate() + paymentDays);
+    
     const invoicePayload = {
       currency: order.currency,
-      issue_date: new Date().toISOString().split('T')[0], // Today's date
-      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+      issue_date: issueDate.toISOString().split('T')[0], // Today's date
+      due_date: dueDate.toISOString().split('T')[0], // Calculated based on company payment_days
       notes: order.notes || `Invoice created from order ${order.number || orderId}`,
       company_id: order.company_id,
       contact_id: order.contact_id || null,

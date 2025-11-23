@@ -59,6 +59,15 @@
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
 # Environment variables for Netlify Functions
-# Note: Environment variables should be set in Netlify Dashboard
-# Dashboard → Site Settings → Environment Variables
+# 
+# For LOCAL DEVELOPMENT:
+# - Create a .env file in the project root with:
+#   SUPABASE_URL=https://your-project.supabase.co
+#   SUPABASE_SERVICE_KEY=your-service-role-key
+# 
+# For PRODUCTION:
+# - Set environment variables in Netlify Dashboard
+# - Dashboard → Site Settings → Environment Variables
+# 
+# See docs/NETLIFY_DEV_SETUP.md for detailed setup instructions
 # See env.example for required variables

@@ -135,6 +135,7 @@ export async function fetchCompanies(params: {
       description: company.description,
       foundedDate: company.founded_date,
       parentCompanyId: company.parent_company_id,
+      paymentDays: company.payment_days,
     })) : [];
 
     // Parse the mapped companies array
@@ -205,6 +206,7 @@ export async function fetchCompany(id: string) {
       description: company.description,
       foundedDate: company.founded_date,
       parentCompanyId: company.parent_company_id,
+      paymentDays: company.payment_days,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -287,6 +289,7 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       description: createdCompany.description,
       foundedDate: createdCompany.founded_date,
       parentCompanyId: createdCompany.parent_company_id,
+      paymentDays: createdCompany.payment_days,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -368,6 +371,7 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
       description: company.description,
       foundedDate: company.founded_date,
       parentCompanyId: company.parent_company_id,
+      paymentDays: company.payment_days,
     };
 
     return companyReadSchema.parse(mappedCompany);

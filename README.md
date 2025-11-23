@@ -34,7 +34,22 @@ npm i
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
+
+# OR for Netlify Functions (PDF generation, email sending, etc.):
+npm run dev:netlify
 ```
+
+**Important for Netlify Functions:**
+
+If you're using `npm run dev:netlify` and get 500 errors from functions (like PDF generation), you need to set up environment variables:
+
+1. Create a `.env` file in the project root:
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your-service-role-key
+```
+
+2. See `docs/NETLIFY_DEV_SETUP.md` for detailed instructions.
 
 **Edit a file directly in GitHub**
 

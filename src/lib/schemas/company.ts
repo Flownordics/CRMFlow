@@ -39,6 +39,7 @@ export const companyReadSchema = z.object({
   description: z.string().nullable().optional(),
   foundedDate: z.string().nullable().optional(),
   parentCompanyId: z.string().uuid().nullable().optional(),
+  paymentDays: z.number().int().positive().nullable().optional(),
 });
 
 export const companyCreateSchema = z.object({
@@ -63,6 +64,7 @@ export const companyCreateSchema = z.object({
   description: z.string().optional().nullable(),
   foundedDate: z.string().optional().nullable(),
   parentCompanyId: z.string().uuid().optional().nullable(),
+  paymentDays: z.number().int().positive().optional().nullable(),
 });
 
 export const companyUpdateSchema = companyCreateSchema.partial();
