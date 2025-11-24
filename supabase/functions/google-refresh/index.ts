@@ -72,6 +72,7 @@ Deno.serve(async (req) => {
     const credentials = getCentralizedOAuthCreds();
 
     // Refresh token using Google's OAuth2 endpoint
+    // Note: redirect_uri is NOT needed for token refresh, only for initial authorization
     const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -82,28 +83,39 @@ Deno.serve(async (req) => {
         client_secret: credentials.client_secret,
         refresh_token: integration.refresh_token,
         grant_type: 'refresh_token',
-        redirect_uri: credentials.redirect_uri,
       }),
     });
 
     if (!refreshResponse.ok) {
       const errorData = await refreshResponse.text().catch(() => 'Unable to read error response');
       let errorMessage = 'Failed to refresh token';
+      let errorCode = 'unknown';
       
       try {
-        const errorJson = JSON.parse(errorData);
-        errorMessage = errorJson.error_description || errorJson.error || errorMessage;
+        const errorDataParsed = JSON.parse(errorData);
+        errorCode = errorDataParsed.error || 'unknown';
+        errorMessage = errorDataParsed.error_description || errorDataParsed.error || errorMessage;
         console.error('Token refresh failed - Google API error:', {
           status: refreshResponse.status,
-          error: errorJson.error,
-          error_description: errorJson.error_description,
-          full_response: errorData
+          error: errorCode,
+          error_description: errorDataParsed.error_description,
+          full_response: errorData,
+          has_refresh_token: !!integration.refresh_token,
+          has_client_id: !!credentials.client_id,
+          has_client_secret: !!credentials.client_secret
         });
       } catch {
         console.error('Token refresh failed - Unable to parse error:', {
           status: refreshResponse.status,
           raw_response: errorData
         });
+      }
+      
+      // Provide more specific error messages based on error code
+      if (errorCode === 'invalid_grant') {
+        errorMessage = 'Refresh token is invalid or expired. Please reconnect your Google account.';
+      } else if (errorCode === 'invalid_client') {
+        errorMessage = 'OAuth credentials are invalid. Please check your Google OAuth configuration.';
       }
       
       return errorJson(400, errorMessage, getEnvVar('APP_URL'));
