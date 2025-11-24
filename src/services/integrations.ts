@@ -322,14 +322,21 @@ export async function refreshGoogleTokenIfNeeded(kind: 'gmail' | 'calendar', opt
     }
 
     // Call Edge Function to refresh token
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error("Not authenticated");
+    }
+
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
-        integrationId: integration.id
+        userId: user.id,
+        kind: kind,
+        force: options?.force || false
       })
     });
 
@@ -339,17 +346,8 @@ export async function refreshGoogleTokenIfNeeded(kind: 'gmail' | 'calendar', opt
 
     const result = await response.json();
 
-    // Update the integration with new tokens
-    if (result.accessToken) {
-      await supabase
-        .from('user_integrations')
-        .update({
-          access_token: result.accessToken,
-          refresh_token: result.refreshToken || integration.refresh_token,
-          expires_at: result.expiresAt,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', integration.id);
+    // Edge Function already updates the database, but we can verify the result
+    if (result.ok && result.access_token) {
       return true;
     }
 

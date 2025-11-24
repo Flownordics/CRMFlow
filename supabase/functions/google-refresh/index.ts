@@ -15,8 +15,22 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return errorJson(401, 'Missing or invalid authorization header', getEnvVar('APP_URL'));
+    }
+
+    const accessToken = authHeader.slice('Bearer '.length);
+
     // Create Supabase admin client
     const supabaseAdmin = createSupabaseAdmin();
+
+    // Verify user token and get user info
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
+    if (userError || !user) {
+      return errorJson(401, 'Invalid access token', getEnvVar('APP_URL'));
+    }
 
     // Get request body
     const body = await req.json();
@@ -28,6 +42,11 @@ Deno.serve(async (req) => {
 
     if (!userId) {
       return errorJson(400, 'Missing userId parameter', getEnvVar('APP_URL'));
+    }
+
+    // Security: Verify that the authenticated user matches the userId in request
+    if (userId !== user.id) {
+      return errorJson(403, 'Forbidden: userId does not match authenticated user', getEnvVar('APP_URL'));
     }
 
     // Get user integration with decrypted tokens
@@ -68,9 +87,26 @@ Deno.serve(async (req) => {
     });
 
     if (!refreshResponse.ok) {
-      const errorData = await refreshResponse.text();
-      console.error('Token refresh failed:', errorData);
-      return errorJson(400, 'Failed to refresh token', getEnvVar('APP_URL'));
+      const errorData = await refreshResponse.text().catch(() => 'Unable to read error response');
+      let errorMessage = 'Failed to refresh token';
+      
+      try {
+        const errorJson = JSON.parse(errorData);
+        errorMessage = errorJson.error_description || errorJson.error || errorMessage;
+        console.error('Token refresh failed - Google API error:', {
+          status: refreshResponse.status,
+          error: errorJson.error,
+          error_description: errorJson.error_description,
+          full_response: errorData
+        });
+      } catch {
+        console.error('Token refresh failed - Unable to parse error:', {
+          status: refreshResponse.status,
+          raw_response: errorData
+        });
+      }
+      
+      return errorJson(400, errorMessage, getEnvVar('APP_URL'));
     }
 
     const refreshData = await refreshResponse.json();

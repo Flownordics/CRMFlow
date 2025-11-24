@@ -184,24 +184,35 @@ async function refreshGoogleToken(integration: CalendarIntegration): Promise<str
             throw new Error("VITE_SUPABASE_URL is not configured");
         }
 
+        // Get session token for authentication
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+            throw new Error("Not authenticated");
+        }
+
         const response = await fetch(`${supabaseUrl}/functions/v1/google-refresh`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'Authorization': `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
                 userId: integration.user_id,
                 kind: 'calendar',
-                refreshToken: integration.refresh_token
+                force: true
             })
         });
 
         if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            logger.error('Failed to refresh token:', { status: response.status, error: errorText });
             throw new Error(`Failed to refresh token: ${response.status}`);
         }
 
         const result = await response.json();
+        if (!result.access_token) {
+            throw new Error('No access token in refresh response');
+        }
         return result.access_token;
     } catch (error) {
         logger.error('Error refreshing Google token:', error);
