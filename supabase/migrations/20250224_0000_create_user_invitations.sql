@@ -103,12 +103,13 @@ CREATE OR REPLACE FUNCTION public.create_invitation(
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = public, pg_temp, extensions
 AS $$
 DECLARE
   v_token text;
   v_invitation_id uuid;
   v_expires_at timestamptz;
+  v_base64_token text;
 BEGIN
   -- TODO: Add admin check when user_roles table is implemented
   -- For now, allow any authenticated user to create invitations
@@ -136,8 +137,10 @@ BEGIN
     RAISE EXCEPTION 'Pending invitation already exists for email %', p_email;
   END IF;
 
-  -- Generate secure token
-  v_token := encode(gen_random_bytes(32), 'base64url');
+  -- Generate secure token using base64 encoding, then convert to base64url
+  -- base64url: URL-safe base64 (replace + with -, / with _, remove padding =)
+  v_base64_token := encode(extensions.gen_random_bytes(32), 'base64');
+  v_token := replace(replace(trim(trailing '=' from v_base64_token), '+', '-'), '/', '_');
   
   -- Set expiration to 7 days from now
   v_expires_at := now() + interval '7 days';

@@ -29,6 +29,9 @@ import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "@/services/dealStageAutomation";
 import { logger } from '@/lib/logger';
 import { useOrder, useUpdateOrderHeader, useUpsertOrderLine, useDeleteOrderLine } from "@/services/orders";
+import { RelatedTasksList } from "@/components/tasks/RelatedTasksList";
+import { useProjectFromDeal } from "@/services/projects";
+import { FolderKanban } from "lucide-react";
 
 export default function OrderDetail() {
   const { id = "" } = useParams();
@@ -40,6 +43,7 @@ export default function OrderDetail() {
 
   // Fetch order data with React Query
   const { data: order, isLoading, error } = useOrder(id);
+  const { data: project } = useProjectFromDeal(order?.dealId);
   
   // Mutations
   const updateHeaderMutation = useUpdateOrderHeader(id);
@@ -204,6 +208,16 @@ export default function OrderDetail() {
         title={`Order ${order.number ?? ""}`}
         actions={
           <div className="flex items-center gap-2">
+            {order.dealId && project && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/projects/${project.id}`)}
+                className="flex items-center gap-2"
+              >
+                <FolderKanban className="h-4 w-4" />
+                View Project
+              </Button>
+            )}
             <OpenPdfButton
               onGetUrl={() => getOrderPdfUrl(order.id)}
               onLogged={(url) => logPdfGenerated("order", order.id, order.dealId, url)}
@@ -240,6 +254,33 @@ export default function OrderDetail() {
           </div>
         </div>
       )}
+
+      {/* Linked Project information */}
+      {order.dealId && project && (
+        <div className="rounded-2xl border bg-muted/30 p-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Linked project:{" "}
+              <Link
+                className="underline hover:text-foreground"
+                to={`/projects/${project.id}`}
+              >
+                {project.name}
+              </Link>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              (via deal)
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tasks Section */}
+      <RelatedTasksList
+        relatedType="order"
+        relatedId={order.id}
+        relatedTitle={`Order ${order.number ?? ""}`}
+      />
 
       {/* Header fields */}
       <div className="rounded-2xl border p-4 shadow-card">

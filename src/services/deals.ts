@@ -411,7 +411,7 @@ export async function rpcReorderDeal(dealId: string, newStageId: string, newInde
   }
 
   try {
-    logger.warn("[rpcReorderDeal] 🚀 MOVING DEAL:", {
+    logger.debug("[rpcReorderDeal] 🚀 MOVING DEAL:", {
       dealId,
       newStageId,
       newIndex,
@@ -424,7 +424,7 @@ export async function rpcReorderDeal(dealId: string, newStageId: string, newInde
       p_new_index: newIndex
     });
 
-    logger.warn("[rpcReorderDeal] ✅ Move completed successfully:", {
+    logger.debug("[rpcReorderDeal] ✅ Move completed successfully:", {
       status: response.status,
       data: response.data
     });

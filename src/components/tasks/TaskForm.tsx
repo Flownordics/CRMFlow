@@ -37,10 +37,12 @@ import {
 import { CalendarIcon, X, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Task, CreateTaskData, UpdateTaskData } from "@/services/tasks";
+import { Task, CreateTaskData, UpdateTaskData, useRelatedTasks } from "@/services/tasks";
 import { useCreateTask, useUpdateTask } from "@/services/tasks";
-import { usePeople } from "@/services/people";
+import { useUsers } from "@/services/users";
 import { logger } from '@/lib/logger';
+import { TaskTemplateSuggestions } from './TaskTemplateSuggestions';
+import { TaskTemplate } from '@/services/taskTemplates';
 
 const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -54,6 +56,7 @@ const taskSchema = z.object({
   tags: z.array(z.string()).optional(),
   is_private: z.boolean().optional(),
   estimated_hours: z.number().optional(),
+  depends_on_task_id: z.string().optional(),
 });
 
 type TaskFormData = z.infer<typeof taskSchema>;
@@ -78,10 +81,12 @@ export function TaskForm({
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [dismissedTemplates, setDismissedTemplates] = useState(false);
 
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
-  const { data: people } = usePeople({ limit: 1000 });
+  const { data: users } = useUsers();
+  const { data: relatedTasks } = useRelatedTasks(relatedType || 'deal', relatedId || '');
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
@@ -95,7 +100,7 @@ export function TaskForm({
       related_id: relatedId,
       tags: [],
       is_private: false,
-      estimated_hours: undefined,
+      estimated_hours: undefined as number | undefined,
     },
   });
 
@@ -112,6 +117,7 @@ export function TaskForm({
         tags: task.tags || [],
         is_private: task.is_private,
         estimated_hours: task.estimated_hours,
+        depends_on_task_id: task.depends_on_task_id,
       });
       setTags(task.tags || []);
       setDueDate(task.due_date ? new Date(task.due_date) : undefined);
@@ -130,6 +136,7 @@ export function TaskForm({
       });
       setTags([]);
       setDueDate(undefined);
+      setDismissedTemplates(false);
     }
   }, [task, relatedType, relatedId, form]);
 
@@ -139,6 +146,7 @@ export function TaskForm({
         ...data,
         due_date: dueDate?.toISOString(),
         tags,
+        depends_on_task_id: data.depends_on_task_id || undefined, // Convert empty string/undefined to undefined, let service handle null conversion
       };
 
       if (task) {
@@ -195,6 +203,25 @@ export function TaskForm({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Template Suggestions */}
+            {!task && relatedType && relatedId && !dismissedTemplates && (
+              <TaskTemplateSuggestions
+                triggerType="entity_type"
+                triggerValue={relatedType}
+                onSelectTemplate={(template) => {
+                  form.setValue('title', template.title);
+                  form.setValue('description', template.task_description || '');
+                  form.setValue('priority', template.priority);
+                  form.setValue('estimated_hours', template.estimated_hours);
+                  if (template.tags.length > 0) {
+                    setTags(template.tags);
+                  }
+                  setDismissedTemplates(true);
+                }}
+                onDismiss={() => setDismissedTemplates(true)}
+              />
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -290,9 +317,9 @@ export function TaskForm({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {people?.data?.map((person) => (
-                          <SelectItem key={person.id} value={person.id}>
-                            {person.name}
+                        {users?.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name || user.email}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -301,6 +328,39 @@ export function TaskForm({
                   </FormItem>
                 )}
               />
+
+              {relatedType && relatedId && relatedTasks && relatedTasks.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="depends_on_task_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Depends On</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange(value === "none" ? undefined : value)} 
+                        value={field.value || "none"}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="No dependency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No dependency</SelectItem>
+                          {relatedTasks
+                            .filter(t => !task || t.id !== task.id) // Don't allow self-dependency
+                            .map((relatedTask) => (
+                              <SelectItem key={relatedTask.id} value={relatedTask.id}>
+                                {relatedTask.title} ({relatedTask.status})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -313,7 +373,7 @@ export function TaskForm({
                         type="number"
                         step="0.5"
                         placeholder="0"
-                        {...field}
+                        value={field.value ?? ""}
                         onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
                       />
                     </FormControl>
@@ -330,20 +390,17 @@ export function TaskForm({
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !dueDate && "text-muted-foreground"
-                      )}
+                      className="w-full justify-start font-normal"
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate ? format(dueDate, "PPP") : "Pick a date"}
+                      {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={dueDate}
-                      onSelect={setDueDate}
+                      selected={dueDate ?? undefined}
+                      onSelect={(d) => setDueDate(d ?? undefined)}
                       initialFocus
                     />
                   </PopoverContent>

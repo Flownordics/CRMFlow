@@ -18,7 +18,14 @@ import { useMemo, useState, useCallback, memo, useRef } from "react";
 import { Stage } from "@/services/pipelines";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, ChevronDown, ChevronUp, MoreVertical, FolderKanban } from "lucide-react";
 import { useMoveDeal } from "@/services/pipelines";
 import { cn } from "@/lib/utils";
 import { toastBus } from "@/lib/toastBus";
@@ -64,12 +71,18 @@ export function KanbanBoard({
     onCreateInStage,
     onStageChange,
     onOpenEdit,
+    onCreateProject,
+    onViewProject,
+    dealsWithProjects,
 }: {
     stages: Stage[];
     dealsByStage: Record<string, DealData[]>;
     onCreateInStage?: (stageId: string) => void;
     onStageChange?: (payload: { deal: DealData; fromStageId: string; toStageId: string; toStageName: string }) => void;
     onOpenEdit?: (deal: DealData) => void;
+    onCreateProject?: (deal: DealData) => void;
+    onViewProject?: (deal: DealData) => void;
+    dealsWithProjects?: Set<string>; // Set of deal IDs that have projects
 }) {
     // Debug logging for props
     logger.debug("[KanbanBoard] Props received:", {
@@ -163,7 +176,7 @@ export function KanbanBoard({
     const onDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event;
         
-        logger.warn("[KanbanBoard] 🎯 onDragEnd CALLED with active.id:", active.id);
+        logger.debug("[KanbanBoard] 🎯 onDragEnd CALLED with active.id:", active.id);
         
         // Prevent duplicate calls
         if (movingRef.current) {
@@ -178,7 +191,7 @@ export function KanbanBoard({
         }
 
         const dealId = String(active.id);
-        logger.warn("[KanbanBoard] onDragEnd - dealId extracted:", dealId);
+        logger.debug("[KanbanBoard] onDragEnd - dealId extracted:", dealId);
         let toStageId: string;
 
         // Handle different types of drop targets
@@ -367,6 +380,9 @@ export function KanbanBoard({
                                                 stageId={col.id}
                                                 stageName={col.name}
                                                 onOpen={onOpenEdit}
+                                                onCreateProject={onCreateProject}
+                                                onViewProject={onViewProject}
+                                                hasProject={dealsWithProjects?.has(deal.id)}
                                             />
                                         ))}
                                         
@@ -435,6 +451,9 @@ interface DraggableDealProps {
     stageId: string;
     stageName?: string;
     onOpen?: (deal: DealData) => void;
+    onCreateProject?: (deal: DealData) => void;
+    onViewProject?: (deal: DealData) => void;
+    hasProject?: boolean;
 }
 
 function DraggableDealBase({
@@ -442,6 +461,9 @@ function DraggableDealBase({
     deal,
     stageName,
     onOpen,
+    onCreateProject,
+    onViewProject,
+    hasProject,
 }: DraggableDealProps) {
     const {
         attributes,
@@ -464,16 +486,25 @@ function DraggableDealBase({
     const dueSoon = deal.closeDate && isValid(new Date(deal.closeDate)) &&
         differenceInCalendarDays(new Date(deal.closeDate), new Date()) <= 7;
 
+    const handleCardClick = (e: React.MouseEvent) => {
+        // Don't open edit if clicking on dropdown menu
+        if ((e.target as HTMLElement).closest('[role="menu"]') || 
+            (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]')) {
+            return;
+        }
+        onOpen?.(deal);
+    };
+
     return (
         <div
             ref={setNodeRef}
             style={style}
             {...attributes}
             {...listeners}
-            onClick={() => onOpen?.(deal)}
+            onClick={handleCardClick}
             className={cn(
                 "cursor-grab touch-none select-none rounded-xl border bg-card p-2.5 hover:shadow-hover transition-shadow w-full",
-                "flex gap-2",
+                "flex gap-2 group",
                 isDragging && "opacity-75",
                 "focus:outline-none focus-visible:ring-2",
                 stageTokenRing(theme.color)
@@ -504,6 +535,50 @@ function DraggableDealBase({
                     </Badge>
                 )}
             </div>
+            {/* Quick Actions Dropdown */}
+            {(onCreateProject || onViewProject) && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger
+                        asChild
+                        onClick={(e) => {
+                            e.stopPropagation(); // Prevent card click
+                        }}
+                    >
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                            <span className="sr-only">More actions</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        {hasProject && onViewProject ? (
+                            <DropdownMenuItem
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onViewProject(deal);
+                                }}
+                            >
+                                <FolderKanban className="h-4 w-4 mr-2" />
+                                View Project
+                            </DropdownMenuItem>
+                        ) : onCreateProject ? (
+                            <DropdownMenuItem
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onCreateProject(deal);
+                                }}
+                            >
+                                <FolderKanban className="h-4 w-4 mr-2" />
+                                Create Project
+                            </DropdownMenuItem>
+                        ) : null}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
         </div>
     );
 }

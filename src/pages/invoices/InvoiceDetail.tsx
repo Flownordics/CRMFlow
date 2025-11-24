@@ -35,11 +35,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { RelatedTasksList } from "@/components/tasks/RelatedTasksList";
+import { useProjectFromDeal } from "@/services/projects";
+import { FolderKanban } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function InvoiceDetail() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { data: invoice, isLoading, error } = useInvoice(id);
+  const { data: project } = useProjectFromDeal(invoice?.dealId);
   const { data: payments = [], isLoading: paymentsLoading } = useInvoicePayments(id);
   const [creating, setCreating] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -87,6 +93,16 @@ export default function InvoiceDetail() {
         title={`Invoice ${invoice.number ?? ""}`}
         actions={
           <div className="flex items-center gap-2">
+            {invoice.dealId && project && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/projects/${project.id}`)}
+                className="flex items-center gap-2"
+              >
+                <FolderKanban className="h-4 w-4" />
+                View Project
+              </Button>
+            )}
             <InvoiceStatusBadge invoice={invoice} />
             <OpenPdfButton
               onGetUrl={() => getInvoicePdfUrl(invoice.id)}
@@ -108,6 +124,26 @@ export default function InvoiceDetail() {
           </div>
         }
       />
+
+      {/* Linked Project information */}
+      {invoice.dealId && project && (
+        <div className="rounded-2xl border bg-muted/30 p-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Linked project:{" "}
+              <Link
+                className="underline hover:text-foreground"
+                to={`/projects/${project.id}`}
+              >
+                {project.name}
+              </Link>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              (via deal)
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -228,6 +264,13 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+
+      {/* Tasks Section */}
+      <RelatedTasksList
+        relatedType="invoice"
+        relatedId={invoice.id}
+        relatedTitle={`Invoice ${invoice.number ?? ""}`}
+      />
 
       {/* Header fields */}
       <div className="rounded-2xl border p-4 shadow-card">

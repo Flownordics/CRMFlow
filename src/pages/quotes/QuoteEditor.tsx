@@ -43,6 +43,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { RelatedTasksList } from "@/components/tasks/RelatedTasksList";
+import { useProjectFromDeal } from "@/services/projects";
+import { FolderKanban } from "lucide-react";
 
 export default function QuoteEditor() {
   const { id = "" } = useParams();
@@ -53,6 +56,7 @@ export default function QuoteEditor() {
   const deleteLine = useDeleteQuoteLine(id);
   const deleteQuote = useDeleteQuote();
   const { t } = useI18n();
+  const { data: project } = useProjectFromDeal(quote?.deal_id);
   // Google integration removed - starting fresh
 
   const [creating, setCreating] = useState(false);
@@ -197,6 +201,16 @@ export default function QuoteEditor() {
         title={`Quote ${quote.number ?? ""}`}
         actions={
           <div className="flex items-center gap-2">
+            {quote.deal_id && project && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/projects/${project.id}`)}
+                className="flex items-center gap-2"
+              >
+                <FolderKanban className="h-4 w-4" />
+                View Project
+              </Button>
+            )}
             <StatusBadge
               intent={
                 quote.status === "draft"
@@ -492,6 +506,13 @@ export default function QuoteEditor() {
 
       {/* Email Activity */}
       <EmailLogs quoteId={id} />
+
+      {/* Tasks Section */}
+      <RelatedTasksList
+        relatedType="quote"
+        relatedId={quote.id}
+        relatedTitle={`Quote ${quote.number ?? ""}`}
+      />
 
       <div className="text-sm">
         <Link to="/quotes" className="underline">

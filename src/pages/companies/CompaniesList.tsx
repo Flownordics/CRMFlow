@@ -351,19 +351,20 @@ export default function CompaniesList() {
                     {/* Left Actions */}
                     <div className="flex items-center gap-2 overflow-x-auto">
                         {companies.length > 0 && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={toggleSelectAll}
-                                className="touch-manipulation whitespace-nowrap"
-                            >
+                            <div className="flex items-center gap-2 px-3 py-2 border border-input bg-background rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer touch-manipulation whitespace-nowrap">
                                 <Checkbox
                                     checked={selectedCompanyIds.length === companies.length}
                                     onCheckedChange={toggleSelectAll}
-                                    className="mr-2"
+                                    id="select-all-checkbox"
                                 />
-                                Select All
-                            </Button>
+                                <label
+                                    htmlFor="select-all-checkbox"
+                                    className="text-sm font-medium cursor-pointer"
+                                    onClick={toggleSelectAll}
+                                >
+                                    Select All
+                                </label>
+                            </div>
                         )}
                         <Button 
                             variant="outline"

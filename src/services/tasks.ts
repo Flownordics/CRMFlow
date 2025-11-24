@@ -17,6 +17,7 @@ export interface Task {
     assigned_by?: string;
     related_type?: 'deal' | 'quote' | 'order' | 'invoice' | 'company' | 'person';
     related_id?: string;
+    depends_on_task_id?: string;
     tags: string[];
     is_private: boolean;
     estimated_hours?: number;
@@ -63,6 +64,7 @@ export interface CreateTaskData {
     assigned_to?: string;
     related_type?: 'deal' | 'quote' | 'order' | 'invoice' | 'company' | 'person';
     related_id?: string;
+    depends_on_task_id?: string;
     tags?: string[];
     is_private?: boolean;
     estimated_hours?: number;
@@ -167,6 +169,7 @@ export const taskService = {
                 ...taskData,
                 user_id: user.id,
                 assigned_to: taskData.assigned_to === 'unassigned' ? null : taskData.assigned_to,
+                depends_on_task_id: taskData.depends_on_task_id || null,
             })
             .select('*')
             .single();
@@ -187,6 +190,7 @@ export const taskService = {
             .update({
                 ...updateData,
                 assigned_to: updateData.assigned_to === 'unassigned' ? null : updateData.assigned_to,
+                depends_on_task_id: updateData.depends_on_task_id || null,
             })
             .eq('id', id)
             .select('*')
@@ -294,6 +298,50 @@ export const taskService = {
         return data || [];
     },
 
+    // Get task dependencies (tasks that depend on this task)
+    async getTaskDependencies(taskId: string): Promise<Task[]> {
+        const { data, error } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('depends_on_task_id', taskId)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            throw new Error(`Failed to fetch task dependencies: ${error.message}`);
+        }
+
+        return data || [];
+    },
+
+    // Get task that this task depends on
+    async getTaskDependency(taskId: string): Promise<Task | null> {
+        const task = await this.getTask(taskId);
+        if (!task || !task.depends_on_task_id) {
+            return null;
+        }
+
+        return await this.getTask(task.depends_on_task_id);
+    },
+
+    // Check if task can be completed (all dependencies completed)
+    async canCompleteTask(taskId: string): Promise<{ canComplete: boolean; blockingTasks: Task[] }> {
+        const task = await this.getTask(taskId);
+        if (!task || !task.depends_on_task_id) {
+            return { canComplete: true, blockingTasks: [] };
+        }
+
+        const dependency = await this.getTask(task.depends_on_task_id);
+        if (!dependency) {
+            return { canComplete: true, blockingTasks: [] };
+        }
+
+        const isDependencyCompleted = dependency.status === 'completed';
+        return {
+            canComplete: isDependencyCompleted,
+            blockingTasks: isDependencyCompleted ? [] : [dependency],
+        };
+    },
+
     // Get overdue tasks
     async getOverdueTasks(): Promise<Task[]> {
         const now = new Date();
@@ -318,6 +366,20 @@ export function useTasks(filters: TaskFilters = {}) {
     return useQuery({
         queryKey: qk.tasks.list(filters),
         queryFn: () => taskService.getTasks(filters),
+    });
+}
+
+/**
+ * Hook to fetch tasks related to a specific entity (deal, quote, order, invoice)
+ * Wrapper around useTasks with pre-configured filters
+ */
+export function useRelatedTasks(
+    relatedType: 'deal' | 'quote' | 'order' | 'invoice' | 'company' | 'person',
+    relatedId: string
+) {
+    return useTasks({
+        related_type: relatedType,
+        related_id: relatedId
     });
 }
 
@@ -366,7 +428,11 @@ export function useCreateTask() {
     return useMutation({
         mutationFn: taskService.createTask,
         onSuccess: () => {
+            // Invalidate all task queries to ensure UI updates immediately
             queryClient.invalidateQueries({ queryKey: qk.tasks.all });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.list() });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.upcoming() });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.overdue() });
         },
     });
 }
@@ -377,8 +443,12 @@ export function useUpdateTask() {
     return useMutation({
         mutationFn: taskService.updateTask,
         onSuccess: (data) => {
+            // Invalidate all task queries to ensure UI updates immediately
             queryClient.invalidateQueries({ queryKey: qk.tasks.all });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.list() });
             queryClient.invalidateQueries({ queryKey: qk.tasks.detail(data.id) });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.upcoming() });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.overdue() });
         },
     });
 }
@@ -389,7 +459,11 @@ export function useDeleteTask() {
     return useMutation({
         mutationFn: taskService.deleteTask,
         onSuccess: () => {
+            // Invalidate all task queries to ensure UI updates immediately
             queryClient.invalidateQueries({ queryKey: qk.tasks.all });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.list() });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.upcoming() });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.overdue() });
         },
     });
 }

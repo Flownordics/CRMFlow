@@ -7,13 +7,16 @@ import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
 import { CreateOrderModal } from "@/components/orders/CreateOrderModal";
 import { DealsKpiHeader } from "@/components/deals/DealsKpiHeader";
 import { DealsStageLegend } from "@/components/deals/DealsStageLegend";
+import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { useState, useMemo } from "react";
+import { useProjects } from "@/services/projects";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { useHotkeys } from "@/lib/useHotkeys";
-import { useCreateQuoteFromDeal, useCreateOrderFromDeal, buildPrefillFromDeal, type DealData as ConversionDealData } from "@/services/conversions";
+import { useCreateQuoteFromDeal, useCreateOrderFromDeal, buildPrefillFromDeal, createQuoteFromDeal, type DealData as ConversionDealData } from "@/services/conversions";
 import { toastBus } from "@/lib/toastBus";
 import { useI18n } from "@/lib/i18n";
 import { Deal } from "@/services/deals";
@@ -53,6 +56,7 @@ interface DealData {
 
 export default function DealsBoard() {
   const { t } = useI18n();
+  const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const [stageForNew, setStageForNew] = useState<string | null>(null);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
@@ -95,9 +99,60 @@ export default function DealsBoard() {
   const [editOpen, setEditOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
 
+  // Project creation state
+  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
+  const [dealForProject, setDealForProject] = useState<DealData | null>(null);
+  const navigate = useNavigate();
+
+  // Get all projects to check which deals have projects
+  const { data: projects } = useProjects();
+  const dealsWithProjects = useMemo(() => {
+    const set = new Set<string>();
+    projects?.forEach(project => {
+      if (project.deal_id) {
+        set.add(project.deal_id);
+      }
+    });
+    return set;
+  }, [projects]);
+
   // Conversion hooks
-  const createQuoteFromDeal = useCreateQuoteFromDeal();
+  const createQuoteFromDealMutation = useCreateQuoteFromDeal();
   const createOrderFromDeal = useCreateOrderFromDeal();
+
+  // Auto-create quote and redirect to editor
+  const handleAutoCreateQuote = async (deal: DealData) => {
+    try {
+      toastBus.emit({
+        title: "Creating quote...",
+        description: "Please wait while we prepare your quote",
+      });
+
+      const quote = await createQuoteFromDeal(deal.id);
+      
+      toastBus.emit({
+        title: "Quote created",
+        description: "Redirecting to quote editor...",
+      });
+
+      // Log activity
+      await logActivity({
+        dealId: deal.id,
+        type: "doc_created",
+        meta: { docType: "quote", quoteId: quote.id }
+      });
+
+      // Navigate to quote editor
+      nav(`/quotes/${quote.id}`);
+    } catch (error: any) {
+      logger.error("[DealsBoard] Failed to auto-create quote:", error);
+      toastBus.emit({
+        title: "Failed to create quote",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Handle opening edit drawer
   const handleOpenEdit = (dealData: DealData) => {
@@ -106,6 +161,21 @@ export default function DealsBoard() {
     if (fullDeal) {
       setSelectedDeal(fullDeal);
       setEditOpen(true);
+    }
+  };
+
+  // Handle creating project from deal
+  const handleCreateProject = (dealData: DealData) => {
+    setDealForProject(dealData);
+    setCreateProjectDialogOpen(true);
+  };
+
+  // Handle viewing project from deal
+  const handleViewProject = async (dealData: DealData) => {
+    if (!projects) return;
+    const project = projects.find(p => p.deal_id === dealData.id);
+    if (project) {
+      navigate(`/projects/${project.id}`);
     }
   };
 
@@ -188,13 +258,13 @@ export default function DealsBoard() {
       markIdempotent(automationKey, 2 * 60 * 1000);
       lastAutomationRef.current = { id: deal.id, at: now };
 
-      logger.debug("[DealsBoard] Setting automation state:", { type: automationType, dealId: deal.id });
+      logger.debug("[DealsBoard] Auto-creating document:", { type: automationType, dealId: deal.id });
 
-      // Set automation state
+      // Auto-create and redirect for better UX
       if (isProposal) {
-        setAutomation({ type: 'quote', deal });
+        handleAutoCreateQuote(deal);
       } else if (isWon) {
-        setAutomation({ type: 'order', deal });
+        setAutomation({ type: 'order', deal }); // Keep order modal for now
       }
     } else {
       logger.debug("[DealsBoard] No automation trigger for stage:", name);
@@ -389,6 +459,9 @@ export default function DealsBoard() {
           }}
           onStageChange={handleStageChange}
           onOpenEdit={handleOpenEdit}
+          onCreateProject={handleCreateProject}
+          onViewProject={handleViewProject}
+          dealsWithProjects={dealsWithProjects}
         />
       </div>
 
@@ -398,90 +471,45 @@ export default function DealsBoard() {
         defaultStageId={stageForNew ?? undefined}
       />
 
-      {/* Automation Modals */}
-      {automation && (
-        <>
-          {logger.debug("[DealsBoard] Rendering automation modal:", automation)}
-          {automation.type === 'quote' && (
-            <CreateQuoteModal
-              open={true}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setAutomation(null);
-                  // Clear idempotency key when modal is closed
-                  const key = generateAutomationKey('quote', automation.deal.id);
-                  clearIdempotent(key);
-                }
-              }}
-              defaultDealId={automation.deal.id}
-              defaultCompanyId={automation.deal.companyId}
-              defaultContactId={automation.deal.contactId}
-              defaultCurrency={automation.deal.currency || "DKK"}
-              expectedValueMinor={automation.deal.amountMinor}
-              defaultTitle={automation.deal.title}
-              defaultNotes={automation.deal.notes}
-              defaultTaxPct={automation.deal.taxPct}
-              defaultValidUntil={automation.deal.closeDate}
-              defaultQuote={automation.quoteData} // Pass quote data if available
-              onSuccess={(quote) => {
-                toastBus.emit({
-                  title: t("quote_created"),
-                  description: t("quote_created_from_deal")
-                });
-                // Log activity
-                logActivity({
-                  type: 'quote_created_from_deal',
-                  dealId: automation.deal.id,
-                  meta: { quoteId: quote.id }
-                });
-                setAutomation(null);
-                // Clear idempotency key on success
-                const key = generateAutomationKey('quote', automation.deal.id);
-                clearIdempotent(key);
-              }}
-            />
-          )}
-
-          {automation.type === 'order' && (
-            <CreateOrderModal
-              open={true}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setAutomation(null);
-                  // Clear idempotency key when modal is closed
-                  const key = generateAutomationKey('order', automation.deal.id);
-                  clearIdempotent(key);
-                }
-              }}
-              defaultDealId={automation.deal.id}
-              defaultCompanyId={automation.deal.companyId}
-              defaultContactId={automation.deal.contactId}
-              defaultCurrency={automation.deal.currency || "DKK"}
-              fromQuoteId={undefined}
-              expectedValueMinor={automation.deal.amountMinor}
-              defaultTitle={automation.deal.title}
-              defaultNotes={automation.deal.notes}
-              defaultTaxPct={automation.deal.taxPct}
-              defaultDeliveryDate={automation.deal.closeDate}
-              onSuccess={(order) => {
-                toastBus.emit({
-                  title: t("order_created"),
-                  description: t("order_created_from_deal")
-                });
-                // Log activity
-                logActivity({
-                  type: 'order_created_from_deal',
-                  dealId: automation.deal.id,
-                  meta: { orderId: order.id }
-                });
-                setAutomation(null);
-                // Clear idempotency key on success
-                const key = generateAutomationKey('order', automation.deal.id);
-                clearIdempotent(key);
-              }}
-            />
-          )}
-        </>
+      {/* Automation Modals - Only for orders now, quotes are auto-created */}
+      {automation && automation.type === 'order' && (
+        <CreateOrderModal
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              setAutomation(null);
+              // Clear idempotency key when modal is closed
+              const key = generateAutomationKey('order', automation.deal.id);
+              clearIdempotent(key);
+            }
+          }}
+          defaultDealId={automation.deal.id}
+          defaultCompanyId={automation.deal.companyId}
+          defaultContactId={automation.deal.contactId}
+          defaultCurrency={automation.deal.currency || "DKK"}
+          fromQuoteId={undefined}
+          expectedValueMinor={automation.deal.amountMinor}
+          defaultTitle={automation.deal.title}
+          defaultNotes={automation.deal.notes}
+          defaultTaxPct={automation.deal.taxPct}
+          defaultDeliveryDate={automation.deal.closeDate}
+          onSuccess={(order) => {
+            toastBus.emit({
+              title: t("order_created"),
+              description: t("order_created_from_deal")
+            });
+            // Log activity
+            logActivity({
+              type: 'order_created_from_deal',
+              dealId: automation.deal.id,
+              meta: { orderId: order.id }
+            });
+            setAutomation(null);
+            // Clear idempotency key on success
+            const key = generateAutomationKey('order', automation.deal.id);
+            clearIdempotent(key);
+          }}
+        />
       )}
 
       {/* Legacy Modals (keeping for backward compatibility) */}
@@ -525,6 +553,20 @@ export default function DealsBoard() {
         stages={kpiStages}
         stageProbPctById={{}}
       />
+
+      {/* Create Project Dialog */}
+      {dealForProject && (
+        <CreateProjectDialog
+          open={createProjectDialogOpen}
+          onOpenChange={(open) => {
+            setCreateProjectDialogOpen(open);
+            if (!open) {
+              setDealForProject(null);
+            }
+          }}
+          dealId={dealForProject.id}
+        />
+      )}
     </div>
   );
 }

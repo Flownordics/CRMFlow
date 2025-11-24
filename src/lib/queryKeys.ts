@@ -106,6 +106,7 @@ export const qk = {
   stageProbabilities: () => ["stage_probabilities"] as const,
   stages: (pipelineId?: string) => ["stages", { pipelineId }] as const,
   userSettings: () => ["user_settings"] as const,
+  users: () => ["users"] as const,
 
   integrations: {
     all: () => ["integrations"] as const,
@@ -122,6 +123,19 @@ export const qk = {
     overdue: () => ["tasks", "overdue"] as const,
     comments: (taskId: string) => ["tasks", "comments", taskId] as const,
     activities: (taskId: string) => ["tasks", "activities", taskId] as const,
+  },
+
+  projects: {
+    list: (filters?: Record<string, unknown>) => ["projects", "list", filters ?? {}] as const,
+    detail: (id: string | null | undefined) => ["project", id] as const,
+  },
+
+  taskTemplates: {
+    all: () => ["taskTemplates"] as const,
+    list: (filters?: Record<string, unknown>) => ["taskTemplates", "list", filters ?? {}] as const,
+    detail: (id: string) => ["taskTemplates", "detail", id] as const,
+    matching: (triggerType: string, triggerValue: string, companyId?: string) => 
+      ["taskTemplates", "matching", triggerType, triggerValue, companyId] as const,
   },
 
   // Call Lists

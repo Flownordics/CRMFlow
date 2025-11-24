@@ -209,30 +209,97 @@ function generateIdempotencyKey(): string {
 
 // Create quote from deal
 export async function createQuoteFromDeal(dealId: string): Promise<QuoteResponse> {
-  const idempotencyKey = generateIdempotencyKey();
-
-  if (USE_MOCKS) {
-    const { data } = await api.post(`/deals/${dealId}/convert/quote`, {}, {
-      headers: { 'Idempotency-Key': idempotencyKey }
-    });
-    return QuoteResponse.parse(data);
+  // Check if deal already has a quote
+  const { data: existingQuotes } = await apiClient.get(`/quotes?deal_id=eq.${dealId}&deleted_at=is.null&limit=1`);
+  if (Array.isArray(existingQuotes) && existingQuotes.length > 0) {
+    throw new Error("This deal already has a quote. A deal can only have one quote.");
   }
 
   try {
-    const response = await apiClient.post(`/deals/${dealId}/convert/quote`, {}, {
-      headers: { 'Idempotency-Key': idempotencyKey }
-    });
+    // Fetch deal data
+    const { data: dealsData, error: dealError } = await apiClient.get(`/deals?id=eq.${dealId}&select=*`);
+    
+    if (dealError) {
+      throw new Error(`Failed to fetch deal: ${dealError.message}`);
+    }
 
-    const quote = response.data || response;
-    return QuoteResponse.parse(quote);
-  } catch (error) {
+    const deals = Array.isArray(dealsData) ? dealsData : (dealsData?.data || []);
+    const deal = deals[0];
+    
+    if (!deal) {
+      throw new Error(`Deal not found: ${dealId}`);
+    }
+
+    // Check if deal has company (required)
+    if (!deal.company_id) {
+      throw new Error("Deal must have a company to create a quote");
+    }
+
+    // Import createQuote function
+    const { createQuote } = await import('./quotes');
+    
+    // Calculate dates
+    const issueDate = new Date().toISOString().split('T')[0];
+    const validUntil = deal.close_date 
+      ? new Date(deal.close_date).toISOString().split('T')[0]
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 30 days from now
+
+    // Calculate expected value (use expected_value_minor or default to 0)
+    const expectedValue = deal.expected_value_minor || 0;
+    const taxPct = 25; // Default tax rate
+    const subtotalMinor = expectedValue;
+    const taxMinor = Math.round(subtotalMinor * (taxPct / 100));
+    const totalMinor = subtotalMinor + taxMinor;
+
+    // Create quote with default line item if there's an expected value
+    const quotePayload = {
+      status: 'draft',
+      currency: deal.currency || 'DKK',
+      issue_date: issueDate,
+      valid_until: validUntil,
+      notes: `Quote created from deal: ${deal.title}`,
+      company_id: deal.company_id,
+      contact_id: deal.contact_id || null,
+      deal_id: dealId,
+      subtotal_minor: subtotalMinor,
+      tax_minor: taxMinor,
+      total_minor: totalMinor,
+      lines: expectedValue > 0 ? [{
+        description: deal.title || 'Quote line item',
+        qty: 1,
+        unit_minor: subtotalMinor,
+        tax_rate_pct: taxPct,
+        discount_pct: 0,
+      }] : [],
+    };
+
+    logger.debug(`[createQuoteFromDeal] Creating quote with payload:`, quotePayload);
+
+    // Create quote using the standard createQuote function
+    const quote = await createQuote(quotePayload);
+
+    return {
+      id: quote.id,
+      dealId: dealId,
+    };
+  } catch (error: any) {
     logger.error(`Failed to create quote from deal ${dealId}:`, error);
-    throw new Error("Failed to create quote from deal");
+    // Check if error is due to unique constraint violation
+    if (error?.message?.includes('unique') || error?.code === '23505' || error?.message?.includes('already has a quote')) {
+      throw new Error("This deal already has a quote. A deal can only have one quote.");
+    }
+    throw new Error(error?.message || "Failed to create quote from deal");
   }
 }
 
 // Create order from deal
 export async function createOrderFromDeal(dealId: string): Promise<OrderResponse> {
+  // Check if deal already has an order
+  const { data: existingOrders } = await apiClient.get(`/orders?deal_id=eq.${dealId}&deleted_at=is.null&limit=1`);
+  if (Array.isArray(existingOrders) && existingOrders.length > 0) {
+    throw new Error("This deal already has an order. A deal can only have one order.");
+  }
+
   const idempotencyKey = generateIdempotencyKey();
 
   if (USE_MOCKS) {
@@ -249,9 +316,13 @@ export async function createOrderFromDeal(dealId: string): Promise<OrderResponse
 
     const order = response.data || response;
     return OrderResponse.parse(order);
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`Failed to create order from deal ${dealId}:`, error);
-    throw new Error("Failed to create order from deal");
+    // Check if error is due to unique constraint violation
+    if (error?.message?.includes('unique') || error?.code === '23505') {
+      throw new Error("This deal already has an order. A deal can only have one order.");
+    }
+    throw new Error(error?.message || "Failed to create order from deal");
   }
 }
 

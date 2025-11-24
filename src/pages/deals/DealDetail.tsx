@@ -17,6 +17,12 @@ import { CalendarIcon } from "lucide-react";
 import { useCompanies } from "@/services/companies";
 import { logger } from '@/lib/logger';
 import { DealAccountingSummary } from "@/components/deals/DealAccountingSummary";
+import { RelatedTasksList } from "@/components/tasks/RelatedTasksList";
+import { useProjectFromDeal } from "@/services/projects";
+import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
+import { FolderKanban, FileText, ShoppingCart } from "lucide-react";
+import { useQuotes } from "@/services/quotes";
+import { useOrders } from "@/services/orders";
 
 export default function DealDetail() {
   const { id = "" } = useParams();
@@ -27,6 +33,14 @@ export default function DealDetail() {
   const updateDeal = useUpdateDeal(id);
   const [busy, setBusy] = useState<null | "quote" | "order" | "invoice">(null);
   const [closeDate, setCloseDate] = useState<Date | null>(deal?.close_date ? new Date(deal.close_date) : null);
+  const { data: project, isLoading: isLoadingProject } = useProjectFromDeal(deal?.id);
+  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
+  
+  // Check if deal already has a quote or order
+  const { data: quotesData } = useQuotes({ dealId: deal?.id });
+  const { data: ordersData } = useOrders({ dealId: deal?.id });
+  const existingQuote = quotesData?.data?.[0];
+  const existingOrder = ordersData?.data?.[0];
 
   // Update local state when deal data changes
   useEffect(() => {
@@ -124,14 +138,23 @@ export default function DealDetail() {
         await logActivity({ dealId: deal.id, type: "doc_created", meta: { docType: "invoice", invoiceId } });
         nav(`/invoices/${invoiceId}`);
       }
+    } catch (error) {
+      logger.error(`Failed to create ${type}:`, error);
+      toastBus.emit({
+        title: `Failed to create ${type}`,
+        description: error instanceof Error ? error.message : `Failed to create ${type}`,
+        variant: "destructive"
+      });
     } finally {
       setBusy(null);
     }
   }
 
   // Simple CTA-regler (MVP) – vis hvilke næste steps, baseret på stage-navn
-  const showQuote = /proposal|offer|tilbud/i.test(deal.stage_id ?? "") || true; // true = vis altid (kan finjusteres)
-  const showOrder = /won|accepted|vundet/i.test(deal.stage_id ?? "");
+  // Only show "Create Quote" if no quote exists yet
+  const showQuote = (!existingQuote && (/proposal|offer|tilbud/i.test(deal.stage_id ?? "") || true));
+  // Only show "Create Order" if no order exists yet
+  const showOrder = (!existingOrder && /won|accepted|vundet/i.test(deal.stage_id ?? ""));
   const showInvoice = /fulfilled|delivered|leveret|won/i.test(deal.stage_id ?? "");
 
   return (
@@ -139,12 +162,35 @@ export default function DealDetail() {
       <div className="flex items-center justify-between">
         <h1 className="text-h1">{deal.title}</h1>
         <div className="flex gap-2">
-          {showQuote && (
+          {deal && !isLoadingProject && (
+            project ? (
+              <Button variant="outline" onClick={() => nav(`/projects/${project.id}`)}>
+                <FolderKanban className="h-4 w-4 mr-2" />
+                View Project
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setCreateProjectDialogOpen(true)}>
+                <FolderKanban className="h-4 w-4 mr-2" />
+                Create Project
+              </Button>
+            )
+          )}
+          {existingQuote ? (
+            <Button variant="outline" onClick={() => nav(`/quotes/${existingQuote.id}`)}>
+              <FileText className="h-4 w-4 mr-2" />
+              View Quote
+            </Button>
+          ) : showQuote && (
             <Button onClick={() => handleCreate("quote")} disabled={!!busy}>
               {busy === "quote" ? "Opretter…" : "Create Quote"}
             </Button>
           )}
-          {showOrder && (
+          {existingOrder ? (
+            <Button variant="outline" onClick={() => nav(`/orders/${existingOrder.id}`)}>
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              View Order
+            </Button>
+          ) : showOrder && (
             <Button variant="outline" onClick={() => handleCreate("order")} disabled={!!busy}>
               {busy === "order" ? "Opretter…" : "Create Order"}
             </Button>
@@ -156,6 +202,14 @@ export default function DealDetail() {
           )}
         </div>
       </div>
+
+      {deal && (
+        <CreateProjectDialog
+          open={createProjectDialogOpen}
+          onOpenChange={setCreateProjectDialogOpen}
+          dealId={deal.id}
+        />
+      )}
 
       <div className="rounded-2xl border p-4 shadow-card">
         <div className="text-sm text-muted-foreground mb-2">
@@ -206,6 +260,13 @@ export default function DealDetail() {
         <h2 className="text-lg font-semibold mb-2">Activity</h2>
         <DealActivityList dealId={deal.id} />
       </div>
+
+      {/* Tasks Section */}
+      <RelatedTasksList
+        relatedType="deal"
+        relatedId={deal.id}
+        relatedTitle={deal.title}
+      />
 
       <div className="text-sm">
         <Link className="underline" to="/deals">

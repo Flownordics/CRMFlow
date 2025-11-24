@@ -22,6 +22,8 @@ const CompaniesList = lazy(() => import("@/pages/companies/CompaniesList"));
 const CompanyPage = lazy(() => import("@/pages/companies/CompanyPage"));
 const DealsBoard = lazy(() => import("@/pages/deals/DealsBoard"));
 const DealDetail = lazy(() => import("@/pages/deals/DealDetail"));
+const ProjectsList = lazy(() => import("@/pages/projects/ProjectsList"));
+const ProjectDetail = lazy(() => import("@/pages/projects/ProjectDetail"));
 const Quotes = lazy(() => import("@/pages/Quotes"));
 const QuoteEditor = lazy(() => import("@/pages/quotes/QuoteEditor"));
 
@@ -99,6 +101,10 @@ const App = () => {
                       <Route path="deals">
                         <Route index element={<DealsBoard />} />
                         <Route path=":id" element={<DealDetail />} />
+                      </Route>
+                      <Route path="projects">
+                        <Route index element={<ProjectsList />} />
+                        <Route path=":id" element={<ProjectDetail />} />
                       </Route>
                       <Route path="quotes">
                         <Route index element={<Quotes />} />

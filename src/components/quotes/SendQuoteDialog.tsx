@@ -6,8 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { AccessibleDialogContent } from "@/components/ui/accessible-dialog";
+import { Dialog, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogContent } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useSendQuoteEmail } from "@/services/email";
@@ -184,10 +183,10 @@ Your Sales Team`);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <AccessibleDialogContent className="sm:max-w-[600px]" data-testid="send-quote-dialog">
+            <DialogContent className="sm:max-w-[600px]" data-testid="send-quote-dialog">
                 <DialogHeader>
-                    <DialogTitle id="send-quote-title">Send tilbud</DialogTitle>
-                    <DialogDescription id="send-quote-desc">
+                    <DialogTitle>Send tilbud</DialogTitle>
+                    <DialogDescription>
                         Send tilbuddet til kunden. Du kan downloade PDF og sende manuelt.
                     </DialogDescription>
                 </DialogHeader>
@@ -363,7 +362,7 @@ Your Sales Team`);
                         </Button>
                     </DialogFooter>
                 </form>
-            </AccessibleDialogContent>
+            </DialogContent>
         </Dialog>
     );
 }
