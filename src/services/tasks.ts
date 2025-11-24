@@ -68,6 +68,7 @@ export interface CreateTaskData {
     tags?: string[];
     is_private?: boolean;
     estimated_hours?: number;
+    actual_hours?: number;
 }
 
 export interface UpdateTaskData extends Partial<CreateTaskData> {

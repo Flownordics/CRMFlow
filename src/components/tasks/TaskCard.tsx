@@ -152,7 +152,7 @@ export function TaskCard({ task, onEdit, onView }: TaskCardProps) {
             <div className={cn(
               "flex items-center gap-1",
               dueDateStatus?.type === 'overdue' && "text-destructive font-medium",
-              dueDateStatus?.type === 'upcoming' && "text-yellow-600 dark:text-yellow-400"
+              dueDateStatus?.type === 'upcoming' && "text-warning"
             )}>
               <Calendar className="h-3 w-3" />
               <span>{formatTaskDueDate(task.due_date)}</span>
@@ -271,7 +271,7 @@ export function TaskCard({ task, onEdit, onView }: TaskCardProps) {
               variant={dueDateStatus.type === 'overdue' ? 'destructive' : 'outline'}
               className={cn(
                 "text-xs flex items-center gap-1",
-                dueDateStatus.type === 'upcoming' && "bg-yellow-50 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
+                dueDateStatus.type === 'upcoming' && "bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning"
               )}
             >
               <AlertTriangle className="h-3 w-3" />
@@ -285,12 +285,12 @@ export function TaskCard({ task, onEdit, onView }: TaskCardProps) {
               <span>Depends on:</span>
               <span className={cn(
                 "font-medium",
-                dependencyTask.status === 'completed' ? "text-green-600" : "text-yellow-600"
+                dependencyTask.status === 'completed' ? "text-success" : "text-warning"
               )}>
                 {dependencyTask.title}
               </span>
               {dependencyTask.status !== 'completed' && (
-                <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+                <Badge variant="outline" className="text-xs bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning">
                   Blocking
                 </Badge>
               )}

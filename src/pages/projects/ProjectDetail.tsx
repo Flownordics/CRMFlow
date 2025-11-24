@@ -40,10 +40,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const statusColors = {
-  active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-  on_hold: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  completed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-  cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300",
+  active: "bg-success/10 text-success dark:bg-success/20 dark:text-success",
+  on_hold: "bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning",
+  completed: "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary",
+  cancelled: "bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground",
 };
 
 export default function ProjectDetail() {
@@ -123,15 +123,15 @@ export default function ProjectDetail() {
   }, [taskCompletionRate, project?.status, totalTasks, totalQuotes, totalOrders, totalInvoices]);
   
   const getHealthColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
+    if (score >= 80) return 'text-success';
+    if (score >= 60) return 'text-warning';
+    return 'text-destructive';
   };
   
   const getHealthBadge = (score: number) => {
-    if (score >= 80) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-    if (score >= 60) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+    if (score >= 80) return 'bg-success/10 text-success dark:bg-success/20 dark:text-success';
+    if (score >= 60) return 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning';
+    return 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive';
   };
 
   if (isLoading) {
@@ -335,15 +335,15 @@ export default function ProjectDetail() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Completed</div>
-                  <div className="text-lg font-semibold text-green-600">{completedTasks}</div>
+                  <div className="text-lg font-semibold text-success">{completedTasks}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">In Progress</div>
-                  <div className="text-lg font-semibold text-blue-600">{tasks?.filter(t => t.status === 'in_progress').length || 0}</div>
+                  <div className="text-lg font-semibold text-primary">{tasks?.filter(t => t.status === 'in_progress').length || 0}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Pending</div>
-                  <div className="text-lg font-semibold text-yellow-600">{pendingTasks}</div>
+                  <div className="text-lg font-semibold text-warning">{pendingTasks}</div>
                 </div>
               </div>
               
@@ -433,7 +433,7 @@ export default function ProjectDetail() {
               <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-600" />
+                    <FileText className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">Quotes</span>
                   </div>
                   <Badge variant="outline">{quotes.length}</Badge>
@@ -461,7 +461,7 @@ export default function ProjectDetail() {
               <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4 text-green-600" />
+                    <ShoppingCart className="h-4 w-4 text-success" />
                     <span className="text-sm font-medium">Orders</span>
                   </div>
                   <Badge variant="outline">{orders.length}</Badge>
@@ -489,7 +489,7 @@ export default function ProjectDetail() {
               <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Receipt className="h-4 w-4 text-purple-600" />
+                    <Receipt className="h-4 w-4 text-accent" />
                     <span className="text-sm font-medium">Invoices</span>
                   </div>
                   <Badge variant="outline">{invoices.length}</Badge>

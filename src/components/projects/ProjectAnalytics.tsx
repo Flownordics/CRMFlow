@@ -82,15 +82,15 @@ export function ProjectAnalytics({ dealId, projectStatus, budgetMinor, currency 
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{completedTasks}</p>
+                <p className="text-2xl font-bold text-success">{completedTasks}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">In Progress</p>
-                <p className="text-2xl font-bold text-blue-600">{inProgressTasks}</p>
+                <p className="text-2xl font-bold text-primary">{inProgressTasks}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{pendingTasks}</p>
+                <p className="text-2xl font-bold text-warning">{pendingTasks}</p>
               </div>
             </div>
             <div>
@@ -115,17 +115,17 @@ export function ProjectAnalytics({ dealId, projectStatus, budgetMinor, currency 
         <CardContent>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center p-3 border rounded-lg">
-              <FileText className="h-6 w-6 mx-auto mb-2 text-blue-600" />
-              <p className="text-2xl font-bold">{totalQuotes}</p>
-              <p className="text-xs text-muted-foreground">Quotes</p>
-            </div>
-            <div className="text-center p-3 border rounded-lg">
-              <ShoppingCart className="h-6 w-6 mx-auto mb-2 text-green-600" />
-              <p className="text-2xl font-bold">{totalOrders}</p>
-              <p className="text-xs text-muted-foreground">Orders</p>
-            </div>
-            <div className="text-center p-3 border rounded-lg">
-              <Receipt className="h-6 w-6 mx-auto mb-2 text-purple-600" />
+                    <FileText className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <p className="text-2xl font-bold">{totalQuotes}</p>
+                    <p className="text-xs text-muted-foreground">Quotes</p>
+                  </div>
+                  <div className="text-center p-3 border rounded-lg">
+                    <ShoppingCart className="h-6 w-6 mx-auto mb-2 text-success" />
+                    <p className="text-2xl font-bold">{totalOrders}</p>
+                    <p className="text-xs text-muted-foreground">Orders</p>
+                  </div>
+                  <div className="text-center p-3 border rounded-lg">
+                    <Receipt className="h-6 w-6 mx-auto mb-2 text-accent" />
               <p className="text-2xl font-bold">{totalInvoices}</p>
               <p className="text-xs text-muted-foreground">Invoices</p>
             </div>
@@ -153,7 +153,7 @@ export function ProjectAnalytics({ dealId, projectStatus, budgetMinor, currency 
                   <p className="text-sm text-muted-foreground mb-1">Actual Hours</p>
                   <p className={cn(
                     "text-2xl font-bold",
-                    hoursVariance > 0 ? "text-red-600" : hoursVariance < 0 ? "text-green-600" : ""
+                    hoursVariance > 0 ? "text-destructive" : hoursVariance < 0 ? "text-success" : ""
                   )}>
                     {totalActualHours.toFixed(1)}h
                   </p>
@@ -180,7 +180,7 @@ export function ProjectAnalytics({ dealId, projectStatus, budgetMinor, currency 
                       <span className="text-muted-foreground">Variance</span>
                       <span className={cn(
                         "font-medium",
-                        hoursVariance > 0 ? "text-red-600" : hoursVariance < 0 ? "text-green-600" : ""
+                        hoursVariance > 0 ? "text-destructive" : hoursVariance < 0 ? "text-success" : ""
                       )}>
                         {hoursVariance > 0 ? "+" : ""}{hoursVariance.toFixed(1)}h 
                         ({hoursVariancePercent > 0 ? "+" : ""}{hoursVariancePercent.toFixed(0)}%)
@@ -220,7 +220,7 @@ export function ProjectAnalytics({ dealId, projectStatus, budgetMinor, currency 
                   <p className="text-sm text-muted-foreground mb-1">Actual (Invoices)</p>
                   <p className={cn(
                     "text-2xl font-bold",
-                    totalInvoiceValue > budgetMinor ? "text-red-600" : "text-green-600"
+                    totalInvoiceValue > budgetMinor ? "text-destructive" : "text-success"
                   )}>
                     {formatMoneyMinor(totalInvoiceValue, currency)}
                   </p>
@@ -247,7 +247,7 @@ export function ProjectAnalytics({ dealId, projectStatus, budgetMinor, currency 
                       <span className="text-muted-foreground">Variance</span>
                       <span className={cn(
                         "font-medium",
-                        totalInvoiceValue > budgetMinor ? "text-red-600" : "text-green-600"
+                        totalInvoiceValue > budgetMinor ? "text-destructive" : "text-success"
                       )}>
                         {totalInvoiceValue > budgetMinor ? "+" : ""}
                         {formatMoneyMinor(totalInvoiceValue - budgetMinor, currency)}
@@ -283,11 +283,11 @@ export function ProjectAnalytics({ dealId, projectStatus, budgetMinor, currency 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Paid</p>
-                  <p className="text-xl font-semibold text-green-600">{paidInvoices}</p>
+                  <p className="text-xl font-semibold text-success">{paidInvoices}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Unpaid</p>
-                  <p className="text-xl font-semibold text-red-600">{unpaidInvoices}</p>
+                  <p className="text-xl font-semibold text-destructive">{unpaidInvoices}</p>
                 </div>
               </div>
             </div>

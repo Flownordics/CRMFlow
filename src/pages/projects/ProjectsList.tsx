@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,14 +25,13 @@ import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/Ana
 import { ProjectsTable } from "@/components/projects/ProjectsTable";
 
 const statusColors = {
-  active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-  on_hold: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  completed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-  cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300",
+  active: "bg-success/10 text-success dark:bg-success/20 dark:text-success",
+  on_hold: "bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning",
+  completed: "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary",
+  cancelled: "bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground",
 };
 
 export default function ProjectsList() {
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
@@ -46,22 +45,32 @@ export default function ProjectsList() {
   const companies = companiesData?.data || [];
   const { data: users } = useUsers();
 
-  const { data: projects, isLoading, error } = useProjects({
+  // Get ALL projects for KPI cards (no filters)
+  const { data: allProjectsData } = useProjects({});
+  const allProjects = allProjectsData || [];
+
+  // Get FILTERED projects for the list
+  const { data: filteredProjects, isLoading, error } = useProjects({
     search: searchTerm || undefined,
     status: statusFilter !== "all" ? [statusFilter] : undefined,
     company_id: companyFilter !== "all" ? companyFilter : undefined,
     owner_user_id: ownerFilter !== "all" ? ownerFilter : undefined,
   });
 
-  const allProjects = projects || [];
+  const filteredProjectsList = filteredProjects || [];
   
-  // Client-side pagination
-  const totalPages = Math.ceil(allProjects.length / limit);
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, companyFilter, ownerFilter]);
+  
+  // Client-side pagination for filtered projects
+  const totalPages = Math.ceil(filteredProjectsList.length / limit);
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
-  const paginatedProjects = allProjects.slice(startIndex, endIndex);
+  const paginatedProjects = filteredProjectsList.slice(startIndex, endIndex);
 
-  // Calculate KPIs for all projects (not just current page)
+  // Calculate KPIs for ALL projects (not filtered)
   const kpis = useMemo(() => {
     const total = allProjects.length;
     const active = allProjects.filter(p => p.status === 'active').length;
@@ -97,31 +106,28 @@ export default function ProjectsList() {
     <div className="p-6 space-y-6">
       <PageHeader
         title="Projects"
-        description="Manage your projects linked to deals"
-        icon={FolderKanban}
+        subtitle="Manage your projects linked to deals"
       />
 
-      {/* Analytics/KPI Cards */}
-      {allProjects.length > 0 && (
-        <AnalyticsCardGrid columns={4}>
-          <AnalyticsCard title="Total Projects" icon={FolderKanban}>
-            <div className="text-3xl font-bold">{kpis.total}</div>
-            <p className="text-sm text-muted-foreground mt-1">All projects</p>
-          </AnalyticsCard>
-          <AnalyticsCard title="Active" icon={TrendingUp}>
-            <div className="text-3xl font-bold text-green-600">{kpis.active}</div>
-            <p className="text-sm text-muted-foreground mt-1">In progress</p>
-          </AnalyticsCard>
-          <AnalyticsCard title="On Hold" icon={FolderKanban}>
-            <div className="text-3xl font-bold text-yellow-600">{kpis.onHold}</div>
-            <p className="text-sm text-muted-foreground mt-1">Paused</p>
-          </AnalyticsCard>
-          <AnalyticsCard title="Completed" icon={FolderKanban}>
-            <div className="text-3xl font-bold text-blue-600">{kpis.completed}</div>
-            <p className="text-sm text-muted-foreground mt-1">Finished</p>
-          </AnalyticsCard>
-        </AnalyticsCardGrid>
-      )}
+      {/* Analytics/KPI Cards - Always show, based on ALL projects */}
+      <AnalyticsCardGrid columns={4}>
+        <AnalyticsCard title="Total Projects" icon={FolderKanban}>
+          <div className="text-3xl font-bold">{kpis.total}</div>
+          <p className="text-sm text-muted-foreground mt-1">All projects</p>
+        </AnalyticsCard>
+        <AnalyticsCard title="Active" icon={TrendingUp}>
+          <div className="text-3xl font-bold text-success">{kpis.active}</div>
+          <p className="text-sm text-muted-foreground mt-1">In progress</p>
+        </AnalyticsCard>
+        <AnalyticsCard title="On Hold" icon={FolderKanban}>
+          <div className="text-3xl font-bold text-warning">{kpis.onHold}</div>
+          <p className="text-sm text-muted-foreground mt-1">Paused</p>
+        </AnalyticsCard>
+        <AnalyticsCard title="Completed" icon={FolderKanban}>
+          <div className="text-3xl font-bold text-primary">{kpis.completed}</div>
+          <p className="text-sm text-muted-foreground mt-1">Finished</p>
+        </AnalyticsCard>
+      </AnalyticsCardGrid>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4 items-center">
@@ -191,12 +197,14 @@ export default function ProjectsList() {
       </div>
 
       {/* Projects List */}
-      {allProjects.length === 0 ? (
+      {filteredProjectsList.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <FolderKanban className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">No projects found</p>
           <p className="text-sm mt-2">
-            Projects are created from deals. Create a project from a deal to get started.
+            {allProjects.length === 0
+              ? "Projects are created from deals. Create a project from a deal to get started."
+              : "No projects match your current filters. Try adjusting your search criteria."}
           </p>
         </div>
       ) : (
@@ -215,7 +223,7 @@ export default function ProjectsList() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4">
               <div className="text-sm text-muted-foreground">
-                Showing {startIndex + 1}-{Math.min(endIndex, allProjects.length)} of {allProjects.length} projects
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredProjectsList.length)} of {filteredProjectsList.length} projects
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -286,9 +294,9 @@ function ProjectCard({ project }: { project: any }) {
   }, [taskCompletionRate, project.status, totalTasks]);
 
   const getHealthColor = (score: number) => {
-    if (score >= 80) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-    if (score >= 60) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+    if (score >= 80) return 'bg-success/10 text-success dark:bg-success/20 dark:text-success';
+    if (score >= 60) return 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning';
+    return 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive';
   };
 
   return (

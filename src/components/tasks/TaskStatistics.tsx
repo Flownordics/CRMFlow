@@ -62,17 +62,17 @@ export function TaskStatistics({ tasks, className }: TaskStatisticsProps) {
           </Badge>
         )}
         {inProgress > 0 && (
-          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+          <Badge variant="outline" className="text-xs bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary">
             {inProgress} In Progress
           </Badge>
         )}
         {completed > 0 && (
-          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-300">
+          <Badge variant="outline" className="text-xs bg-success/10 text-success dark:bg-success/20 dark:text-success">
             {completed} Completed
           </Badge>
         )}
         {cancelled > 0 && (
-          <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+          <Badge variant="outline" className="text-xs bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground">
             {cancelled} Cancelled
           </Badge>
         )}
@@ -88,7 +88,7 @@ export function TaskStatistics({ tasks, className }: TaskStatisticsProps) {
             </Badge>
           )}
           {upcoming > 0 && (
-            <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 flex items-center gap-1">
+            <Badge variant="outline" className="text-xs bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {upcoming} Due Soon
             </Badge>

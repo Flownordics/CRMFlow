@@ -56,6 +56,7 @@ const taskSchema = z.object({
   tags: z.array(z.string()).optional(),
   is_private: z.boolean().optional(),
   estimated_hours: z.number().optional(),
+  actual_hours: z.number().optional(),
   depends_on_task_id: z.string().optional(),
 });
 
@@ -117,6 +118,7 @@ export function TaskForm({
         tags: task.tags || [],
         is_private: task.is_private,
         estimated_hours: task.estimated_hours,
+        actual_hours: task.actual_hours,
         depends_on_task_id: task.depends_on_task_id,
       });
       setTags(task.tags || []);
@@ -133,6 +135,7 @@ export function TaskForm({
         tags: [],
         is_private: false,
         estimated_hours: undefined,
+        actual_hours: undefined,
       });
       setTags([]);
       setDueDate(undefined);
@@ -372,6 +375,28 @@ export function TaskForm({
                       <Input
                         type="number"
                         step="0.5"
+                        min="0"
+                        placeholder="0"
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="actual_hours"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Actual Hours</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        min="0"
                         placeholder="0"
                         value={field.value ?? ""}
                         onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}

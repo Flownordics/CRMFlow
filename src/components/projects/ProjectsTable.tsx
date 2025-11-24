@@ -18,10 +18,10 @@ interface ProjectsTableProps {
 }
 
 const statusColors = {
-  active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-  on_hold: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  completed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-  cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300",
+  active: "bg-success/10 text-success dark:bg-success/20 dark:text-success",
+  on_hold: "bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning",
+  completed: "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary",
+  cancelled: "bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground",
 };
 
 export function ProjectsTable({ projects }: ProjectsTableProps) {
@@ -89,9 +89,9 @@ function ProjectTableRow({ project }: { project: Project }) {
   }, [taskCompletionRate, project.status, totalTasks]);
 
   const getHealthColor = (score: number) => {
-    if (score >= 80) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-    if (score >= 60) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+    if (score >= 80) return 'bg-success/10 text-success dark:bg-success/20 dark:text-success';
+    if (score >= 60) return 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning';
+    return 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive';
   };
 
   return (

@@ -120,10 +120,10 @@ export function ProjectTeam({ dealId }: ProjectTeamProps) {
                     variant="outline"
                     className={cn(
                       completionRate >= 80
-                        ? "border-green-500 text-green-700 dark:text-green-400"
+                        ? "border-success text-success dark:text-success"
                         : completionRate >= 50
-                        ? "border-yellow-500 text-yellow-700 dark:text-yellow-400"
-                        : "border-red-500 text-red-700 dark:text-red-400"
+                        ? "border-warning text-warning dark:text-warning"
+                        : "border-destructive text-destructive dark:text-destructive"
                     )}
                   >
                     {completionRate.toFixed(0)}% done

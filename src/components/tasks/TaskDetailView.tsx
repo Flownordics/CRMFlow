@@ -46,11 +46,9 @@ export function TaskDetailView({ task, open, onOpenChange, onEdit }: TaskDetailV
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                             <DialogTitle className="text-2xl">{task.title}</DialogTitle>
-                            {task.description && (
-                                <DialogDescription className="text-base mt-2">
-                                    {task.description}
-                                </DialogDescription>
-                            )}
+                            <DialogDescription className="text-base mt-2">
+                                {task.description || "Task details"}
+                            </DialogDescription>
                         </div>
                         <Button onClick={handleEdit} size="sm">
                             <Edit className="h-4 w-4 mr-2" />

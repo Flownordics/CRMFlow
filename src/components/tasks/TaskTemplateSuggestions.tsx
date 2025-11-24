@@ -33,11 +33,11 @@ export function TaskTemplateSuggestions({
     }
 
     return (
-        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">
+        <Card className="border-primary/20 bg-primary/5 dark:bg-primary/10 dark:border-primary/30">
             <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-blue-600" />
+                        <Sparkles className="h-4 w-4 text-primary" />
                         <CardTitle className="text-sm font-medium">Suggested Tasks</CardTitle>
                     </div>
                     {onDismiss && (
