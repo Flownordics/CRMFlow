@@ -30,7 +30,7 @@ export async function getPendingInvitations(): Promise<Invitation[]> {
 /**
  * Create new invitation (admin only)
  */
-export async function createInvitation(input: CreateInvitationInput): Promise<string | null> {
+export async function createInvitation(input: CreateInvitationInput): Promise<string> {
   try {
     const { data, error } = await supabase.rpc('create_invitation', {
       p_email: input.email.toLowerCase(),
@@ -39,13 +39,29 @@ export async function createInvitation(input: CreateInvitationInput): Promise<st
 
     if (error) {
       logger.error('Error creating invitation:', error);
-      throw error;
+      // Extract meaningful error message from Supabase/PostgREST error
+      // Database function exceptions (RAISE EXCEPTION) are in the message
+      // PostgREST errors may have code, message, details, or hint
+      const errorMessage = 
+        error.message || 
+        error.details || 
+        error.hint || 
+        (typeof error === 'string' ? error : 'Failed to create invitation');
+      throw new Error(errorMessage);
+    }
+
+    if (!data) {
+      throw new Error('No token returned from invitation creation');
     }
 
     return data as string;
   } catch (error) {
     logger.error('Failed to create invitation:', error);
-    return null;
+    // Re-throw to let the mutation handle it properly
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to create invitation');
   }
 }
 
@@ -60,13 +76,21 @@ export async function revokeInvitation(invitationId: string): Promise<boolean> {
 
     if (error) {
       logger.error('Error revoking invitation:', error);
-      throw error;
+      const errorMessage = 
+        error.message || 
+        error.details || 
+        error.hint || 
+        (typeof error === 'string' ? error : 'Failed to revoke invitation');
+      throw new Error(errorMessage);
     }
 
     return data as boolean;
   } catch (error) {
     logger.error('Failed to revoke invitation:', error);
-    return false;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to revoke invitation');
   }
 }
 
