@@ -4,6 +4,7 @@ import { qk } from "@/lib/queryKeys";
 import { toastBus } from "@/lib/toastBus";
 import { logActivity } from "./activity";
 import { logger } from '@/lib/logger';
+import { projectService } from "./projects";
 
 // Deal stage automation rules
 export interface DealStageRule {
@@ -220,6 +221,14 @@ export async function automateDealStage(
 
         logger.debug(`[DealStageAutomation] Deal ${dealId} automatically moved from "${currentStageName}" to "${rule.toStage}" due to ${trigger}`);
 
+        // Automatically update project status if deal is won or lost
+        try {
+            await updateProjectStatusForDeal(dealId, rule.toStage);
+        } catch (error) {
+            // Don't fail the deal stage automation if project update fails
+            logger.warn(`[DealStageAutomation] Failed to update project status for deal ${dealId}:`, error);
+        }
+
         return {
             updated: true,
             fromStage: currentStageName || undefined,
@@ -231,6 +240,33 @@ export async function automateDealStage(
         logger.error(`Failed to automate deal stage for deal ${dealId}:`, error);
         throw error;
     }
+}
+
+// Helper function to update project status based on deal stage
+// This can be called both from automation and manual deal stage changes
+export async function updateProjectStatusForDeal(dealId: string, stageName: string): Promise<void> {
+    const stageNameLower = stageName.toLowerCase();
+    
+    // Check if stage indicates "won" (won, closed won, etc.)
+    const isWon = stageNameLower.includes('won') && !stageNameLower.includes('lost');
+    
+    // Check if stage indicates "lost" (lost, closed lost, etc.)
+    const isLost = stageNameLower.includes('lost');
+    
+    if (isWon) {
+        // Update project to "completed" when deal is won
+        const project = await projectService.updateProjectStatusByDealId(dealId, 'completed');
+        if (project) {
+            logger.debug(`[ProjectStatusUpdate] Project ${project.id} automatically set to "completed" because deal ${dealId} is won`);
+        }
+    } else if (isLost) {
+        // Update project to "cancelled" when deal is lost
+        const project = await projectService.updateProjectStatusByDealId(dealId, 'cancelled');
+        if (project) {
+            logger.debug(`[ProjectStatusUpdate] Project ${project.id} automatically set to "cancelled" because deal ${dealId} is lost`);
+        }
+    }
+    // If neither won nor lost, leave project status unchanged
 }
 
 // React Query hook for deal stage automation
@@ -248,6 +284,10 @@ export function useAutomateDealStage() {
                 // Invalidate deals queries to refresh the UI
                 qc.invalidateQueries({ queryKey: qk.deals() });
                 qc.invalidateQueries({ queryKey: qk.deal(variables.dealId) });
+                
+                // Invalidate project queries to refresh project status
+                qc.invalidateQueries({ queryKey: ['projects'] });
+                qc.invalidateQueries({ queryKey: ['project'] });
 
                 // Show success toast
                 toastBus.emit({

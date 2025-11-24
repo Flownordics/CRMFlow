@@ -176,6 +176,18 @@ export const projectService = {
             throw new Error(`Failed to delete project: ${error.message}`);
         }
     },
+
+    // Update project status by deal_id
+    async updateProjectStatusByDealId(dealId: string, status: 'active' | 'on_hold' | 'completed' | 'cancelled'): Promise<Project | null> {
+        // First, find the project by deal_id
+        const project = await this.getProjectByDealId(dealId);
+        if (!project) {
+            return null; // No project exists for this deal
+        }
+
+        // Update the project status
+        return await this.updateProject(project.id, { status });
+    },
 };
 
 // React Query hooks

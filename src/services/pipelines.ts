@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { rpcReorderDeal } from "./deals";
 import { logger } from '@/lib/logger';
+import { updateProjectStatusForDeal } from "./dealStageAutomation";
 
 export const Stage = z.object({
   id: z.string(),
@@ -83,8 +84,25 @@ export function useMoveDeal() {
       stageId: string;
       index?: number;
     }) => moveDeal(dealId, stageId, index),
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
       qc.invalidateQueries({ queryKey: qk.deals() });
+      
+      // Get stage name to check if it's won/lost
+      try {
+        const stageResponse = await apiClient.get(`/stages?id=eq.${variables.stageId}&select=name`);
+        const stages = stageResponse.data;
+        if (stages && stages.length > 0) {
+          const stageName = stages[0].name;
+          // Update project status if deal is moved to won/lost stage
+          await updateProjectStatusForDeal(variables.dealId, stageName);
+          // Invalidate project queries to refresh UI
+          qc.invalidateQueries({ queryKey: ['projects'] });
+          qc.invalidateQueries({ queryKey: ['project'] });
+        }
+      } catch (error) {
+        logger.warn(`[useMoveDeal] Failed to update project status for deal ${variables.dealId}:`, error);
+      }
+      
       // Log activity for stage change
       import("@/services/activity").then(({ logActivity }) => {
         // We need to get the current stage from the deals query
