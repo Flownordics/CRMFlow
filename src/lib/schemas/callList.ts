@@ -67,7 +67,7 @@ export const activityLogReadSchema = z.object({
     outcome: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
     meta: z.record(z.any()).optional(),
-    relatedType: z.enum(['deal', 'quote', 'order', 'invoice', 'payment']).nullable().optional(),
+    relatedType: z.enum(['deal', 'quote', 'order', 'invoice', 'payment', 'task']).nullable().optional(),
     relatedId: z.string().uuid().nullable().optional(),
     createdAt: z.string(),
 });
@@ -78,7 +78,7 @@ export const activityLogCreateSchema = z.object({
     outcome: z.string().optional(),
     notes: z.string().optional(),
     meta: z.record(z.any()).optional(),
-    relatedType: z.enum(['deal', 'quote', 'order', 'invoice', 'payment']).optional(),
+    relatedType: z.enum(['deal', 'quote', 'order', 'invoice', 'payment', 'task']).optional(),
     relatedId: z.string().uuid().optional(),
 });
 

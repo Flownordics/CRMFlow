@@ -1,4 +1,4 @@
-import { api, apiClient, apiPostWithReturn, normalizeApiData } from "../lib/api";
+import { api, apiClient, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "../lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { z } from "zod";
