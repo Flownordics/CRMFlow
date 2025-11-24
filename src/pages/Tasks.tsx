@@ -287,13 +287,13 @@ export default function Tasks({ embedded = false }: TasksProps) {
                     </CardHeader>
                     <CardContent>
                         {upcomingLoading ? (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            <div className="space-y-2">
                                 {Array.from({ length: 3 }).map((_, index) => (
-                                    <Skeleton key={index} className="h-32" />
+                                    <Skeleton key={index} className="h-16" />
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            <div className="space-y-0 border rounded-lg overflow-hidden">
                                 {upcomingTasks.map((task) => (
                                     <TaskCard
                                         key={task.id}
@@ -320,13 +320,13 @@ export default function Tasks({ embedded = false }: TasksProps) {
                     </CardHeader>
                     <CardContent>
                         {overdueLoading ? (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            <div className="space-y-2">
                                 {Array.from({ length: 3 }).map((_, index) => (
-                                    <Skeleton key={index} className="h-32" />
+                                    <Skeleton key={index} className="h-16" />
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            <div className="space-y-0 border rounded-lg overflow-hidden">
                                 {overdueTasks.map((task) => (
                                     <TaskCard
                                         key={task.id}
@@ -351,13 +351,13 @@ export default function Tasks({ embedded = false }: TasksProps) {
                 </CardHeader>
                 <CardContent>
                     {tasksLoading ? (
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="space-y-2">
                             {Array.from({ length: 6 }).map((_, index) => (
-                                <Skeleton key={index} className="h-32" />
+                                <Skeleton key={index} className="h-16" />
                             ))}
                         </div>
                     ) : tasks && tasks.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="space-y-0 border rounded-lg overflow-hidden">
                             {tasks.map((task) => (
                                 <TaskCard
                                     key={task.id}
