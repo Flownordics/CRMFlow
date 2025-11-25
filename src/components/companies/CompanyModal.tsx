@@ -14,12 +14,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Company, companyCreateSchema, companyUpdateSchema } from "@/lib/schemas/company";
-import { useCreateCompany, useUpdateCompany } from "@/services/companies";
+import { useCreateCompany, useUpdateCompany, checkCompanyVatExists, checkCompanyNameExists } from "@/services/companies";
 import { lookupCvr, mapCvrToCompanyData } from "@/services/cvrLookup";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { Mail, Building2, Search, Loader2 } from "lucide-react";
 import { logger } from '@/lib/logger';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface CompanyModalProps {
     company?: Company;
@@ -35,6 +45,8 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
     const [isCvrLoading, setIsCvrLoading] = useState(false);
     const [cvrSearch, setCvrSearch] = useState("");
     const [cvrEmployees, setCvrEmployees] = useState<number | null>(null);
+    const [showNameWarning, setShowNameWarning] = useState(false);
+    const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
     const isEditing = !!company;
 
     const createCompany = useCreateCompany();
@@ -100,6 +112,36 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
     }, [company, open, form, defaultValues]);
 
     const onSubmit = async (data: any) => {
+        // Only validate when creating, not editing
+        if (!isEditing) {
+            // Check CVR number first - block if exists
+            if (data.vat && data.vat.trim() !== "") {
+                const vatExists = await checkCompanyVatExists(data.vat.trim());
+                if (vatExists) {
+                    toast.error("En virksomhed med dette CVR-nummer eksisterer allerede. Du kan ikke oprette en virksomhed med et eksisterende CVR-nummer.");
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
+            // Check company name - show warning if exists
+            if (data.name && data.name.trim() !== "") {
+                const nameExists = await checkCompanyNameExists(data.name.trim());
+                if (nameExists) {
+                    // Store the data and show warning dialog
+                    setPendingSubmitData(data);
+                    setShowNameWarning(true);
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+        }
+
+        // Proceed with submission
+        await performSubmit(data);
+    };
+
+    const performSubmit = async (data: any) => {
         setIsSubmitting(true);
         try {
             if (isEditing) {
@@ -112,11 +154,32 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
                 onSuccess?.(newCompany);
             }
             onOpenChange(false);
+            setShowNameWarning(false);
+            setPendingSubmitData(null);
         } catch (error) {
             toast.error(t("companies.saveError"));
             logger.error("Error saving company:", error);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleNameWarningConfirm = async () => {
+        if (pendingSubmitData) {
+            await performSubmit(pendingSubmitData);
+        }
+    };
+
+    const handleNameWarningCancel = () => {
+        setShowNameWarning(false);
+        setPendingSubmitData(null);
+    };
+
+    const handleNameWarningOpenChange = (open: boolean) => {
+        setShowNameWarning(open);
+        if (!open) {
+            // Reset pending data when dialog closes
+            setPendingSubmitData(null);
         }
     };
 
@@ -371,6 +434,27 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
                         </Button>
                     </DialogFooter>
                 </form>
+
+                {/* Name warning dialog */}
+                <AlertDialog open={showNameWarning} onOpenChange={handleNameWarningOpenChange}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Firmanavn eksisterer allerede</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                En virksomhed med navnet "{pendingSubmitData?.name}" eksisterer allerede i systemet. 
+                                Er du sikker på, at du ønsker at oprette en ny virksomhed med dette navn alligevel?
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel onClick={handleNameWarningCancel}>
+                                {t("common.cancel")}
+                            </AlertDialogCancel>
+                            <AlertDialogAction onClick={handleNameWarningConfirm}>
+                                Opret alligevel
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </AccessibleDialogContent>
         </Dialog>
     );

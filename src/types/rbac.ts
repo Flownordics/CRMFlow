@@ -35,7 +35,6 @@ export interface UserProfile {
   role: UserRole;
   full_name: string | null;
   avatar_url: string | null;
-  department: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

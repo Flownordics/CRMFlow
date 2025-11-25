@@ -187,15 +187,15 @@ export function TaskCard({ task, onEdit, onView }: TaskCardProps) {
                   className="h-7 text-xs"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleStatusChange('completed');
+                    handleStatusChange('in_progress');
                   }}
                   disabled={updateTask.isPending || (task.depends_on_task_id && dependencyTask?.status !== 'completed')}
                   title={task.depends_on_task_id && dependencyTask?.status !== 'completed' 
-                    ? `Cannot complete: depends on "${dependencyTask?.title}"` 
+                    ? `Cannot start: depends on "${dependencyTask?.title}"` 
                     : undefined}
                 >
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Done
+                  <Play className="h-3 w-3 mr-1" />
+                  Start
                 </Button>
               )}
               {task.status === 'in_progress' && (

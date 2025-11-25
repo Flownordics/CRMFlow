@@ -301,13 +301,14 @@ export async function autoGenerateCallList(request: AutoGenerateCallListRequest)
         const { name = "Auto-ringeliste", limit = 20, overwriteListId } = request;
 
         // Step 1: Fetch qualified companies with prioritization
-        // Priority: Red (oldest first) → Yellow (oldest first) → Green (oldest first)
+        // Priority: Red (oldest first) → Yellow (oldest first) → Green (oldest first) → NULL status (oldest first)
 
         const redCompanies = await apiClient.get(
             `/companies?select=id,name,phone,activity_status,last_activity_at` +
             `&activity_status=eq.red` +
             `&do_not_call=eq.false` +
             `&phone=not.is.null` +
+            `&deleted_at=is.null` +
             `&order=last_activity_at.asc.nullslast` +
             `&limit=${limit}`
         );
@@ -324,6 +325,7 @@ export async function autoGenerateCallList(request: AutoGenerateCallListRequest)
                 `&activity_status=eq.yellow` +
                 `&do_not_call=eq.false` +
                 `&phone=not.is.null` +
+                `&deleted_at=is.null` +
                 `&order=last_activity_at.asc.nullslast` +
                 `&limit=${remaining}`
             );
@@ -342,6 +344,7 @@ export async function autoGenerateCallList(request: AutoGenerateCallListRequest)
                 `&activity_status=eq.green` +
                 `&do_not_call=eq.false` +
                 `&phone=not.is.null` +
+                `&deleted_at=is.null` +
                 `&order=last_activity_at.asc.nullslast` +
                 `&limit=${remaining}`
             );
@@ -350,6 +353,25 @@ export async function autoGenerateCallList(request: AutoGenerateCallListRequest)
             if (typeof greenData === "string") greenData = [];
             if (!Array.isArray(greenData)) greenData = [greenData];
             selectedCompanies = [...selectedCompanies, ...greenData];
+        }
+
+        // If still need more, add companies with NULL activity_status (no activity status set)
+        if (selectedCompanies.length < limit) {
+            const remaining = limit - selectedCompanies.length;
+            const nullStatusCompanies = await apiClient.get(
+                `/companies?select=id,name,phone,activity_status,last_activity_at` +
+                `&activity_status=is.null` +
+                `&do_not_call=eq.false` +
+                `&phone=not.is.null` +
+                `&deleted_at=is.null` +
+                `&order=created_at.asc` +
+                `&limit=${remaining}`
+            );
+
+            let nullStatusData = normalizeApiData(nullStatusCompanies);
+            if (typeof nullStatusData === "string") nullStatusData = [];
+            if (!Array.isArray(nullStatusData)) nullStatusData = [nullStatusData];
+            selectedCompanies = [...selectedCompanies, ...nullStatusData];
         }
 
         // Step 2: Create or update call list

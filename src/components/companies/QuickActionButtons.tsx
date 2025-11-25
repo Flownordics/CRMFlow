@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mail, Phone, Calendar, Handshake, FileText, PhoneCall } from "lucide-react";
+import { Mail, Phone, Calendar, Handshake, FileText, PhoneCall, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { useLogCompanyActivity } from "@/services/activityLog";
@@ -12,14 +12,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { CreateEventDialog } from "@/components/calendar/CreateEventDialog";
 import { CreateDealModal } from "@/components/deals/CreateDealModal";
 import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
+import { useUpdateCompany } from "@/services/companies";
+import { lookupCvr, mapCvrToCompanyData } from "@/services/cvrLookup";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/queryKeys";
 
 interface QuickActionButtonsProps {
   companyId: string;
   companyName: string;
   companyEmail?: string | null;
+  companyVat?: string | null;
 }
 
-export function QuickActionButtons({ companyId, companyName, companyEmail }: QuickActionButtonsProps) {
+export function QuickActionButtons({ companyId, companyName, companyEmail, companyVat }: QuickActionButtonsProps) {
   const navigate = useNavigate();
   const [logCallDialogOpen, setLogCallDialogOpen] = useState(false);
   const [scheduleMeetingDialogOpen, setScheduleMeetingDialogOpen] = useState(false);
@@ -27,7 +32,10 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
   const [createQuoteModalOpen, setCreateQuoteModalOpen] = useState(false);
   const [callOutcome, setCallOutcome] = useState<string>("");
   const [callNotes, setCallNotes] = useState("");
+  const [isCvrSyncing, setIsCvrSyncing] = useState(false);
   const logActivity = useLogCompanyActivity(companyId);
+  const updateCompany = useUpdateCompany(companyId);
+  const queryClient = useQueryClient();
 
   const handleSendEmail = () => {
     if (companyEmail) {
@@ -73,6 +81,33 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
     setCreateQuoteModalOpen(true);
   };
 
+  const handleCvrSync = async () => {
+    if (!companyVat || companyVat.trim() === "") {
+      toast.error("No CVR number available for this company");
+      return;
+    }
+
+    setIsCvrSyncing(true);
+    try {
+      // Lookup CVR data using the company's VAT number
+      const cvrData = await lookupCvr(companyVat);
+      const mappedData = mapCvrToCompanyData(cvrData);
+
+      // Update company with CVR data
+      await updateCompany.mutateAsync(mappedData);
+
+      // Invalidate and refetch company data
+      await queryClient.invalidateQueries({ queryKey: qk.company(companyId) });
+
+      toast.success(`Company data synced from CVR: ${cvrData.name}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to sync CVR data: ${errorMessage}`);
+    } finally {
+      setIsCvrSyncing(false);
+    }
+  };
+
   const actions = [
     {
       label: "Send Email",
@@ -105,6 +140,13 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
       onClick: handleCreateQuote,
       variant: "outline" as const,
     },
+    {
+      label: "CVR Sync",
+      icon: RefreshCw,
+      onClick: handleCvrSync,
+      variant: "outline" as const,
+      disabled: !companyVat || companyVat.trim() === "" || isCvrSyncing,
+    },
   ];
 
   return (
@@ -119,17 +161,18 @@ export function QuickActionButtons({ companyId, companyName, companyEmail }: Qui
         <CardContent className="grid grid-cols-2 gap-2">
           {actions.map((action) => {
             const Icon = action.icon;
+            const isLoading = action.label === "CVR Sync" && isCvrSyncing;
             return (
               <Button
                 key={action.label}
                 variant={action.variant}
                 size="sm"
                 onClick={action.onClick}
-                disabled={action.disabled}
+                disabled={action.disabled || isLoading}
                 className="w-full"
               >
-                <Icon className="h-4 w-4 mr-2" />
-                {action.label}
+                <Icon className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+                {isLoading ? "Syncing..." : action.label}
               </Button>
             );
           })}

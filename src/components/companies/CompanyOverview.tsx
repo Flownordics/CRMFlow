@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Copy, Mail, Phone, Globe, Building2, BadgeDollarSign, MapPin, Hash, Briefcase, Activity, Tag, Users, FileText, Shield, CheckCircle2 } from "lucide-react";
+import { Copy, Mail, Phone, Globe, Building2, BadgeDollarSign, MapPin, Hash, Briefcase, Activity, Tag, Users, FileText, Shield, CheckCircle2, Calendar, Clock, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Company } from "@/lib/schemas/company";
 import { toastBus } from "@/lib/toastBus";
@@ -16,6 +16,7 @@ import { CompanyRevenueCard } from "./CompanyRevenueCard";
 import { CompanyTagsManager } from "./CompanyTagsManager";
 import { CompanyNotes } from "./CompanyNotes";
 import { QuickActionButtons } from "./QuickActionButtons";
+import { useUsers } from "@/services/users";
 
 interface CompanyOverviewProps {
   company: Company;
@@ -28,6 +29,25 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
   const navigate = useNavigate();
   const logActivityMutation = useLogCompanyActivity(company.id);
   const { data: recentActivities } = useCompanyActivityLogs(company.id);
+  const { data: users } = useUsers();
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return null;
+    return new Date(dateString).toLocaleDateString('da-DK', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getCreatedByUser = () => {
+    if (!company.createdBy || !users) return null;
+    return users.find(u => u.id === company.createdBy);
+  };
+
+  const createdByUser = getCreatedByUser();
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -122,6 +142,7 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
           companyId={company.id} 
           companyName={company.name}
           companyEmail={company.email}
+          companyVat={company.vat}
         />
 
         {/* Revenue & Deals */}
@@ -343,17 +364,17 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
             </div>
           )}
 
-          {company.city && (
-            <div className="text-sm">
-              <span className="font-medium">{t("companies.city")}: </span>
-              <span className="text-muted-foreground">{company.city}</span>
-            </div>
-          )}
-
           {company.zip && (
             <div className="text-sm">
               <span className="font-medium">Postal Code: </span>
               <span className="text-muted-foreground">{company.zip}</span>
+            </div>
+          )}
+
+          {company.city && (
+            <div className="text-sm">
+              <span className="font-medium">{t("companies.city")}: </span>
+              <span className="text-muted-foreground">{company.city}</span>
             </div>
           )}
 
@@ -364,7 +385,7 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
             </div>
           )}
 
-          {!company.address && !company.city && !company.zip && !company.country && (
+          {!company.address && !company.zip && !company.city && !company.country && (
             <div className="text-sm text-muted-foreground">
               {t("companies.noAddress")}
             </div>
@@ -470,6 +491,46 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
            (company.commercialProtected === null || company.commercialProtected === undefined) && (
             <div className="text-sm text-muted-foreground">
               {t("companies.noMetaInfo")}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Meta Information */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Calendar className="h-4 w-4" aria-hidden="true" />
+            Meta Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {company.createdBy && createdByUser && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <User className="h-3 w-3" aria-hidden="true" />
+              <span>
+                Oprettet af: <span className="font-medium">{createdByUser.name || createdByUser.email}</span>
+              </span>
+            </div>
+          )}
+          
+          {company.createdAt && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-3 w-3" aria-hidden="true" />
+              <span>Oprettet: {formatDate(company.createdAt)}</span>
+            </div>
+          )}
+          
+          {company.updatedAt && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-3 w-3" aria-hidden="true" />
+              <span>Opdateret: {formatDate(company.updatedAt)}</span>
+            </div>
+          )}
+
+          {!company.createdBy && !company.createdAt && !company.updatedAt && (
+            <div className="text-sm text-muted-foreground">
+              Ingen metadata tilgængelig
             </div>
           )}
         </CardContent>

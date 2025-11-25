@@ -4,6 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConnectedAccounts } from '@/components/settings/ConnectedAccounts';
 import { CalendarSyncSettings } from '@/components/settings/CalendarSyncSettings';
 import { UserInvitations } from '@/components/settings/UserInvitations';
+import { UserManagement } from '@/components/settings/UserManagement';
+import { UserProfileSettings } from '@/components/settings/UserProfileSettings';
 import { TrashBinSettings } from '@/components/settings/TrashBinSettings';
 import { Can } from '@/components/auth/Can';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,6 +82,7 @@ export function SettingsPage() {
           <TabsList>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
             <Can role="admin">
               <TabsTrigger value="users">Users</TabsTrigger>
             </Can>
@@ -128,8 +131,13 @@ export function SettingsPage() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="profile" className="space-y-6">
+            <UserProfileSettings />
+          </TabsContent>
+
           <Can role="admin">
             <TabsContent value="users" className="space-y-6">
+              <UserManagement />
               <UserInvitations />
             </TabsContent>
           </Can>

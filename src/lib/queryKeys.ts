@@ -107,6 +107,8 @@ export const qk = {
   stages: (pipelineId?: string) => ["stages", { pipelineId }] as const,
   userSettings: () => ["user_settings"] as const,
   users: () => ["users"] as const,
+  usersWithProfiles: () => ["users", "with-profiles"] as const,
+  userProfile: () => ["user_profile"] as const,
 
   integrations: {
     all: () => ["integrations"] as const,
