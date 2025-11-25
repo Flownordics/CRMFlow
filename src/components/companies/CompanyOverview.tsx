@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Copy, Mail, Phone, Globe, Building2, BadgeDollarSign, MapPin, Hash, Briefcase, Activity, Tag } from "lucide-react";
+import { Copy, Mail, Phone, Globe, Building2, BadgeDollarSign, MapPin, Hash, Briefcase, Activity, Tag, Users, FileText, Shield, CheckCircle2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Company } from "@/lib/schemas/company";
 import { toastBus } from "@/lib/toastBus";
@@ -350,6 +350,13 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
             </div>
           )}
 
+          {company.zip && (
+            <div className="text-sm">
+              <span className="font-medium">Postal Code: </span>
+              <span className="text-muted-foreground">{company.zip}</span>
+            </div>
+          )}
+
           {company.country && (
             <div className="text-sm">
               <span className="font-medium">{t("companies.country")}: </span>
@@ -357,7 +364,7 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
             </div>
           )}
 
-          {!company.address && !company.city && !company.country && (
+          {!company.address && !company.city && !company.zip && !company.country && (
             <div className="text-sm text-muted-foreground">
               {t("companies.noAddress")}
             </div>
@@ -404,7 +411,63 @@ export function CompanyOverview({ company, onEdit }: CompanyOverviewProps) {
             </div>
           )}
 
-          {!company.vat && !company.domain && !company.industry && (
+          {company.industryCode && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="font-medium">Industry Code</span>
+              </div>
+              <span className="text-sm text-muted-foreground">{company.industryCode}</span>
+            </div>
+          )}
+
+          {/* CVR Information */}
+          {company.monthlyEmployment && typeof company.monthlyEmployment === 'object' && 'employees' in company.monthlyEmployment && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="font-medium">Employees</span>
+              </div>
+              <span className="text-sm text-muted-foreground">{company.monthlyEmployment.employees as number}</span>
+            </div>
+          )}
+
+          {company.cvrStatus && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="font-medium">CVR Status</span>
+              </div>
+              <Badge variant="outline">{company.cvrStatus}</Badge>
+            </div>
+          )}
+
+          {company.legalType && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="font-medium">Legal Type</span>
+              </div>
+              <span className="text-sm text-muted-foreground">{company.legalType}</span>
+            </div>
+          )}
+
+          {company.commercialProtected !== null && company.commercialProtected !== undefined && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <Shield className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="font-medium">Commercial Protected</span>
+              </div>
+              <Badge variant={company.commercialProtected ? "default" : "secondary"}>
+                {company.commercialProtected ? "Yes" : "No"}
+              </Badge>
+            </div>
+          )}
+
+          {!company.vat && !company.domain && !company.industry && 
+           !(company.monthlyEmployment && typeof company.monthlyEmployment === 'object' && 'employees' in company.monthlyEmployment) && 
+           !company.industryCode && !company.cvrStatus && !company.legalType && 
+           (company.commercialProtected === null || company.commercialProtected === undefined) && (
             <div className="text-sm text-muted-foreground">
               {t("companies.noMetaInfo")}
             </div>
