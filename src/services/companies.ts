@@ -110,8 +110,8 @@ export async function fetchCompanies(params: {
     const companies = Array.isArray(raw) ? raw.map(company => ({
       id: company.id,
       name: company.name,
-      email: company.email,
-      invoiceEmail: company.invoice_email,
+      email: company.email && company.email.trim() !== "" ? company.email : null,
+      invoiceEmail: company.invoice_email && company.invoice_email.trim() !== "" ? company.invoice_email : null,
       domain: company.domain,
       vat: company.vat,
       phone: company.phone,
@@ -136,6 +136,13 @@ export async function fetchCompanies(params: {
       foundedDate: company.founded_date,
       parentCompanyId: company.parent_company_id,
       paymentDays: company.payment_days,
+      // CVR lookup fields
+      zip: company.zip,
+      cvrStatus: company.cvr_status,
+      legalType: company.legal_type,
+      commercialProtected: company.commercial_protected,
+      industryCode: company.industry_code,
+      monthlyEmployment: company.monthly_employment,
     })) : [];
 
     // Parse the mapped companies array
@@ -181,8 +188,8 @@ export async function fetchCompany(id: string) {
     const mappedCompany = {
       id: company.id,
       name: company.name,
-      email: company.email,
-      invoiceEmail: company.invoice_email,
+      email: company.email && company.email.trim() !== "" ? company.email : null,
+      invoiceEmail: company.invoice_email && company.invoice_email.trim() !== "" ? company.invoice_email : null,
       domain: company.domain,
       vat: company.vat,
       phone: company.phone,
@@ -207,6 +214,13 @@ export async function fetchCompany(id: string) {
       foundedDate: company.founded_date,
       parentCompanyId: company.parent_company_id,
       paymentDays: company.payment_days,
+      // CVR lookup fields
+      zip: company.zip,
+      cvrStatus: company.cvr_status,
+      legalType: company.legal_type,
+      commercialProtected: company.commercial_protected,
+      industryCode: company.industry_code,
+      monthlyEmployment: company.monthly_employment,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -245,6 +259,13 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       description: companyData.description,
       founded_date: companyData.foundedDate,
       parent_company_id: companyData.parentCompanyId,
+      // CVR lookup fields
+      zip: companyData.zip,
+      cvr_status: companyData.cvrStatus,
+      legal_type: companyData.legalType,
+      commercial_protected: companyData.commercialProtected,
+      industry_code: companyData.industryCode,
+      monthly_employment: companyData.monthlyEmployment,
     };
 
     const response = await apiPostWithReturn("/companies", dbData);
@@ -265,8 +286,8 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
     const mappedCompany = {
       id: createdCompany.id,
       name: createdCompany.name,
-      email: createdCompany.email,
-      invoiceEmail: createdCompany.invoice_email,
+      email: createdCompany.email && createdCompany.email.trim() !== "" ? createdCompany.email : null,
+      invoiceEmail: createdCompany.invoice_email && createdCompany.invoice_email.trim() !== "" ? createdCompany.invoice_email : null,
       vat: createdCompany.vat,
       phone: createdCompany.phone,
       address: createdCompany.address,
@@ -290,6 +311,13 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       foundedDate: createdCompany.founded_date,
       parentCompanyId: createdCompany.parent_company_id,
       paymentDays: createdCompany.payment_days,
+      // CVR lookup fields
+      zip: createdCompany.zip,
+      cvrStatus: createdCompany.cvr_status,
+      legalType: createdCompany.legal_type,
+      commercialProtected: createdCompany.commercial_protected,
+      industryCode: createdCompany.industry_code,
+      monthlyEmployment: createdCompany.monthly_employment,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -327,6 +355,13 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
   if (patch.description !== undefined) dbPatch.description = patch.description;
   if (patch.foundedDate !== undefined) dbPatch.founded_date = patch.foundedDate;
   if (patch.parentCompanyId !== undefined) dbPatch.parent_company_id = patch.parentCompanyId;
+  // CVR lookup fields
+  if (patch.zip !== undefined) dbPatch.zip = patch.zip;
+  if (patch.cvrStatus !== undefined) dbPatch.cvr_status = patch.cvrStatus;
+  if (patch.legalType !== undefined) dbPatch.legal_type = patch.legalType;
+  if (patch.commercialProtected !== undefined) dbPatch.commercial_protected = patch.commercialProtected;
+  if (patch.industryCode !== undefined) dbPatch.industry_code = patch.industryCode;
+  if (patch.monthlyEmployment !== undefined) dbPatch.monthly_employment = patch.monthlyEmployment;
 
   try {
     
@@ -347,8 +382,8 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
     const mappedCompany = {
       id: company.id,
       name: company.name,
-      email: company.email,
-      invoiceEmail: company.invoice_email,
+      email: company.email && company.email.trim() !== "" ? company.email : null,
+      invoiceEmail: company.invoice_email && company.invoice_email.trim() !== "" ? company.invoice_email : null,
       vat: company.vat,
       phone: company.phone,
       address: company.address,
@@ -372,6 +407,13 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
       foundedDate: company.founded_date,
       parentCompanyId: company.parent_company_id,
       paymentDays: company.payment_days,
+      // CVR lookup fields
+      zip: company.zip,
+      cvrStatus: company.cvr_status,
+      legalType: company.legal_type,
+      commercialProtected: company.commercial_protected,
+      industryCode: company.industry_code,
+      monthlyEmployment: company.monthly_employment,
     };
 
     return companyReadSchema.parse(mappedCompany);

@@ -15,9 +15,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Company, companyCreateSchema, companyUpdateSchema } from "@/lib/schemas/company";
 import { useCreateCompany, useUpdateCompany } from "@/services/companies";
+import { lookupCvr, mapCvrToCompanyData } from "@/services/cvrLookup";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
-import { Mail, Building2 } from "lucide-react";
+import { Mail, Building2, Search, Loader2 } from "lucide-react";
 import { logger } from '@/lib/logger';
 
 interface CompanyModalProps {
@@ -31,6 +32,9 @@ interface CompanyModalProps {
 export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultValues }: CompanyModalProps) {
     const { t } = useI18n();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isCvrLoading, setIsCvrLoading] = useState(false);
+    const [cvrSearch, setCvrSearch] = useState("");
+    const [cvrEmployees, setCvrEmployees] = useState<number | null>(null);
     const isEditing = !!company;
 
     const createCompany = useCreateCompany();
@@ -46,6 +50,7 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
             phone: "",
             address: "",
             city: "",
+            zip: "",
             country: "",
             industry: "",
             website: "",
@@ -63,10 +68,17 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
                 phone: company.phone || "",
                 address: company.address || "",
                 city: company.city || "",
+                zip: company.zip || "",
                 country: company.country || "",
                 industry: company.industry || "",
                 website: company.website || "",
             });
+            // Show employees if available
+            if (company.monthlyEmployment && typeof company.monthlyEmployment === 'object' && 'employees' in company.monthlyEmployment) {
+                setCvrEmployees(company.monthlyEmployment.employees as number);
+            } else {
+                setCvrEmployees(null);
+            }
         } else if (open) {
             form.reset({
                 name: defaultValues?.name || "",
@@ -76,10 +88,14 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
                 phone: defaultValues?.phone || "",
                 address: defaultValues?.address || "",
                 city: defaultValues?.city || "",
+                zip: defaultValues?.zip || "",
                 country: defaultValues?.country || "",
                 industry: defaultValues?.industry || "",
                 website: defaultValues?.website || "",
             });
+            // Reset CVR lookup state when opening for new company
+            setCvrSearch("");
+            setCvrEmployees(null);
         }
     }, [company, open, form, defaultValues]);
 
@@ -110,6 +126,39 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
         }
     };
 
+    const handleCvrLookup = async () => {
+        if (!cvrSearch.trim()) {
+            toast.error("Indtast CVR nummer eller firmanavn");
+            return;
+        }
+
+        setIsCvrLoading(true);
+        try {
+            const cvrData = await lookupCvr(cvrSearch);
+            const mappedData = mapCvrToCompanyData(cvrData);
+            
+            // Update form with CVR data
+            form.reset({
+                ...form.getValues(),
+                ...mappedData,
+            });
+
+            // Set employees count for display
+            if (cvrData.monthlyEmployment?.employees) {
+                setCvrEmployees(cvrData.monthlyEmployment.employees);
+            }
+
+            toast.success(`CVR data hentet: ${cvrData.name}`);
+            setCvrSearch(""); // Clear search input
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Ukendt fejl";
+            toast.error(errorMessage);
+            logger.error("CVR lookup error in CompanyModal:", error);
+        } finally {
+            setIsCvrLoading(false);
+        }
+    };
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <AccessibleDialogContent
@@ -125,6 +174,47 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
                 </DialogHeader>
 
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    {/* CVR Lookup Section - Only show when creating, not editing */}
+                    {!isEditing && (
+                        <div className="space-y-2 p-4 border rounded-lg bg-muted/50">
+                            <Label className="text-sm font-semibold">CVR Lookup</Label>
+                            <p className="text-xs text-muted-foreground mb-3">
+                                Søg efter virksomhed ved CVR nummer eller firmanavn for at auto-udfylde felter
+                            </p>
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="CVR nummer eller firmanavn"
+                                    value={cvrSearch}
+                                    onChange={(e) => setCvrSearch(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            handleCvrLookup();
+                                        }
+                                    }}
+                                    disabled={isCvrLoading}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleCvrLookup}
+                                    disabled={isCvrLoading || !cvrSearch.trim()}
+                                >
+                                    {isCvrLoading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Search className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </div>
+                            {cvrEmployees !== null && (
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    Ansatte: {cvrEmployees}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     <div className="space-y-2">
                         <Label htmlFor="name">{t("companies.name")} *</Label>
                         <Input
@@ -226,13 +316,22 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="city">{t("companies.city")}</Label>
                             <Input
                                 id="city"
                                 {...form.register("city")}
                                 placeholder="Copenhagen"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="zip">Postnummer</Label>
+                            <Input
+                                id="zip"
+                                {...form.register("zip")}
+                                placeholder="2100"
                             />
                         </div>
 

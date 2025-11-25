@@ -40,6 +40,13 @@ export const companyReadSchema = z.object({
   foundedDate: z.string().nullable().optional(),
   parentCompanyId: z.string().uuid().nullable().optional(),
   paymentDays: z.number().int().positive().nullable().optional(),
+  // CVR lookup fields
+  zip: z.string().nullable().optional(),
+  cvrStatus: z.string().nullable().optional(),
+  legalType: z.string().nullable().optional(),
+  commercialProtected: z.boolean().nullable().optional(),
+  industryCode: z.string().nullable().optional(),
+  monthlyEmployment: z.record(z.any()).nullable().optional(),
 });
 
 export const companyCreateSchema = z.object({
@@ -65,6 +72,13 @@ export const companyCreateSchema = z.object({
   foundedDate: z.string().optional().nullable(),
   parentCompanyId: z.string().uuid().optional().nullable(),
   paymentDays: z.number().int().positive().optional().nullable(),
+  // CVR lookup fields
+  zip: z.string().optional().nullable(),
+  cvrStatus: z.string().optional().nullable(),
+  legalType: z.string().optional().nullable(),
+  commercialProtected: z.boolean().optional().nullable(),
+  industryCode: z.string().optional().nullable(),
+  monthlyEmployment: z.record(z.any()).optional().nullable(),
 });
 
 export const companyUpdateSchema = companyCreateSchema.partial();
