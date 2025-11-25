@@ -12,8 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { CreateEventDialog } from "@/components/calendar/CreateEventDialog";
 import { CreateDealModal } from "@/components/deals/CreateDealModal";
 import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
-import { useUpdateCompany } from "@/services/companies";
-import { lookupCvr, mapCvrToCompanyData } from "@/services/cvrLookup";
+import { useUpdateCompany, fetchCompany } from "@/services/companies";
+import { lookupCvr, mergeCvrWithExistingCompany } from "@/services/cvrLookup";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 
@@ -89,12 +89,18 @@ export function QuickActionButtons({ companyId, companyName, companyEmail, compa
 
     setIsCvrSyncing(true);
     try {
+      // Fetch current company data to preserve existing values
+      const existingCompany = await fetchCompany(companyId);
+
       // Lookup CVR data using the company's VAT number
       const cvrData = await lookupCvr(companyVat);
-      const mappedData = mapCvrToCompanyData(cvrData);
 
-      // Update company with CVR data
-      await updateCompany.mutateAsync(mappedData);
+      // Merge CVR data with existing company data
+      // This ensures that empty/null values from CVR don't overwrite manually added data
+      const mergedData = mergeCvrWithExistingCompany(existingCompany, cvrData);
+
+      // Update company with merged data (only non-empty CVR values will overwrite)
+      await updateCompany.mutateAsync(mergedData);
 
       // Invalidate and refetch company data
       await queryClient.invalidateQueries({ queryKey: qk.company(companyId) });

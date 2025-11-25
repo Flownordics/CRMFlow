@@ -168,3 +168,102 @@ export function mapCvrToCompanyData(cvrData: CvrResponse): Partial<{
   };
 }
 
+/**
+ * Helper function to check if a value is non-empty
+ * @param value - Value to check
+ * @returns true if value is not null, undefined, or empty string
+ */
+function isNonEmpty(value: any): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string' && value.trim().length === 0) return false;
+  return true;
+}
+
+/**
+ * Merge CVR data with existing company data, only overwriting fields where CVR has non-empty values
+ * This ensures that manually added data (like website) is not overwritten with empty values from CVR
+ * @param existingCompany - Current company data from database
+ * @param cvrData - CVR API response data
+ * @returns Merged company data object with only non-empty CVR values overwriting existing data
+ */
+export function mergeCvrWithExistingCompany(
+  existingCompany: {
+    name?: string | null;
+    vat?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    city?: string | null;
+    zip?: string | null;
+    country?: string | null;
+    industry?: string | null;
+    website?: string | null;
+    cvrStatus?: string | null;
+    legalType?: string | null;
+    commercialProtected?: boolean | null;
+    industryCode?: string | null;
+    monthlyEmployment?: Record<string, any> | null;
+    employeeCount?: number | null;
+  },
+  cvrData: CvrResponse
+): Partial<{
+  name: string;
+  vat: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  zip: string | null;
+  country: string | null;
+  industry: string | null;
+  website: string | null;
+  cvrStatus: string | null;
+  legalType: string | null;
+  commercialProtected: boolean | null;
+  industryCode: string | null;
+  monthlyEmployment: Record<string, any> | null;
+  employeeCount: number | null;
+}> {
+  const mappedCvr = mapCvrToCompanyData(cvrData);
+  const merged: any = {};
+
+  // Always update name and vat from CVR (these are core identifiers)
+  if (isNonEmpty(mappedCvr.name)) merged.name = mappedCvr.name;
+  if (isNonEmpty(mappedCvr.vat)) merged.vat = mappedCvr.vat;
+
+  // For all other fields, only overwrite if CVR has a non-empty value
+  // This preserves manually added data when CVR doesn't have that information
+  const fieldsToMerge: Array<keyof typeof mappedCvr> = [
+    'email',
+    'phone',
+    'address',
+    'city',
+    'zip',
+    'country',
+    'industry',
+    'website',
+    'cvrStatus',
+    'legalType',
+    'commercialProtected',
+    'industryCode',
+    'monthlyEmployment',
+    'employeeCount',
+  ];
+
+  for (const field of fieldsToMerge) {
+    const cvrValue = mappedCvr[field];
+    const existingValue = existingCompany[field];
+
+    // Only include field in update if CVR has a non-empty value
+    // This means:
+    // - If CVR has a value, use it (overwrites existing)
+    // - If CVR is null/empty, don't include it (preserves existing)
+    if (isNonEmpty(cvrValue)) {
+      merged[field] = cvrValue;
+    }
+    // If CVR value is empty, we don't add it to merged object, so existing value is preserved
+  }
+
+  return merged;
+}
+
