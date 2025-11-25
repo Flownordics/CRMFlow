@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Building2, Users, Handshake, FileText, Activity } from "lucide-react";
+import { CompanyLogo } from "@/components/companies/CompanyLogo";
 
 export default function CompanyPage() {
   const { id } = useParams<{ id: string }>();
@@ -59,7 +60,12 @@ export default function CompanyPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={company.name}
+        title={
+          <div className="flex items-center gap-3">
+            <CompanyLogo company={company} size="lg" />
+            <span>{company.name}</span>
+          </div>
+        }
         subtitle={subtitle}
         actions={
           <div className="flex gap-2">

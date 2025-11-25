@@ -11,6 +11,9 @@ import { USE_MOCKS } from "@/lib/debug";
 import { handleError } from "@/lib/errorHandler";
 import { logger } from "@/lib/logger";
 import { isValidUuid } from "@/lib/validation";
+import { supabase } from "@/integrations/supabase/client";
+import { getCompanyLogoUrl } from "@/lib/companyLogo";
+import { fetchAndStoreCompanyLogo } from "@/services/companyLogoStorage";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -122,6 +125,7 @@ export async function fetchCompanies(params: {
       website: company.website,
       createdAt: company.created_at,
       updatedAt: company.updated_at,
+      createdBy: company.created_by,
       lastActivityAt: company.last_activity_at,
       activityStatus: company.activity_status,
       doNotCall: company.do_not_call,
@@ -143,6 +147,7 @@ export async function fetchCompanies(params: {
       commercialProtected: company.commercial_protected,
       industryCode: company.industry_code,
       monthlyEmployment: company.monthly_employment,
+      logoUrl: company.logo_url,
     })) : [];
 
     // Parse the mapped companies array
@@ -200,6 +205,7 @@ export async function fetchCompany(id: string) {
       website: company.website,
       createdAt: company.created_at,
       updatedAt: company.updated_at,
+      createdBy: company.created_by,
       lastActivityAt: company.last_activity_at,
       activityStatus: company.activity_status,
       doNotCall: company.do_not_call,
@@ -221,6 +227,7 @@ export async function fetchCompany(id: string) {
       commercialProtected: company.commercial_protected,
       industryCode: company.industry_code,
       monthlyEmployment: company.monthly_employment,
+      logoUrl: company.logo_url,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -236,6 +243,10 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
   }
 
   try {
+    // Get current user for created_by
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id || null;
+
     // Map camelCase to DB snake_case
     const dbData = {
       name: companyData.name,
@@ -248,7 +259,9 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       country: companyData.country,
       industry: companyData.industry,
       website: companyData.website,
+      logo_url: companyData.logoUrl, // Will be updated after company is created
       do_not_call: companyData.doNotCall ?? false,
+      created_by: userId,
       // Enhanced fields
       employee_count: companyData.employeeCount,
       annual_revenue_range: companyData.annualRevenueRange,
@@ -282,6 +295,31 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       throw new Error("[company] No company data returned from API");
     }
 
+    // Download and store logo in bucket if not explicitly provided
+    let storedLogoUrl = companyData.logoUrl;
+    if (!storedLogoUrl) {
+      try {
+        storedLogoUrl = await fetchAndStoreCompanyLogo(
+          companyData.website,
+          companyData.email,
+          createdCompany.id
+        );
+        
+        // Update company with stored logo URL if we got one
+        if (storedLogoUrl) {
+          await apiPatchWithReturn(`/companies?id=eq.${createdCompany.id}`, {
+            logo_url: storedLogoUrl,
+          });
+        }
+      } catch (error) {
+        // Log error but don't fail company creation if logo download fails
+        logger.warn("Failed to download and store company logo", {
+          error,
+          companyId: createdCompany.id,
+        }, 'CompanyCreate');
+      }
+    }
+
     // Map response back to camelCase
     const mappedCompany = {
       id: createdCompany.id,
@@ -297,6 +335,7 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       website: createdCompany.website,
       createdAt: createdCompany.created_at,
       updatedAt: createdCompany.updated_at,
+      createdBy: createdCompany.created_by,
       lastActivityAt: createdCompany.last_activity_at,
       activityStatus: createdCompany.activity_status,
       doNotCall: createdCompany.do_not_call,
@@ -318,6 +357,7 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
       commercialProtected: createdCompany.commercial_protected,
       industryCode: createdCompany.industry_code,
       monthlyEmployment: createdCompany.monthly_employment,
+      logoUrl: storedLogoUrl || createdCompany.logo_url,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -343,7 +383,65 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
   if (patch.city !== undefined) dbPatch.city = patch.city;
   if (patch.country !== undefined) dbPatch.country = patch.country;
   if (patch.industry !== undefined) dbPatch.industry = patch.industry;
-  if (patch.website !== undefined) dbPatch.website = patch.website;
+  if (patch.website !== undefined) {
+    dbPatch.website = patch.website;
+    // If website is updated, download and store new logo in bucket
+    // Only skip if logoUrl was explicitly set to null or a specific value in the patch
+    if (patch.logoUrl === undefined) {
+      // Get current company email if not in patch
+      let emailForLogo = patch.email;
+      if (!emailForLogo) {
+        try {
+          const currentCompany = await fetchCompany(id);
+          emailForLogo = currentCompany.email;
+        } catch (error) {
+          // If we can't fetch current company, just use patch email (which might be undefined)
+          logger.warn("Could not fetch current company for logo update", { companyId: id }, 'CompanyUpdate');
+        }
+      }
+      
+      // Download and store logo in bucket
+      try {
+        const storedLogoUrl = await fetchAndStoreCompanyLogo(
+          patch.website,
+          emailForLogo,
+          id
+        );
+        // Update logo_url with stored URL (or null if download failed)
+        dbPatch.logo_url = storedLogoUrl;
+      } catch (error) {
+        // Log error but don't fail update if logo download fails
+        logger.warn("Failed to download and store company logo on update", {
+          error,
+          companyId: id,
+        }, 'CompanyUpdate');
+        // Set to null if download failed
+        dbPatch.logo_url = null;
+      }
+    } else if (patch.logoUrl !== null) {
+      // If logoUrl is explicitly provided (not null), use it
+      dbPatch.logo_url = patch.logoUrl;
+    } else {
+      // If logoUrl is explicitly set to null, clear it
+      dbPatch.logo_url = null;
+    }
+  }
+  
+  // Also check if email is updated (without website), try to fetch logo from email domain
+  if (patch.email !== undefined && patch.website === undefined && patch.logoUrl === undefined) {
+    // Fetch current company to get existing website
+    try {
+      const currentCompany = await fetchCompany(id);
+      const logoUrl = getCompanyLogoUrl(currentCompany.website, patch.email);
+      if (logoUrl) {
+        dbPatch.logo_url = logoUrl;
+      }
+    } catch (error) {
+      // If we can't fetch current company, skip logo update
+      logger.warn("Could not fetch current company for logo update", { companyId: id }, 'CompanyUpdate');
+    }
+  }
+  if (patch.logoUrl !== undefined) dbPatch.logo_url = patch.logoUrl;
   if (patch.doNotCall !== undefined) dbPatch.do_not_call = patch.doNotCall;
   // Enhanced fields
   if (patch.employeeCount !== undefined) dbPatch.employee_count = patch.employeeCount;
@@ -393,6 +491,7 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
       website: company.website,
       createdAt: company.created_at,
       updatedAt: company.updated_at,
+      createdBy: company.created_by,
       lastActivityAt: company.last_activity_at,
       activityStatus: company.activity_status,
       doNotCall: company.do_not_call,
@@ -414,6 +513,7 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
       commercialProtected: company.commercial_protected,
       industryCode: company.industry_code,
       monthlyEmployment: company.monthly_employment,
+      logoUrl: company.logo_url,
     };
 
     return companyReadSchema.parse(mappedCompany);
@@ -805,4 +905,75 @@ export function useDeletedCompanies() {
     queryKey: ['deleted-companies'],
     queryFn: () => fetchDeletedCompanies(50)
   });
+}
+
+/**
+ * Check if a company with the given CVR (VAT) number already exists
+ * @param vat - CVR/VAT number to check
+ * @returns true if company exists, false otherwise
+ */
+export async function checkCompanyVatExists(vat: string): Promise<boolean> {
+  if (!vat || vat.trim() === "") {
+    return false;
+  }
+
+  if (USE_MOCKS) {
+    // Mock implementation - return false for testing
+    return false;
+  }
+
+  try {
+    const response = await apiClient.get(
+      `/companies?vat=eq.${encodeURIComponent(vat.trim())}&deleted_at=is.null&select=id&limit=1`
+    );
+    const raw = normalizeApiData(response);
+
+    if (typeof raw === "string") {
+      throw new Error("[company] Non-JSON response during VAT check.");
+    }
+
+    const companies = Array.isArray(raw) ? raw : [raw];
+    return companies.length > 0;
+  } catch (error) {
+    logger.error("Failed to check if company VAT exists", { error, vat }, 'CompanyVatCheck');
+    // On error, return false to allow creation (fail open)
+    return false;
+  }
+}
+
+/**
+ * Check if a company with the given name already exists (case-insensitive)
+ * @param name - Company name to check
+ * @returns true if company exists, false otherwise
+ */
+export async function checkCompanyNameExists(name: string): Promise<boolean> {
+  if (!name || name.trim() === "") {
+    return false;
+  }
+
+  if (USE_MOCKS) {
+    // Mock implementation - return false for testing
+    return false;
+  }
+
+  try {
+    // Use case-insensitive exact match with ilike (PostgREST format: name.ilike.value)
+    const trimmedName = name.trim();
+    const encodedName = encodeURIComponent(trimmedName);
+    const response = await apiClient.get(
+      `/companies?name.ilike.${encodedName}&deleted_at=is.null&select=id&limit=1`
+    );
+    const raw = normalizeApiData(response);
+
+    if (typeof raw === "string") {
+      throw new Error("[company] Non-JSON response during name check.");
+    }
+
+    const companies = Array.isArray(raw) ? raw : [raw];
+    return companies.length > 0;
+  } catch (error) {
+    logger.error("Failed to check if company name exists", { error, name }, 'CompanyNameCheck');
+    // On error, return false to allow creation (fail open)
+    return false;
+  }
 }

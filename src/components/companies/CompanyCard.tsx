@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ActivityStatusBadge } from "./ActivityStatusBadge";
 import { ActivityStatus } from "@/lib/schemas/callList";
 import { getIndustryColor } from "@/lib/chartUtils";
+import { CompanyLogo } from "./CompanyLogo";
 
 interface CompanyCardProps {
     company: Company;
@@ -33,11 +34,7 @@ export function CompanyCard({ company, onClick, className }: CompanyCardProps) {
                     style={{ backgroundColor: industryColor }}
                     aria-hidden="true"
                 />
-                <Icon
-                    className="h-4 w-4"
-                    style={{ color: industryColor }}
-                    aria-hidden="true"
-                />
+                <CompanyLogo company={company} size="md" />
                 <h3 className="font-medium truncate flex-1">{company.name}</h3>
                 <ActivityStatusBadge 
                     status={company.activityStatus as ActivityStatus} 

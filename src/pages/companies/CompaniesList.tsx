@@ -19,6 +19,7 @@ import { getIndustryColor } from "@/lib/chartUtils";
 import { ActivityStatusBadge } from "@/components/companies/ActivityStatusBadge";
 import { ActivityStatus } from "@/lib/schemas/callList";
 import { AddToCallListDialog } from "@/components/call-lists/AddToCallListDialog";
+import { CompanyLogo } from "@/components/companies/CompanyLogo";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkActionsMenu } from "@/components/companies/BulkActionsMenu";
 import { CompanyTagsBadges } from "@/components/companies/CompanyTagsManager";
@@ -162,11 +163,7 @@ export default function CompaniesList() {
                 const industryColor = getIndustryColor(r.industry);
                 return (
                     <div className="flex items-center gap-2">
-                        <Icon 
-                            className="h-4 w-4" 
-                            style={{ color: industryColor }}
-                            aria-hidden="true" 
-                        />
+                        <CompanyLogo company={r} size="sm" />
                         <a className="font-medium hover:underline" href={`/companies/${r.id}`}>
                             {r.name}
                         </a>
