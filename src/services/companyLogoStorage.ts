@@ -11,10 +11,69 @@ const LOGO_BUCKET = "company-logos";
 const LOGO_FOLDER = "logos";
 
 /**
+ * Deletes all existing logos for a company from storage
+ * @param companyId - Company ID
+ */
+async function deleteCompanyLogos(companyId: string): Promise<void> {
+  try {
+    // List all files in the logos folder
+    const { data: files, error: listError } = await supabase.storage
+      .from(LOGO_BUCKET)
+      .list(LOGO_FOLDER);
+
+    if (listError) {
+      logger.warn("Failed to list logo files for cleanup", {
+        error: listError,
+        companyId,
+      }, 'CompanyLogoStorage');
+      return;
+    }
+
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    // Find all files that belong to this company (filename starts with company ID)
+    const companyLogoFiles = files.filter(file => 
+      file.name.startsWith(`${companyId}.`)
+    );
+
+    if (companyLogoFiles.length === 0) {
+      return;
+    }
+
+    // Delete all company logos
+    const pathsToDelete = companyLogoFiles.map(file => `${LOGO_FOLDER}/${file.name}`);
+    const { error: deleteError } = await supabase.storage
+      .from(LOGO_BUCKET)
+      .remove(pathsToDelete);
+
+    if (deleteError) {
+      logger.warn("Failed to delete old company logos", {
+        error: deleteError,
+        companyId,
+        paths: pathsToDelete,
+      }, 'CompanyLogoStorage');
+    } else if (companyLogoFiles.length > 0) {
+      logger.info("Deleted old company logos", {
+        companyId,
+        count: companyLogoFiles.length,
+      }, 'CompanyLogoStorage');
+    }
+  } catch (error) {
+    logger.error("Error deleting company logos", {
+      error,
+      companyId,
+    }, 'CompanyLogoStorage');
+  }
+}
+
+/**
  * Downloads a logo from Clearbit and uploads it to Supabase Storage
+ * Ensures only one logo exists per company by using company ID in filename
  * @param clearbitUrl - Clearbit logo URL
- * @param companyId - Company ID for naming
- * @param domain - Company domain for naming
+ * @param companyId - Company ID for naming (ensures uniqueness)
+ * @param domain - Company domain (for logging purposes)
  * @returns Public URL to the stored logo, or null if upload fails
  */
 export async function downloadAndStoreLogo(
@@ -25,6 +84,9 @@ export async function downloadAndStoreLogo(
   try {
     // Ensure bucket exists (this should be done in migration, but we check anyway)
     await ensureBucketExists();
+
+    // Delete any existing logos for this company to prevent duplicates
+    await deleteCompanyLogos(companyId);
 
     // Download logo from Clearbit
     const response = await fetch(clearbitUrl, {
@@ -49,39 +111,24 @@ export async function downloadAndStoreLogo(
                      contentType.includes('webp') ? 'webp' : 
                      contentType.includes('jpg') || contentType.includes('jpeg') ? 'jpg' : 'png';
     
-    // Create filename: domain-timestamp.extension
-    const sanitizedDomain = domain.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
-    const timestamp = Date.now();
-    const fileName = `${sanitizedDomain}-${timestamp}.${extension}`;
+    // Create filename: companyId.extension (ensures one logo per company)
+    const fileName = `${companyId}.${extension}`;
     const filePath = `${LOGO_FOLDER}/${fileName}`;
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage (upsert: true to overwrite if somehow it exists)
     const { data, error } = await supabase.storage
       .from(LOGO_BUCKET)
       .upload(filePath, blob, {
         contentType: contentType,
-        upsert: false, // Don't overwrite existing files
+        upsert: true, // Overwrite if exists (shouldn't happen after delete, but safety net)
         cacheControl: '3600', // Cache for 1 hour
       });
 
     if (error) {
-      // If file already exists, try to get public URL
-      if (error.message.includes('already exists')) {
-        const { data: existingFile } = await supabase.storage
-          .from(LOGO_BUCKET)
-          .list(LOGO_FOLDER, {
-            search: sanitizedDomain,
-          });
-        
-        if (existingFile && existingFile.length > 0) {
-          const existingPath = `${LOGO_FOLDER}/${existingFile[0].name}`;
-          return getPublicUrl(existingPath);
-        }
-      }
-      
       logger.error("Failed to upload logo to storage", {
         error,
         filePath,
+        companyId,
       }, 'CompanyLogoStorage');
       return null;
     }
@@ -171,7 +218,16 @@ export async function fetchAndStoreCompanyLogo(
 }
 
 /**
- * Deletes a logo from storage (useful when company is deleted or logo is updated)
+ * Deletes a logo from storage by company ID
+ * This is the preferred method as it ensures all logos for a company are deleted
+ * @param companyId - Company ID
+ */
+export async function deleteStoredLogoByCompanyId(companyId: string): Promise<void> {
+  await deleteCompanyLogos(companyId);
+}
+
+/**
+ * Deletes a logo from storage by URL (useful when company is deleted or logo is updated)
  * @param logoUrl - Public URL of the logo to delete
  */
 export async function deleteStoredLogo(logoUrl: string): Promise<void> {
