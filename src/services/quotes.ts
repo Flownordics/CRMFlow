@@ -1,4 +1,4 @@
-import { apiClient, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
+import { apiClient, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
@@ -322,10 +322,28 @@ export async function upsertQuoteLine(
 
     return lineDbToUi(lineData);
   } else {
-    const response = await apiClient.post(`/line_items`, {
+    // For new line items, calculate the next available position
+    // to avoid unique constraint violations on (parent_type, parent_id, position)
+    let nextPosition = 0;
+    try {
+      const existingLinesResponse = await apiClient.get(
+        `/line_items?parent_type=eq.quote&parent_id=eq.${quoteId}&select=position&order=position.desc&limit=1`
+      );
+      const existingLines = normalizeApiData(existingLinesResponse);
+      if (Array.isArray(existingLines) && existingLines.length > 0 && existingLines[0]?.position != null) {
+        nextPosition = (existingLines[0].position as number) + 1;
+      }
+    } catch (error) {
+      // If fetching existing lines fails, default to position 0
+      // This might cause a conflict if position 0 already exists, but it's better than failing silently
+      logger.warn("[upsertQuoteLine] Failed to fetch existing line positions, defaulting to 0:", error);
+    }
+
+    const response = await apiPostWithReturn(`/line_items`, {
       ...dbLine,
       parent_type: 'quote',
       parent_id: quoteId,
+      position: nextPosition,
     });
     const raw = normalizeApiData(response);
 
@@ -334,10 +352,32 @@ export async function upsertQuoteLine(
     }
 
     // PostgREST returns arrays, so we need to handle that
-    const lineData = Array.isArray(raw) ? raw[0] : raw;
+    let lineData = Array.isArray(raw) ? raw[0] : raw;
+
+    // If no data returned, try to fetch the most recently created line item for this quote
+    if (!lineData) {
+      logger.warn("[upsertQuoteLine] No line data in response, fetching most recent line item");
+      try {
+        const fetchResponse = await apiClient.get(
+          `/line_items?parent_type=eq.quote&parent_id=eq.${quoteId}&order=created_at.desc&limit=1`
+        );
+        const fetchedRaw = normalizeApiData(fetchResponse);
+        if (Array.isArray(fetchedRaw) && fetchedRaw.length > 0) {
+          lineData = fetchedRaw[0];
+        }
+      } catch (fetchError) {
+        logger.error("[upsertQuoteLine] Failed to fetch created line item:", fetchError);
+      }
+    }
 
     if (!lineData) {
-      throw new Error("[line_item] No line data returned from API");
+      logger.error("[upsertQuoteLine] No line data after all attempts", {
+        rawResponse: raw,
+        responseStatus: response.status,
+        quoteId,
+        position: nextPosition
+      });
+      throw new Error("[line_item] No line data returned from API. Response: " + JSON.stringify(raw));
     }
 
     return lineDbToUi(lineData);
@@ -544,6 +584,16 @@ export function useUpdateQuoteHeader(id: string) {
       qc.invalidateQueries({ queryKey: qk.quotes() });
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
 
+      // Invalidate related entity queries
+      if (updatedQuote.deal_id) {
+        qc.invalidateQueries({ queryKey: qk.deal(updatedQuote.deal_id) });
+        qc.invalidateQueries({ queryKey: qk.deals() });
+      }
+      if (updatedQuote.company_id) {
+        qc.invalidateQueries({ queryKey: qk.company(updatedQuote.company_id) });
+        qc.invalidateQueries({ queryKey: qk.companies() });
+      }
+
       // Check if status changed to 'accepted' and trigger order conversion
       logger.debug("[useUpdateQuoteHeader] Status update successful, patch:", patch);
 
@@ -605,9 +655,25 @@ export function useUpsertQuoteLine(id: string) {
   return useMutation<QuoteLineUI, Error, Parameters<typeof upsertQuoteLine>[1]>({
     mutationFn: (line: Parameters<typeof upsertQuoteLine>[1]) =>
       upsertQuoteLine(id, line),
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: qk.quote(id) });
       qc.invalidateQueries({ queryKey: qk.quotes() });
+      // Fetch quote to get deal_id and company_id for invalidation
+      try {
+        const quote = await fetchQuote(id);
+        if (quote.deal_id) {
+          qc.invalidateQueries({ queryKey: qk.deal(quote.deal_id) });
+          qc.invalidateQueries({ queryKey: qk.deals() });
+        }
+        if (quote.company_id) {
+          qc.invalidateQueries({ queryKey: qk.company(quote.company_id) });
+          qc.invalidateQueries({ queryKey: qk.companies() });
+        }
+      } catch (error) {
+        // If fetch fails, just invalidate all
+        qc.invalidateQueries({ queryKey: qk.deals() });
+        qc.invalidateQueries({ queryKey: qk.companies() });
+      }
     },
   });
 }
@@ -616,9 +682,25 @@ export function useDeleteQuoteLine(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (lineId: string) => deleteQuoteLine(id, lineId),
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: qk.quote(id) });
       qc.invalidateQueries({ queryKey: qk.quotes() });
+      // Fetch quote to get deal_id and company_id for invalidation
+      try {
+        const quote = await fetchQuote(id);
+        if (quote.deal_id) {
+          qc.invalidateQueries({ queryKey: qk.deal(quote.deal_id) });
+          qc.invalidateQueries({ queryKey: qk.deals() });
+        }
+        if (quote.company_id) {
+          qc.invalidateQueries({ queryKey: qk.company(quote.company_id) });
+          qc.invalidateQueries({ queryKey: qk.companies() });
+        }
+      } catch (error) {
+        // If fetch fails, just invalidate all
+        qc.invalidateQueries({ queryKey: qk.deals() });
+        qc.invalidateQueries({ queryKey: qk.companies() });
+      }
     },
   });
 }
@@ -631,6 +713,16 @@ export function useCreateQuote() {
       qc.invalidateQueries({ queryKey: qk.quotes() });
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
       qc.setQueryData(qk.quote(quote.id), quote);
+      
+      // Invalidate related entity queries
+      if (quote.deal_id) {
+        qc.invalidateQueries({ queryKey: qk.deal(quote.deal_id) });
+        qc.invalidateQueries({ queryKey: qk.deals() });
+      }
+      if (quote.company_id) {
+        qc.invalidateQueries({ queryKey: qk.company(quote.company_id) });
+        qc.invalidateQueries({ queryKey: qk.companies() });
+      }
       
       // Log to company activity if quote has NO deal (standalone quote)
       if (!quote.deal_id && quote.company_id) {
@@ -696,9 +788,12 @@ export function useDeleteQuote() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
     mutationFn: deleteQuote,
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: qk.quotes() });
+      qc.invalidateQueries({ queryKey: qk.quote(id) });
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
+      // Note: We can't invalidate deal/company queries here without fetching the quote first
+      // But the quote list refresh should be sufficient
     },
   });
 }
@@ -707,9 +802,12 @@ export function useRestoreQuote() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
     mutationFn: restoreQuote,
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: qk.quotes() });
+      qc.invalidateQueries({ queryKey: qk.quote(id) });
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
+      // Note: We can't invalidate deal/company queries here without fetching the quote first
+      // But the quote list refresh should be sufficient
     },
   });
 }

@@ -1,4 +1,4 @@
-import { apiClient, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
+import { apiClient, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
@@ -244,6 +244,30 @@ export function useInvoices(params: {
     });
 }
 
+export function useCreateInvoice() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: createInvoice,
+        onSuccess: (invoice) => {
+            queryClient.invalidateQueries({ queryKey: qk.invoices() });
+            queryClient.invalidateQueries({ queryKey: qk.invoice(invoice.id) });
+            queryClient.invalidateQueries({ queryKey: qk.accounting() });
+            queryClient.invalidateQueries({ queryKey: qk.overdueInvoices() });
+            queryClient.invalidateQueries({ queryKey: qk.recentInvoices() });
+            // Invalidate related entity queries
+            if (invoice.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(invoice.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (invoice.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(invoice.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
+        },
+    });
+}
+
 export function useInvoice(id: string) {
     return useQuery({
         queryKey: qk.invoice(id),
@@ -268,6 +292,16 @@ export function useAddPayment() {
             // Invalidate all payment queries to refresh payment history
             queryClient.invalidateQueries({ queryKey: qk.payments({}) });
             queryClient.invalidateQueries({ queryKey: qk.invoicePayments(invoiceId) });
+            
+            // Invalidate related entity queries
+            if (updatedInvoice.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(updatedInvoice.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (updatedInvoice.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(updatedInvoice.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }
@@ -281,6 +315,19 @@ export function useUpdateInvoice() {
         onSuccess: async (updatedInvoice, { id, payload }) => {
             queryClient.invalidateQueries({ queryKey: qk.invoice(id) });
             queryClient.invalidateQueries({ queryKey: qk.invoices() });
+            queryClient.invalidateQueries({ queryKey: qk.accounting() });
+            queryClient.invalidateQueries({ queryKey: qk.overdueInvoices() });
+            queryClient.invalidateQueries({ queryKey: qk.recentInvoices() });
+
+            // Invalidate related entity queries
+            if (updatedInvoice.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(updatedInvoice.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (updatedInvoice.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(updatedInvoice.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
 
             // Trigger deal stage automation for invoice status changes
             if (updatedInvoice.deal_id && payload.status === 'paid') {
@@ -299,9 +346,14 @@ export function useDeleteInvoice() {
 
     return useMutation({
         mutationFn: deleteInvoice,
-        onSuccess: () => {
+        onSuccess: (_, id) => {
             queryClient.invalidateQueries({ queryKey: qk.invoices() });
+            queryClient.invalidateQueries({ queryKey: qk.invoice(id) });
             queryClient.invalidateQueries({ queryKey: qk.accounting() });
+            queryClient.invalidateQueries({ queryKey: qk.overdueInvoices() });
+            queryClient.invalidateQueries({ queryKey: qk.recentInvoices() });
+            // Note: We can't invalidate deal/company queries here without fetching the invoice first
+            // But the invoice list refresh should be sufficient
         },
     });
 }
@@ -314,6 +366,18 @@ export function useSendInvoice() {
         onSuccess: (updatedInvoice, id) => {
             queryClient.invalidateQueries({ queryKey: qk.invoice(id) });
             queryClient.invalidateQueries({ queryKey: qk.invoices() });
+            queryClient.invalidateQueries({ queryKey: qk.accounting() });
+            queryClient.invalidateQueries({ queryKey: qk.overdueInvoices() });
+            queryClient.invalidateQueries({ queryKey: qk.recentInvoices() });
+            // Invalidate related entity queries
+            if (updatedInvoice.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(updatedInvoice.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (updatedInvoice.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(updatedInvoice.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }
@@ -323,10 +387,26 @@ export function useSendInvoiceEmail() {
 
     return useMutation({
         mutationFn: sendInvoiceEmail,
-        onSuccess: (result, { invoiceId }) => {
+        onSuccess: async (result, { invoiceId }) => {
             if (result.success) {
                 queryClient.invalidateQueries({ queryKey: qk.invoice(invoiceId) });
                 queryClient.invalidateQueries({ queryKey: qk.invoices() });
+                // Fetch invoice to get deal_id and company_id for invalidation
+                try {
+                    const invoice = await fetchInvoice(invoiceId);
+                    if (invoice.deal_id) {
+                        queryClient.invalidateQueries({ queryKey: qk.deal(invoice.deal_id) });
+                        queryClient.invalidateQueries({ queryKey: qk.deals() });
+                    }
+                    if (invoice.company_id) {
+                        queryClient.invalidateQueries({ queryKey: qk.company(invoice.company_id) });
+                        queryClient.invalidateQueries({ queryKey: qk.companies() });
+                    }
+                } catch (error) {
+                    // If fetch fails, just invalidate all
+                    queryClient.invalidateQueries({ queryKey: qk.deals() });
+                    queryClient.invalidateQueries({ queryKey: qk.companies() });
+                }
             }
         },
     });
@@ -727,10 +807,27 @@ export async function upsertInvoiceLine(
         const response = await apiPatchWithReturn(`/line_items?id=eq.${line.id}`, linePayload);
         return normalizeApiData(response);
     } else {
+        // For new line items, calculate the next available position
+        // to avoid unique constraint violations on (parent_type, parent_id, position)
+        let nextPosition = 0;
+        try {
+            const existingLinesResponse = await apiClient.get(
+                `/line_items?parent_type=eq.invoice&parent_id=eq.${invoiceId}&select=position&order=position.desc&limit=1`
+            );
+            const existingLines = normalizeApiData(existingLinesResponse);
+            if (Array.isArray(existingLines) && existingLines.length > 0 && existingLines[0]?.position != null) {
+                nextPosition = (existingLines[0].position as number) + 1;
+            }
+        } catch (error) {
+            // If fetching existing lines fails, default to position 0
+            // This might cause a conflict if position 0 already exists, but it's better than failing silently
+            logger.warn("[upsertInvoiceLine] Failed to fetch existing line positions, defaulting to 0:", error);
+        }
+
         // Create new line
-        const response = await apiClient.post('/line_items', {
+        const response = await apiPostWithReturn('/line_items', {
             ...linePayload,
-            position: 0, // Will be updated by backend
+            position: nextPosition,
         });
         return normalizeApiData(response);
     }
@@ -753,9 +850,25 @@ export function useUpsertInvoiceLine(invoiceId: string) {
     return useMutation({
         mutationFn: (line: Partial<InvoiceLine> & { id?: string }) =>
             upsertInvoiceLine(invoiceId, line),
-        onSuccess: () => {
+        onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: qk.invoice(invoiceId) });
             queryClient.invalidateQueries({ queryKey: qk.invoices() });
+            // Fetch invoice to get deal_id and company_id for invalidation
+            try {
+                const invoice = await fetchInvoice(invoiceId);
+                if (invoice.deal_id) {
+                    queryClient.invalidateQueries({ queryKey: qk.deal(invoice.deal_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.deals() });
+                }
+                if (invoice.company_id) {
+                    queryClient.invalidateQueries({ queryKey: qk.company(invoice.company_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.companies() });
+                }
+            } catch (error) {
+                // If fetch fails, just invalidate all
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }
@@ -768,9 +881,25 @@ export function useDeleteInvoiceLine(invoiceId: string) {
 
     return useMutation({
         mutationFn: (lineId: string) => deleteInvoiceLine(lineId),
-        onSuccess: () => {
+        onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: qk.invoice(invoiceId) });
             queryClient.invalidateQueries({ queryKey: qk.invoices() });
+            // Fetch invoice to get deal_id and company_id for invalidation
+            try {
+                const invoice = await fetchInvoice(invoiceId);
+                if (invoice.deal_id) {
+                    queryClient.invalidateQueries({ queryKey: qk.deal(invoice.deal_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.deals() });
+                }
+                if (invoice.company_id) {
+                    queryClient.invalidateQueries({ queryKey: qk.company(invoice.company_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.companies() });
+                }
+            } catch (error) {
+                // If fetch fails, just invalidate all
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }

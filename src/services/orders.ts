@@ -1,4 +1,4 @@
-import { apiClient, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
+import { apiClient, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "@/lib/api";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
@@ -434,12 +434,29 @@ export async function upsertOrderLine(
         });
         return normalizeApiData(response);
     } else {
+        // For new line items, calculate the next available position
+        // to avoid unique constraint violations on (parent_type, parent_id, position)
+        let nextPosition = 0;
+        try {
+            const existingLinesResponse = await apiClient.get(
+                `/line_items?parent_type=eq.order&parent_id=eq.${orderId}&select=position&order=position.desc&limit=1`
+            );
+            const existingLines = normalizeApiData(existingLinesResponse);
+            if (Array.isArray(existingLines) && existingLines.length > 0 && existingLines[0]?.position != null) {
+                nextPosition = (existingLines[0].position as number) + 1;
+            }
+        } catch (error) {
+            // If fetching existing lines fails, default to position 0
+            // This might cause a conflict if position 0 already exists, but it's better than failing silently
+            logger.warn("[upsertOrderLine] Failed to fetch existing line positions, defaulting to 0:", error);
+        }
+
         // Create new line
-        const response = await apiClient.post('/line_items', {
+        const response = await apiPostWithReturn('/line_items', {
             ...dbLine,
             parent_type: 'order',
             parent_id: orderId,
-            position: 0, // Will be updated by backend
+            position: nextPosition,
         });
         return normalizeApiData(response);
     }
@@ -480,6 +497,20 @@ export function useCreateOrder() {
             qc.invalidateQueries({ queryKey: qk.orders() });
             qc.setQueryData(qk.order(order.id), order);
             
+            // Invalidate related entity queries
+            if (order.deal_id) {
+                qc.invalidateQueries({ queryKey: qk.deal(order.deal_id) });
+                qc.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (order.company_id) {
+                qc.invalidateQueries({ queryKey: qk.company(order.company_id) });
+                qc.invalidateQueries({ queryKey: qk.companies() });
+            }
+            if (order.quote_id) {
+                qc.invalidateQueries({ queryKey: qk.quote(order.quote_id) });
+                qc.invalidateQueries({ queryKey: qk.quotes() });
+            }
+            
             // Log to company activity if order has NO deal (standalone order)
             if (!order.deal_id && order.company_id) {
                 try {
@@ -503,6 +534,20 @@ export function useUpdateOrderHeader(id: string) {
         onSuccess: async (updatedOrder, patch) => {
             qc.invalidateQueries({ queryKey: qk.order(id) });
             qc.invalidateQueries({ queryKey: qk.orders() });
+
+            // Invalidate related entity queries
+            if (updatedOrder.deal_id) {
+                qc.invalidateQueries({ queryKey: qk.deal(updatedOrder.deal_id) });
+                qc.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (updatedOrder.company_id) {
+                qc.invalidateQueries({ queryKey: qk.company(updatedOrder.company_id) });
+                qc.invalidateQueries({ queryKey: qk.companies() });
+            }
+            if (updatedOrder.quote_id) {
+                qc.invalidateQueries({ queryKey: qk.quote(updatedOrder.quote_id) });
+                qc.invalidateQueries({ queryKey: qk.quotes() });
+            }
 
             // Check if status changed to 'invoiced' and trigger invoice conversion
             logger.debug("[useUpdateOrderHeader] Status update successful, patch:", patch);
@@ -544,8 +589,25 @@ export function useUpsertOrderLine(orderId: string) {
     return useMutation({
         mutationFn: (line: Partial<OrderLineUI> & { id?: string }) =>
             upsertOrderLine(orderId, line),
-        onSuccess: () => {
+        onSuccess: async () => {
             qc.invalidateQueries({ queryKey: qk.order(orderId) });
+            qc.invalidateQueries({ queryKey: qk.orders() });
+            // Fetch order to get deal_id and company_id for invalidation
+            try {
+                const order = await fetchOrder(orderId);
+                if (order.deal_id) {
+                    qc.invalidateQueries({ queryKey: qk.deal(order.deal_id) });
+                    qc.invalidateQueries({ queryKey: qk.deals() });
+                }
+                if (order.company_id) {
+                    qc.invalidateQueries({ queryKey: qk.company(order.company_id) });
+                    qc.invalidateQueries({ queryKey: qk.companies() });
+                }
+            } catch (error) {
+                // If fetch fails, just invalidate all
+                qc.invalidateQueries({ queryKey: qk.deals() });
+                qc.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }
@@ -554,8 +616,25 @@ export function useDeleteOrderLine(orderId: string) {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: (lineId: string) => deleteOrderLine(lineId),
-        onSuccess: () => {
+        onSuccess: async () => {
             qc.invalidateQueries({ queryKey: qk.order(orderId) });
+            qc.invalidateQueries({ queryKey: qk.orders() });
+            // Fetch order to get deal_id and company_id for invalidation
+            try {
+                const order = await fetchOrder(orderId);
+                if (order.deal_id) {
+                    qc.invalidateQueries({ queryKey: qk.deal(order.deal_id) });
+                    qc.invalidateQueries({ queryKey: qk.deals() });
+                }
+                if (order.company_id) {
+                    qc.invalidateQueries({ queryKey: qk.company(order.company_id) });
+                    qc.invalidateQueries({ queryKey: qk.companies() });
+                }
+            } catch (error) {
+                // If fetch fails, just invalidate all
+                qc.invalidateQueries({ queryKey: qk.deals() });
+                qc.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }
@@ -679,9 +758,26 @@ export function useSendOrderEmail() {
     
     return useMutation({
         mutationFn: sendOrderEmail,
-        onSuccess: () => {
+        onSuccess: async (_, request) => {
             // Invalidate orders to refresh status
             queryClient.invalidateQueries({ queryKey: qk.orders() });
+            queryClient.invalidateQueries({ queryKey: qk.order(request.orderId) });
+            // Fetch order to get deal_id and company_id for invalidation
+            try {
+                const order = await fetchOrder(request.orderId);
+                if (order.deal_id) {
+                    queryClient.invalidateQueries({ queryKey: qk.deal(order.deal_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.deals() });
+                }
+                if (order.company_id) {
+                    queryClient.invalidateQueries({ queryKey: qk.company(order.company_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.companies() });
+                }
+            } catch (error) {
+                // If fetch fails, just invalidate all
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }
@@ -736,8 +832,11 @@ export function useDeleteOrder() {
     const qc = useQueryClient();
     return useMutation<void, Error, string>({
         mutationFn: deleteOrder,
-        onSuccess: () => {
+        onSuccess: (_, id) => {
             qc.invalidateQueries({ queryKey: qk.orders() });
+            qc.invalidateQueries({ queryKey: qk.order(id) });
+            // Note: We can't invalidate deal/company queries here without fetching the order first
+            // But the order list refresh should be sufficient
         },
     });
 }
@@ -746,8 +845,11 @@ export function useRestoreOrder() {
     const qc = useQueryClient();
     return useMutation<void, Error, string>({
         mutationFn: restoreOrder,
-        onSuccess: () => {
+        onSuccess: (_, id) => {
             qc.invalidateQueries({ queryKey: qk.orders() });
+            qc.invalidateQueries({ queryKey: qk.order(id) });
+            // Note: We can't invalidate deal/company queries here without fetching the order first
+            // But the order list refresh should be sufficient
         },
     });
 }
