@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/lib/i18n";
 import { usePersonDeals } from "@/services/people";
-import { ExternalLink, DollarSign, Calendar } from "lucide-react";
+import { ExternalLink, DollarSign, Calendar, Handshake } from "lucide-react";
 import { formatMoneyMinor } from "@/lib/money";
+import { EmptyState } from "@/components/EmptyState";
 
 interface PersonDealsProps {
     personId: string;
@@ -39,18 +40,19 @@ export function PersonDeals({ personId }: PersonDealsProps) {
     if (!deals || deals.length === 0) {
         return (
             <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                    <div className="text-center space-y-4">
-                        <h3 className="text-lg font-medium">{t("people.noDeals")}</h3>
-                        <p className="text-sm text-muted-foreground">
-                            {t("people.noDealsDescription")}
-                        </p>
+                <CardContent>
+                    <EmptyState
+                        icon={Handshake}
+                        title={t("people.noDeals")}
+                        description={t("people.noDealsDescription")}
+                        action={
                         <Button asChild>
                             <a href={`/deals/new?contactId=${personId}`}>
                                 {t("people.addDeal")}
                             </a>
                         </Button>
-                    </div>
+                        }
+                    />
                 </CardContent>
             </Card>
         );

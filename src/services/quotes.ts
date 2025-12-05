@@ -4,7 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "./dealStageAutomation";
 import { logger } from '@/lib/logger';
+import { supabase } from "@/integrations/supabase/client";
 import { isValidUuid } from "@/lib/validation";
+import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
+import { getEntityCacheConfig, defaultQueryOptions } from "@/lib/queryCacheConfig";
 
 // Adapter functions for DB ↔ UI conversion
 const lineDbToUi = (l: any) => ({
@@ -67,6 +70,7 @@ export type QuoteUI = {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
   lines: QuoteLineUI[];
 };
 
@@ -111,8 +115,9 @@ export async function fetchQuotes(params: {
   q?: string;
   status?: string;
   company_id?: string;
+  dealId?: string;
 } = {}): Promise<{ data: QuoteUI[]; total: number }> {
-  const { page = 1, limit = 20, q = "", status, company_id } = params;
+  const { page = 1, limit = 20, q = "", status, company_id, dealId } = params;
 
   try {
     // Build query string for filtering
@@ -122,8 +127,9 @@ export async function fetchQuotes(params: {
     queryParams.append('offset', offset.toString());
     queryParams.append('limit', limit.toString());
     
-    // Filter out soft-deleted records
-    queryParams.append('deleted_at', 'is.null');
+    // Filter out soft-deleted records - must be added directly to URL string for PostgREST
+    // Note: URLSearchParams will URL-encode this, but PostgREST needs it as-is
+    // So we'll build the URL manually to ensure correct formatting
 
     // Supabase uses 'search' for text search, not 'q'
     if (q) queryParams.append('search', q);
@@ -131,6 +137,11 @@ export async function fetchQuotes(params: {
     // Apply company filter if provided
     if (company_id) {
       queryParams.append('company_id', `eq.${company_id}`);
+    }
+
+    // Apply deal filter if provided
+    if (dealId) {
+      queryParams.append('deal_id', `eq.${dealId}`);
     }
 
     // Apply status filter if provided, otherwise exclude accepted quotes
@@ -141,7 +152,9 @@ export async function fetchQuotes(params: {
       queryParams.append('status', `neq.accepted`);
     }
 
-    const url = `/quotes?${queryParams.toString()}`;
+    // Build URL with deleted_at filter added directly (PostgREST format)
+    const baseParams = queryParams.toString();
+    const url = `/quotes?deleted_at=is.null${baseParams ? `&${baseParams}` : ''}`;
     const response = await apiClient.get(url);
     const raw = response.data;
 
@@ -320,6 +333,14 @@ export async function upsertQuoteLine(
       throw new Error("[line_item] No line data returned from API");
     }
 
+    // Trigger totals update (trigger should handle this, but call explicitly as fallback)
+    try {
+      await supabase.rpc('update_quote_totals', { quote_id: quoteId });
+    } catch (error) {
+      // Don't fail if RPC call fails - trigger should handle it
+      logger.warn("[upsertQuoteLine] Failed to update quote totals via RPC (trigger should handle it):", error);
+    }
+
     return lineDbToUi(lineData);
   } else {
     // For new line items, calculate the next available position
@@ -380,12 +401,29 @@ export async function upsertQuoteLine(
       throw new Error("[line_item] No line data returned from API. Response: " + JSON.stringify(raw));
     }
 
+    // Trigger totals update (trigger should handle this, but call explicitly as fallback)
+    try {
+      await supabase.rpc('update_quote_totals', { quote_id: quoteId });
+    } catch (error) {
+      // Don't fail if RPC call fails - trigger should handle it
+      logger.warn("[upsertQuoteLine] Failed to update quote totals via RPC (trigger should handle it):", error);
+    }
+
     return lineDbToUi(lineData);
   }
 }
 
 export async function deleteQuoteLine(quoteId: string, lineId: string) {
   await apiClient.delete(`/line_items?id=eq.${lineId}`);
+  
+  // Trigger totals update (trigger should handle this, but call explicitly as fallback)
+  try {
+    await supabase.rpc('update_quote_totals', { quote_id: quoteId });
+  } catch (error) {
+    // Don't fail if RPC call fails - trigger should handle it
+    logger.warn("[deleteQuoteLine] Failed to update quote totals via RPC (trigger should handle it):", error);
+  }
+  
   return { ok: true };
 }
 
@@ -550,27 +588,35 @@ export function useQuotes(params: {
   q?: string;
   status?: string;
   company_id?: string;
+  dealId?: string;
 } = {}) {
+  const cacheConfig = getEntityCacheConfig('quotes');
   return useQuery<{ data: QuoteUI[]; total: number }>({
     queryKey: qk.quotes(params),
     queryFn: () => fetchQuotes(params),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...cacheConfig,
+    ...defaultQueryOptions,
   });
 }
 
 export function useQuoteStatusCounts() {
+  const cacheConfig = getEntityCacheConfig('quotes');
   return useQuery<Record<string, number>>({
     queryKey: qk.quoteStatusCounts(),
     queryFn: () => fetchQuoteStatusCounts(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...cacheConfig,
+    ...defaultQueryOptions,
   });
 }
 
 export function useQuote(id: string) {
+  const cacheConfig = getEntityCacheConfig('quote');
   return useQuery<QuoteUI>({
     queryKey: qk.quote(id),
     queryFn: () => fetchQuote(id),
     enabled: !!id && isValidUuid(id),
+    ...cacheConfig,
+    ...defaultQueryOptions,
   });
 }
 
@@ -579,7 +625,49 @@ export function useUpdateQuoteHeader(id: string) {
   return useMutation<QuoteUI, Error, Parameters<typeof updateQuoteHeader>[1]>({
     mutationFn: (payload: Parameters<typeof updateQuoteHeader>[1]) =>
       updateQuoteHeader(id, payload),
+    onMutate: async (patch) => {
+      // Cancel any outgoing refetches
+      await qc.cancelQueries({ queryKey: qk.quote(id) });
+      await qc.cancelQueries({ queryKey: qk.quotes() });
+      await qc.cancelQueries({ queryKey: qk.quoteStatusCounts() });
+
+      // Snapshot the previous value
+      const previousQuote = qc.getQueryData<QuoteUI>(qk.quote(id));
+      const previousQuotes = qc.getQueryData(qk.quotes());
+
+      // Optimistically update quote
+      if (previousQuote) {
+        qc.setQueryData<QuoteUI>(qk.quote(id), (old) => {
+          if (!old) return old;
+          return { ...old, ...patch };
+        });
+      }
+
+      // Optimistically update quotes list
+      qc.setQueryData(qk.quotes(), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((quote: QuoteUI) =>
+            quote.id === id ? { ...quote, ...patch } : quote
+          )
+        };
+      });
+
+      // Return context for rollback
+      return { previousQuote, previousQuotes };
+    },
+    onError: (_err, _patch, context) => {
+      // Rollback on error
+      if (context?.previousQuote) {
+        qc.setQueryData(qk.quote(id), context.previousQuote);
+      }
+      if (context?.previousQuotes) {
+        qc.setQueryData(qk.quotes(), context.previousQuotes);
+      }
+    },
     onSuccess: async (updatedQuote, patch) => {
+      // Invalidate to ensure consistency with server
       qc.invalidateQueries({ queryKey: qk.quote(id) });
       qc.invalidateQueries({ queryKey: qk.quotes() });
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
@@ -656,8 +744,13 @@ export function useUpsertQuoteLine(id: string) {
     mutationFn: (line: Parameters<typeof upsertQuoteLine>[1]) =>
       upsertQuoteLine(id, line),
     onSuccess: async () => {
+      // Small delay to ensure database trigger has updated totals
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Invalidate quote queries to refresh totals
       qc.invalidateQueries({ queryKey: qk.quote(id) });
       qc.invalidateQueries({ queryKey: qk.quotes() });
+      
       // Fetch quote to get deal_id and company_id for invalidation
       try {
         const quote = await fetchQuote(id);
@@ -683,8 +776,13 @@ export function useDeleteQuoteLine(id: string) {
   return useMutation({
     mutationFn: (lineId: string) => deleteQuoteLine(id, lineId),
     onSuccess: async () => {
+      // Small delay to ensure database trigger has updated totals
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Invalidate quote queries to refresh totals
       qc.invalidateQueries({ queryKey: qk.quote(id) });
       qc.invalidateQueries({ queryKey: qk.quotes() });
+      
       // Fetch quote to get deal_id and company_id for invalidation
       try {
         const quote = await fetchQuote(id);
@@ -740,12 +838,45 @@ export function useCreateQuote() {
 }
 
 // Soft delete quote
-export async function deleteQuote(id: string): Promise<void> {
+// Returns deal_id if quote was associated with a deal (for cache invalidation)
+export async function deleteQuote(id: string): Promise<string | null> {
+  let dealId: string | null = null;
+  
   try {
+    // Fetch quote first to get deal_id (before soft delete)
+    try {
+      const quote = await fetchQuote(id);
+      dealId = quote.deal_id || null;
+    } catch (error) {
+      logger.warn("[deleteQuote] Failed to fetch quote before deletion, continuing anyway:", error);
+    }
+
     // Soft delete by setting deleted_at timestamp
     await apiClient.patch(`/quotes?id=eq.${id}`, {
       deleted_at: new Date().toISOString()
     });
+
+    // If quote was associated with a deal, check if deal should be auto-deleted
+    if (dealId) {
+      try {
+        const { checkDealDependencies, deleteDeal } = await import('./deals');
+        const dependencies = await checkDealDependencies(dealId);
+        
+        // If deal has no active or inactive items left, auto-delete it
+        const totalItems = dependencies.activeQuotes + dependencies.activeOrders + dependencies.activeInvoices +
+                          dependencies.inactiveQuotes + dependencies.inactiveOrders + dependencies.inactiveInvoices;
+        
+        if (totalItems === 0) {
+          logger.debug(`[deleteQuote] Auto-deleting deal ${dealId} - no items remaining`);
+          await deleteDeal(dealId);
+        }
+      } catch (error) {
+        // Don't fail quote deletion if deal check/delete fails
+        logger.warn("[deleteQuote] Failed to check/delete associated deal:", error);
+      }
+    }
+
+    return dealId;
   } catch (error) {
     logger.error("Failed to delete quote:", error);
     throw new Error("Failed to delete quote");
@@ -786,14 +917,19 @@ export async function fetchDeletedQuotes(limit: number = 50): Promise<QuoteUI[]>
 
 export function useDeleteQuote() {
   const qc = useQueryClient();
-  return useMutation<void, Error, string>({
+  return useMutation<string | null, Error, string>({
     mutationFn: deleteQuote,
-    onSuccess: (_, id) => {
+    onSuccess: (dealId, id) => {
       qc.invalidateQueries({ queryKey: qk.quotes() });
       qc.invalidateQueries({ queryKey: qk.quote(id) });
       qc.invalidateQueries({ queryKey: qk.quoteStatusCounts() });
-      // Note: We can't invalidate deal/company queries here without fetching the quote first
-      // But the quote list refresh should be sufficient
+      
+      // Invalidate deal queries if quote was associated with a deal
+      if (dealId) {
+        qc.invalidateQueries({ queryKey: qk.deal(dealId) });
+        qc.invalidateQueries({ queryKey: qk.deals() });
+        qc.invalidateQueries({ queryKey: qk.dealsBoard() });
+      }
     },
   });
 }
@@ -818,7 +954,7 @@ export async function searchQuotes(query: string, companyId?: string): Promise<A
     const result = await fetchQuotes({ q: query, limit: 20, company_id: companyId });
     return result.data.map(quote => ({
       id: quote.id,
-      label: quote.number ? `Quote #${quote.number}` : `Quote ${quote.id.slice(0, 8)}`
+      label: quote.number ? `Quote #${quote.number}` : generateFriendlyNumber(quote.id, 'quote')
     }));
   } catch (error) {
     logger.error("Failed to search quotes:", error);

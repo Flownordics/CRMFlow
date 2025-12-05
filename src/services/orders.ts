@@ -6,6 +6,8 @@ import { logger } from '@/lib/logger';
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "./activity";
 import { isValidUuid } from "@/lib/validation";
+import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
+import { getEntityCacheConfig, defaultQueryOptions } from "@/lib/queryCacheConfig";
 
 // Adapter functions for DB ↔ UI conversion (similar to quotes)
 const lineDbToUi = (l: any) => ({
@@ -35,11 +37,11 @@ const orderDbToUi = (o: any): OrderUI => ({
     currency: o.currency,
     status: o.status || "draft",
     order_date: o.order_date,
-
     notes: o.notes,
     company_id: o.company_id,
     contact_id: o.contact_id,
     deal_id: o.deal_id,
+    deleted_at: o.deleted_at || null,
     quote_id: o.quote_id,
     subtotalMinor: o.subtotal_minor,
     taxMinor: o.tax_minor,
@@ -124,6 +126,7 @@ export type OrderUI = {
     created_by?: string | null;
     created_at: string;
     updated_at: string;
+    deleted_at?: string | null;
     lines: OrderLineUI[];
 };
 
@@ -154,8 +157,9 @@ export async function fetchOrders(params: {
     limit?: number;
     q?: string;
     company_id?: string;
+    dealId?: string;
 } = {}): Promise<{ data: OrderUI[]; total: number }> {
-    const { page = 1, limit = 20, q = "", company_id } = params;
+    const { page = 1, limit = 20, q = "", company_id, dealId } = params;
 
     try {
         logger.debug("[fetchOrders] Starting with params:", params);
@@ -167,7 +171,20 @@ export async function fetchOrders(params: {
 
         if (q) queryParams.append('search', q);
 
-        const url = `/orders?${queryParams.toString()}`;
+        // Apply company filter if provided
+        if (company_id) {
+            queryParams.append('company_id', `eq.${company_id}`);
+        }
+
+        // Apply deal filter if provided
+        if (dealId) {
+            queryParams.append('deal_id', `eq.${dealId}`);
+        }
+
+        // Build URL with deleted_at filter added directly (PostgREST format)
+        // Filter out soft-deleted records
+        const baseParams = queryParams.toString();
+        const url = `/orders?deleted_at=is.null${baseParams ? `&${baseParams}` : ''}`;
         logger.debug("[fetchOrders] Fetching from URL:", url);
 
         const response = await apiClient.get(url);
@@ -324,51 +341,124 @@ export async function createOrder(payload: {
 
         // Handle different response scenarios
         if (response.status === 201) {
-            if (response.data && response.data.id) {
+            // Try to normalize the response data first
+            const responseData = normalizeApiData(response);
+            
+            if (responseData && typeof responseData === 'object' && 'id' in responseData) {
                 // Response contains the created order data
+                order = orderDbToUi(responseData);
+                logger.debug("[createOrder] Order created with data in response:", order.id);
+            } else if (response.data && typeof response.data === 'object' && 'id' in response.data) {
+                // Fallback: check response.data directly
                 order = orderDbToUi(response.data);
+                logger.debug("[createOrder] Order created with data in response.data:", order.id);
             } else if (response.headers?.location) {
                 // Response has location header, fetch the order
                 const location = response.headers.location;
                 const orderId = location.split('/').pop();
                 if (orderId) {
                     order = await fetchOrder(orderId);
+                    logger.debug("[createOrder] Order fetched from location header:", order.id);
                 } else {
                     throw new Error("Invalid location header format");
                 }
             } else {
-                // No data and no location header - try to find the created order by quote_id
-                logger.debug("[createOrder] No data or location header, searching for created order by quote_id");
+                // No data and no location header - try to find the created order
+                logger.debug("[createOrder] No data or location header, searching for created order");
+                
+                // Try to find by quote_id first if available
                 if (orderPayload.quote_id) {
-                    const searchResponse = await apiClient.get(`/orders?quote_id=eq.${orderPayload.quote_id}&order=created_at.desc&limit=1`);
-                    if (searchResponse.data && Array.isArray(searchResponse.data) && searchResponse.data.length > 0) {
-                        order = orderDbToUi(searchResponse.data[0]);
+                    const searchResponse = await apiClient.get(`/orders?quote_id=eq.${orderPayload.quote_id}&deleted_at=is.null&order=created_at.desc&limit=1`);
+                    const searchData = normalizeApiData(searchResponse);
+                    const orders = Array.isArray(searchData) ? searchData : (searchData ? [searchData] : []);
+                    
+                    if (orders.length > 0) {
+                        order = orderDbToUi(orders[0]);
                         logger.debug("[createOrder] Found created order by quote_id:", order.id);
                     } else {
                         throw new Error("Order creation succeeded but could not find created order");
                     }
                 } else {
-                    throw new Error("Unexpected response: no order data or location header");
+                    // Fallback: search by company_id and deal_id (if available) to find the most recently created order
+                    logger.debug("[createOrder] Searching for order by company_id and deal_id");
+                    let searchQuery = `/orders?company_id=eq.${orderPayload.company_id}&deleted_at=is.null&order=created_at.desc&limit=1`;
+                    
+                    if (orderPayload.deal_id) {
+                        searchQuery = `/orders?company_id=eq.${orderPayload.company_id}&deal_id=eq.${orderPayload.deal_id}&deleted_at=is.null&order=created_at.desc&limit=1`;
+                    }
+                    
+                    const searchResponse = await apiClient.get(searchQuery);
+                    const searchData = normalizeApiData(searchResponse);
+                    const orders = Array.isArray(searchData) ? searchData : (searchData ? [searchData] : []);
+                    
+                    if (orders.length > 0) {
+                        // Verify this is likely the order we just created (created within last 10 seconds)
+                        const candidate = orders[0];
+                        const createdAt = new Date(candidate.created_at);
+                        const now = new Date();
+                        const secondsDiff = (now.getTime() - createdAt.getTime()) / 1000;
+                        
+                        if (secondsDiff < 10) {
+                            order = orderDbToUi(candidate);
+                            logger.debug("[createOrder] Found created order by company_id/deal_id:", order.id);
+                        } else {
+                            logger.warn(`[createOrder] Found order but it's too old (${secondsDiff}s), might not be the one we just created`);
+                            // Still use it as fallback, but log a warning
+                            order = orderDbToUi(candidate);
+                            logger.debug("[createOrder] Using order as fallback:", order.id);
+                        }
+                    } else {
+                        throw new Error("Order creation succeeded but could not find created order");
+                    }
                 }
             }
         } else {
             // Handle other status codes
-            order = orderDbToUi(response.data || response);
+            const responseData = normalizeApiData(response);
+            if (responseData && typeof responseData === 'object' && 'id' in responseData) {
+                order = orderDbToUi(responseData);
+            } else if (response.data && typeof response.data === 'object' && 'id' in response.data) {
+                order = orderDbToUi(response.data);
+            } else {
+                throw new Error(`Unexpected response status ${response.status} with no order data`);
+            }
         }
 
         // Create line items separately if lines are provided
         if (lines && lines.length > 0) {
             logger.debug(`[createOrder] Creating ${lines.length} line items for order ${order.id}`);
             for (const line of lines) {
+                // Normalize line format - handle both camelCase (UI) and snake_case (DB/API) formats
+                const unitMinor = (line.unitMinor ?? line.unit_minor ?? 0) as number;
+                const taxRatePct = (line.taxRatePct ?? line.tax_rate_pct ?? 25) as number;
+                const discountPct = (line.discountPct ?? line.discount_pct ?? 0) as number;
+                const qty = (line.qty ?? 1) as number;
+                const description = line.description || 'Item';
+                const sku = line.sku ?? null;
+
+                // Validate required fields
+                if (typeof unitMinor !== 'number' || isNaN(unitMinor)) {
+                    logger.error("[createOrder] Invalid unit_minor value:", unitMinor);
+                    throw new Error(`Invalid unit_minor value: ${unitMinor}`);
+                }
+                if (typeof qty !== 'number' || isNaN(qty)) {
+                    logger.error("[createOrder] Invalid qty value:", qty);
+                    throw new Error(`Invalid qty value: ${qty}`);
+                }
+                if (!description || typeof description !== 'string') {
+                    logger.error("[createOrder] Invalid description:", description);
+                    throw new Error(`Invalid description: ${description}`);
+                }
+
                 const linePayload = {
                     parent_type: 'order',
                     parent_id: order.id,
-                    description: line.description,
-                    qty: line.qty,
-                    unit_minor: line.unitMinor,
-                    tax_rate_pct: line.taxRatePct || 25,
-                    discount_pct: line.discountPct || 0,
-                    sku: line.sku || null,
+                    description: description,
+                    qty: qty,
+                    unit_minor: unitMinor,
+                    tax_rate_pct: taxRatePct,
+                    discount_pct: discountPct,
+                    sku: sku,
                     position: lines.indexOf(line), // Add position for ordering
                 };
                 logger.debug("[createOrder] Creating line item:", linePayload);
@@ -376,9 +466,21 @@ export async function createOrder(payload: {
                 try {
                     const lineResponse = await apiClient.post(`/line_items`, linePayload);
                     logger.debug("[createOrder] Line item created:", lineResponse.data);
-                } catch (lineError) {
+                } catch (lineError: any) {
                     logger.error("[createOrder] Failed to create line item:", lineError);
-                    throw lineError;
+                    // Log the full error response for debugging
+                    if (lineError?.response?.data) {
+                        logger.error("[createOrder] Error response data:", lineError.response.data);
+                    }
+                    if (lineError?.response?.status) {
+                        logger.error("[createOrder] Error status:", lineError.response.status);
+                    }
+                    // Provide a more helpful error message
+                    const errorMessage = lineError?.response?.data?.message || 
+                                        lineError?.response?.data?.error ||
+                                        lineError?.message || 
+                                        'Unknown error';
+                    throw new Error(`Failed to create line item: ${errorMessage}. Line payload: ${JSON.stringify(linePayload)}`);
                 }
             }
         } else {
@@ -425,6 +527,7 @@ export async function upsertOrderLine(
     // Convert UI format to DB format
     const dbLine = lineUiToDb(line);
 
+    let result;
     if (line.id) {
         // Update existing line
         const response = await apiPatchWithReturn(`/line_items?id=eq.${line.id}`, {
@@ -432,7 +535,7 @@ export async function upsertOrderLine(
             parent_type: 'order',
             parent_id: orderId,
         });
-        return normalizeApiData(response);
+        result = normalizeApiData(response);
     } else {
         // For new line items, calculate the next available position
         // to avoid unique constraint violations on (parent_type, parent_id, position)
@@ -458,13 +561,47 @@ export async function upsertOrderLine(
             parent_id: orderId,
             position: nextPosition,
         });
-        return normalizeApiData(response);
+        result = normalizeApiData(response);
     }
+
+    // Trigger totals update (trigger should handle this, but call explicitly as fallback)
+    try {
+        await supabase.rpc('update_order_totals', { order_id: orderId });
+    } catch (error) {
+        // Don't fail if RPC call fails - trigger should handle it
+        logger.warn("[upsertOrderLine] Failed to update order totals via RPC (trigger should handle it):", error);
+    }
+
+    return result;
 }
 
 export async function deleteOrderLine(lineId: string) {
+    // Fetch line item first to get order_id before deletion
+    let orderId: string | null = null;
+    try {
+        const lineResponse = await apiClient.get(`/line_items?id=eq.${lineId}&select=parent_id,parent_type`);
+        const lineData = normalizeApiData(lineResponse);
+        if (Array.isArray(lineData) && lineData.length > 0 && lineData[0].parent_type === 'order') {
+            orderId = lineData[0].parent_id;
+        }
+    } catch (error) {
+        logger.warn("[deleteOrderLine] Failed to fetch line item before deletion:", error);
+    }
+
     const response = await apiClient.delete(`/line_items?id=eq.${lineId}`);
-    return normalizeApiData(response);
+    const result = normalizeApiData(response);
+
+    // Trigger totals update (trigger should handle this, but call explicitly as fallback)
+    if (orderId) {
+        try {
+            await supabase.rpc('update_order_totals', { order_id: orderId });
+        } catch (error) {
+            // Don't fail if RPC call fails - trigger should handle it
+            logger.warn("[deleteOrderLine] Failed to update order totals via RPC (trigger should handle it):", error);
+        }
+    }
+
+    return result;
 }
 
 // Hooks
@@ -473,19 +610,25 @@ export function useOrders(params: {
     limit?: number;
     q?: string;
     company_id?: string;
+    dealId?: string;
 } = {}) {
+    const cacheConfig = getEntityCacheConfig('orders');
     return useQuery<{ data: OrderUI[]; total: number }>({
         queryKey: qk.orders(params),
         queryFn: () => fetchOrders(params),
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        ...cacheConfig,
+        ...defaultQueryOptions,
     });
 }
 
 export function useOrder(id: string) {
+    const cacheConfig = getEntityCacheConfig('order');
     return useQuery<OrderUI>({
         queryKey: qk.order(id),
         queryFn: () => fetchOrder(id),
         enabled: !!id && isValidUuid(id),
+        ...cacheConfig,
+        ...defaultQueryOptions,
     });
 }
 
@@ -531,7 +674,48 @@ export function useUpdateOrderHeader(id: string) {
     return useMutation<OrderUI, Error, Parameters<typeof updateOrderHeader>[1]>({
         mutationFn: (payload: Parameters<typeof updateOrderHeader>[1]) =>
             updateOrderHeader(id, payload),
+        onMutate: async (patch) => {
+            // Cancel any outgoing refetches
+            await qc.cancelQueries({ queryKey: qk.order(id) });
+            await qc.cancelQueries({ queryKey: qk.orders() });
+
+            // Snapshot the previous value
+            const previousOrder = qc.getQueryData<OrderUI>(qk.order(id));
+            const previousOrders = qc.getQueryData(qk.orders());
+
+            // Optimistically update order
+            if (previousOrder) {
+                qc.setQueryData<OrderUI>(qk.order(id), (old) => {
+                    if (!old) return old;
+                    return { ...old, ...patch };
+                });
+            }
+
+            // Optimistically update orders list
+            qc.setQueryData(qk.orders(), (old: any) => {
+                if (!old?.data) return old;
+                return {
+                    ...old,
+                    data: old.data.map((order: OrderUI) =>
+                        order.id === id ? { ...order, ...patch } : order
+                    )
+                };
+            });
+
+            // Return context for rollback
+            return { previousOrder, previousOrders };
+        },
+        onError: (_err, _patch, context) => {
+            // Rollback on error
+            if (context?.previousOrder) {
+                qc.setQueryData(qk.order(id), context.previousOrder);
+            }
+            if (context?.previousOrders) {
+                qc.setQueryData(qk.orders(), context.previousOrders);
+            }
+        },
         onSuccess: async (updatedOrder, patch) => {
+            // Invalidate to ensure consistency with server
             qc.invalidateQueries({ queryKey: qk.order(id) });
             qc.invalidateQueries({ queryKey: qk.orders() });
 
@@ -590,8 +774,13 @@ export function useUpsertOrderLine(orderId: string) {
         mutationFn: (line: Partial<OrderLineUI> & { id?: string }) =>
             upsertOrderLine(orderId, line),
         onSuccess: async () => {
+            // Small delay to ensure database trigger has updated totals
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Invalidate order queries to refresh totals
             qc.invalidateQueries({ queryKey: qk.order(orderId) });
             qc.invalidateQueries({ queryKey: qk.orders() });
+            
             // Fetch order to get deal_id and company_id for invalidation
             try {
                 const order = await fetchOrder(orderId);
@@ -617,8 +806,13 @@ export function useDeleteOrderLine(orderId: string) {
     return useMutation({
         mutationFn: (lineId: string) => deleteOrderLine(lineId),
         onSuccess: async () => {
+            // Small delay to ensure database trigger has updated totals
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Invalidate order queries to refresh totals
             qc.invalidateQueries({ queryKey: qk.order(orderId) });
             qc.invalidateQueries({ queryKey: qk.orders() });
+            
             // Fetch order to get deal_id and company_id for invalidation
             try {
                 const order = await fetchOrder(orderId);
@@ -645,7 +839,7 @@ export async function searchOrders(query: string, companyId?: string): Promise<A
         const result = await fetchOrders({ q: query, limit: 20, company_id: companyId });
         return result.data.map(order => ({
             id: order.id,
-            label: order.order_number ? `Order #${order.order_number}` : `Order ${order.id.slice(0, 8)}`
+            label: order.number ? `Order #${order.number}` : generateFriendlyNumber(order.id, 'order')
         }));
     } catch (error) {
         logger.error("Failed to search orders:", error);
@@ -783,12 +977,46 @@ export function useSendOrderEmail() {
 }
 
 // Soft delete order
-export async function deleteOrder(id: string): Promise<void> {
+// Soft delete order
+// Returns deal_id if order was associated with a deal (for cache invalidation)
+export async function deleteOrder(id: string): Promise<string | null> {
+    let dealId: string | null = null;
+    
     try {
+        // Fetch order first to get deal_id (before soft delete)
+        try {
+            const order = await fetchOrder(id);
+            dealId = order.deal_id || null;
+        } catch (error) {
+            logger.warn("[deleteOrder] Failed to fetch order before deletion, continuing anyway:", error);
+        }
+
         // Soft delete by setting deleted_at timestamp
         await apiClient.patch(`/orders?id=eq.${id}`, {
             deleted_at: new Date().toISOString()
         });
+
+        // If order was associated with a deal, check if deal should be auto-deleted
+        if (dealId) {
+            try {
+                const { checkDealDependencies, deleteDeal } = await import('./deals');
+                const dependencies = await checkDealDependencies(dealId);
+                
+                // If deal has no active or inactive items left, auto-delete it
+                const totalItems = dependencies.activeQuotes + dependencies.activeOrders + dependencies.activeInvoices +
+                                  dependencies.inactiveQuotes + dependencies.inactiveOrders + dependencies.inactiveInvoices;
+                
+                if (totalItems === 0) {
+                    logger.debug(`[deleteOrder] Auto-deleting deal ${dealId} - no items remaining`);
+                    await deleteDeal(dealId);
+                }
+            } catch (error) {
+                // Don't fail order deletion if deal check/delete fails
+                logger.warn("[deleteOrder] Failed to check/delete associated deal:", error);
+            }
+        }
+
+        return dealId;
     } catch (error) {
         logger.error("Failed to delete order:", error);
         throw new Error("Failed to delete order");
@@ -830,13 +1058,18 @@ export async function fetchDeletedOrders(limit: number = 50): Promise<OrderUI[]>
 // React Query hooks for delete/restore
 export function useDeleteOrder() {
     const qc = useQueryClient();
-    return useMutation<void, Error, string>({
+    return useMutation<string | null, Error, string>({
         mutationFn: deleteOrder,
-        onSuccess: (_, id) => {
+        onSuccess: (dealId, id) => {
             qc.invalidateQueries({ queryKey: qk.orders() });
             qc.invalidateQueries({ queryKey: qk.order(id) });
-            // Note: We can't invalidate deal/company queries here without fetching the order first
-            // But the order list refresh should be sufficient
+            
+            // Invalidate deal queries if order was associated with a deal
+            if (dealId) {
+                qc.invalidateQueries({ queryKey: qk.deal(dealId) });
+                qc.invalidateQueries({ queryKey: qk.deals() });
+                qc.invalidateQueries({ queryKey: qk.dealsBoard() });
+            }
         },
     });
 }

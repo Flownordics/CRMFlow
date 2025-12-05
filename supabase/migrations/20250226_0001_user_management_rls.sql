@@ -36,3 +36,7 @@ CREATE POLICY "Users can update own profile, admins can update any"
 COMMENT ON POLICY "Users can update own profile, admins can update any" ON public.user_profiles IS 
   'Allows users to update their own profile (except role) and admins to update any profile including role';
 
+
+
+
+

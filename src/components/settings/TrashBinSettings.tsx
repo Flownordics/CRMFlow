@@ -27,16 +27,7 @@ import { fetchDeletedDeals, restoreDeal } from '@/services/deals';
 import { fetchDeletedQuotes, restoreQuote } from '@/services/quotes';
 import { fetchDeletedOrders, restoreOrder } from '@/services/orders';
 import { fetchDeletedInvoices, restoreInvoice } from '@/services/invoices';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type DeletedItemType = 'companies' | 'people' | 'deals' | 'quotes' | 'orders' | 'invoices';
 
@@ -159,6 +150,13 @@ export function TrashBinSettings() {
       : item.name || item.title || item.number || 'Unnamed';
     
     const deletedAt = item.deleted_at || item.deletedAt;
+    
+    // Validate and format the deleted date
+    const deletedDate = deletedAt ? new Date(deletedAt) : null;
+    const isValidDate = deletedDate && !isNaN(deletedDate.getTime());
+    const deletedTimeText = isValidDate 
+      ? formatDistanceToNow(deletedDate, { addSuffix: true })
+      : 'Unknown time';
 
     return (
       <Card key={item.id} className="mb-2 hover:shadow-md transition-shadow">
@@ -170,9 +168,7 @@ export function TrashBinSettings() {
             <div>
               <h3 className="font-semibold">{name}</h3>
               <p className="text-sm text-muted-foreground">
-                Deleted {formatDistanceToNow(new Date(deletedAt), { 
-                  addSuffix: true
-                })}
+                Deleted {deletedTimeText}
               </p>
               {item.email && (
                 <p className="text-xs text-muted-foreground">{item.email}</p>
@@ -322,25 +318,20 @@ export function TrashBinSettings() {
       </Card>
 
       {/* Confirmation Dialog */}
-      <AlertDialog open={!!confirmRestore} onOpenChange={() => setConfirmRestore(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Restore from trash?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to restore "{confirmRestore?.name}"?
-              <br />
-              The item will be restored and available again.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRestoreAction}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Restore
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {confirmRestore && (
+        <ConfirmationDialog
+          open={!!confirmRestore}
+          onOpenChange={(open) => {
+            if (!open) setConfirmRestore(null);
+          }}
+          title="Restore from trash?"
+          description={`Are you sure you want to restore "${confirmRestore.name}"? The item will be restored and available again.`}
+          confirmText="Restore"
+          cancelText="Cancel"
+          onConfirm={confirmRestoreAction}
+          variant="default"
+        />
+      )}
     </div>
   );
 }

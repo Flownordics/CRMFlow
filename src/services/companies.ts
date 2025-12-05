@@ -14,6 +14,24 @@ import { isValidUuid } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { getCompanyLogoUrl } from "@/lib/companyLogo";
 import { fetchAndStoreCompanyLogo } from "@/services/companyLogoStorage";
+import { getEntityCacheConfig, defaultQueryOptions } from "@/lib/queryCacheConfig";
+
+// Helper function to normalize email: convert empty strings and invalid emails to null
+function normalizeEmail(email: any): string | null {
+  if (!email || email === "" || email === null || email === undefined) return null;
+  if (typeof email !== "string") return null;
+  
+  const trimmed = email.trim();
+  if (trimmed === "") return null;
+  
+  // Basic email validation - if it doesn't look like an email, convert to null
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(trimmed)) {
+    return null; // Invalid email format, convert to null
+  }
+  
+  return trimmed;
+}
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -113,8 +131,8 @@ export async function fetchCompanies(params: {
     const companies = Array.isArray(raw) ? raw.map(company => ({
       id: company.id,
       name: company.name,
-      email: company.email && company.email.trim() !== "" ? company.email : null,
-      invoiceEmail: company.invoice_email && company.invoice_email.trim() !== "" ? company.invoice_email : null,
+      email: normalizeEmail(company.email),
+      invoiceEmail: normalizeEmail(company.invoice_email),
       domain: company.domain,
       vat: company.vat,
       phone: company.phone,
@@ -193,8 +211,8 @@ export async function fetchCompany(id: string) {
     const mappedCompany = {
       id: company.id,
       name: company.name,
-      email: company.email && company.email.trim() !== "" ? company.email : null,
-      invoiceEmail: company.invoice_email && company.invoice_email.trim() !== "" ? company.invoice_email : null,
+      email: normalizeEmail(company.email),
+      invoiceEmail: normalizeEmail(company.invoice_email),
       domain: company.domain,
       vat: company.vat,
       phone: company.phone,
@@ -324,8 +342,8 @@ export async function createCompany(companyData: z.infer<typeof companyCreateSch
     const mappedCompany = {
       id: createdCompany.id,
       name: createdCompany.name,
-      email: createdCompany.email && createdCompany.email.trim() !== "" ? createdCompany.email : null,
-      invoiceEmail: createdCompany.invoice_email && createdCompany.invoice_email.trim() !== "" ? createdCompany.invoice_email : null,
+      email: normalizeEmail(createdCompany.email),
+      invoiceEmail: normalizeEmail(createdCompany.invoice_email),
       vat: createdCompany.vat,
       phone: createdCompany.phone,
       address: createdCompany.address,
@@ -480,8 +498,8 @@ export async function updateCompany(id: string, patch: z.infer<typeof companyUpd
     const mappedCompany = {
       id: company.id,
       name: company.name,
-      email: company.email && company.email.trim() !== "" ? company.email : null,
-      invoiceEmail: company.invoice_email && company.invoice_email.trim() !== "" ? company.invoice_email : null,
+      email: normalizeEmail(company.email),
+      invoiceEmail: normalizeEmail(company.invoice_email),
       vat: company.vat,
       phone: company.phone,
       address: company.address,
@@ -550,7 +568,15 @@ export async function searchCompanies(query: string) {
         throw new Error("[companies] Non-JSON response during search.");
       }
 
-      const companies = z.array(companyReadSchema).parse(raw);
+      // Normalize company data before validation (convert empty strings to null, handle invalid emails)
+      const normalizedCompanies = Array.isArray(raw) ? raw.map((company: any) => ({
+        ...company,
+        email: normalizeEmail(company.email),
+        invoice_email: normalizeEmail(company.invoice_email),
+        website: company.website && company.website.trim() !== "" ? company.website : null,
+      })) : [];
+
+      const companies = z.array(companyReadSchema).parse(normalizedCompanies);
       return companies.slice(0, 20); // Limit to 20 results
     }
 
@@ -568,7 +594,15 @@ export async function searchCompanies(query: string) {
       throw new Error("[companies] Non-JSON response during search.");
     }
 
-    const filteredCompanies = z.array(companyReadSchema).parse(raw);
+    // Normalize company data before validation (convert empty strings to null, handle invalid emails)
+    const normalizedCompanies = Array.isArray(raw) ? raw.map((company: any) => ({
+      ...company,
+      email: normalizeEmail(company.email),
+      invoice_email: normalizeEmail(company.invoice_email),
+      website: company.website && company.website.trim() !== "" ? company.website : null,
+    })) : [];
+
+    const filteredCompanies = z.array(companyReadSchema).parse(normalizedCompanies);
     return filteredCompanies.slice(0, 20); // Limit to 20 results
   } catch (error) {
     logger.error("Failed to search companies", { error, query }, 'CompanySearch');
@@ -715,9 +749,12 @@ export function useCompanies(params: {
   country?: string;
   activityStatus?: string;
 } = {}) {
+  const cacheConfig = getEntityCacheConfig('companies');
   return useQuery({
     queryKey: qk.companies(params),
-    queryFn: () => fetchCompanies(params)
+    queryFn: () => fetchCompanies(params),
+    ...cacheConfig,
+    ...defaultQueryOptions,
   });
 }
 
@@ -755,10 +792,13 @@ export function useCompaniesStats() {
 }
 
 export function useCompany(id: string) {
+  const cacheConfig = getEntityCacheConfig('company');
   return useQuery({
     queryKey: qk.company(id),
     queryFn: () => fetchCompany(id),
-    enabled: !!id && isValidUuid(id)
+    enabled: !!id && isValidUuid(id),
+    ...cacheConfig,
+    ...defaultQueryOptions,
   });
 }
 
@@ -801,6 +841,12 @@ export function useCreateCompany() {
     onSuccess: (newCompany) => {
       qc.invalidateQueries({ queryKey: qk.companies() });
       qc.invalidateQueries({ queryKey: qk.company(newCompany.id) });
+      qc.invalidateQueries({ queryKey: ['companies', 'stats'] });
+      // Invalidate company people, deals, documents, activities for the new company
+      qc.invalidateQueries({ queryKey: qk.companyPeople(newCompany.id) });
+      qc.invalidateQueries({ queryKey: qk.companyDeals(newCompany.id) });
+      qc.invalidateQueries({ queryKey: qk.companyDocuments(newCompany.id) });
+      qc.invalidateQueries({ queryKey: qk.companyActivities(newCompany.id) });
     }
   });
 }
@@ -812,8 +858,50 @@ export function useUpdateCompany(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.company(id) });
       qc.invalidateQueries({ queryKey: qk.companies() });
+      qc.invalidateQueries({ queryKey: ['companies', 'stats'] });
+      // Invalidate related queries
+      qc.invalidateQueries({ queryKey: qk.companyPeople(id) });
+      qc.invalidateQueries({ queryKey: qk.companyDeals(id) });
+      qc.invalidateQueries({ queryKey: qk.companyDocuments(id) });
+      qc.invalidateQueries({ queryKey: qk.companyActivities(id) });
     }
   });
+}
+
+// Check company dependencies before delete
+export interface CompanyDependencies {
+  hasActiveDeals: boolean;
+  activeDealsCount: number;
+}
+
+export async function checkCompanyDependencies(companyId: string): Promise<CompanyDependencies> {
+  if (USE_MOCKS) {
+    // Mock implementation - return empty dependencies
+    return {
+      hasActiveDeals: false,
+      activeDealsCount: 0,
+    };
+  }
+
+  try {
+    // Fetch active deals for this company (not soft deleted)
+    const response = await apiClient.get(
+      `/deals?company_id=eq.${companyId}&deleted_at=is.null&select=id&limit=1`
+    );
+    const raw = normalizeApiData(response);
+    const deals = Array.isArray(raw) ? raw : [];
+
+    const activeDealsCount = deals.length;
+    const hasActiveDeals = activeDealsCount > 0;
+
+    return {
+      hasActiveDeals,
+      activeDealsCount,
+    };
+  } catch (error) {
+    logger.error("Failed to check company dependencies", { error, companyId }, 'CompanyDependencies');
+    throw new Error("Failed to check company dependencies");
+  }
 }
 
 // Soft delete a company
@@ -885,6 +973,12 @@ export function useDeleteCompany() {
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: qk.companies() });
       qc.invalidateQueries({ queryKey: qk.company(id) });
+      qc.invalidateQueries({ queryKey: ['companies', 'stats'] });
+      // Invalidate related queries
+      qc.invalidateQueries({ queryKey: qk.companyPeople(id) });
+      qc.invalidateQueries({ queryKey: qk.companyDeals(id) });
+      qc.invalidateQueries({ queryKey: qk.companyDocuments(id) });
+      qc.invalidateQueries({ queryKey: qk.companyActivities(id) });
     }
   });
 }
@@ -896,6 +990,12 @@ export function useRestoreCompany() {
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: qk.companies() });
       qc.invalidateQueries({ queryKey: qk.company(id) });
+      qc.invalidateQueries({ queryKey: ['companies', 'stats'] });
+      // Invalidate related queries
+      qc.invalidateQueries({ queryKey: qk.companyPeople(id) });
+      qc.invalidateQueries({ queryKey: qk.companyDeals(id) });
+      qc.invalidateQueries({ queryKey: qk.companyDocuments(id) });
+      qc.invalidateQueries({ queryKey: qk.companyActivities(id) });
     }
   });
 }

@@ -26,6 +26,7 @@ import { searchQuotes } from "@/services/quotes";
 import { searchOrders } from "@/services/orders";
 import { MergedEvent } from "@/lib/calendar-utils";
 import { logger } from '@/lib/logger';
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface EditEventDialogProps {
     event: MergedEvent;
@@ -38,6 +39,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
     const { t } = useI18n();
     const updateEvent = useUpdateEvent();
     const deleteEvent = useDeleteEvent();
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // Form state
     const [title, setTitle] = useState(event.title || "");
@@ -204,10 +206,6 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
     };
 
     const handleDelete = async () => {
-        if (!confirm("Are you sure you want to delete this event? This action cannot be undone.")) {
-            return;
-        }
-
         try {
             await deleteEvent.mutateAsync(event.id);
 
@@ -232,6 +230,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
                 variant: "success"
             });
 
+            setShowDeleteConfirm(false);
             onOpenChange(false);
             onEventUpdated?.();
         } catch (error) {
@@ -245,6 +244,7 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
     };
 
     return (
+        <>
         <Dialog open={open} onOpenChange={onOpenChange}>
             <AccessibleDialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
@@ -469,10 +469,10 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
                         <Button
                             type="button"
                             variant="destructive"
-                            onClick={handleDelete}
+                            onClick={() => setShowDeleteConfirm(true)}
                             disabled={updateEvent.isPending || deleteEvent.isPending}
                         >
-                            {deleteEvent.isPending ? "Deleting..." : "Delete Event"}
+                            Delete Event
                         </Button>
                         <div className="flex gap-2">
                             <Button
@@ -493,5 +493,18 @@ export function EditEventDialog({ event, open, onOpenChange, onEventUpdated }: E
                 </form>
             </AccessibleDialogContent>
         </Dialog>
+        {showDeleteConfirm && (
+            <ConfirmationDialog
+                open={showDeleteConfirm}
+                onOpenChange={setShowDeleteConfirm}
+                title="Delete Event"
+                description="This event will be deleted permanently. This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                onConfirm={handleDelete}
+                variant="destructive"
+            />
+        )}
+        </>
     );
 }

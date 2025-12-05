@@ -13,3 +13,7 @@ CREATE POLICY "Users can view tasks assigned to them"
 -- - "Support can view assigned tasks" (role-based, assigned_to = auth.uid())
 -- - New: "Users can view tasks assigned to them" (assigned_to = auth.uid()) - for ALL users regardless of role
 
+
+
+
+

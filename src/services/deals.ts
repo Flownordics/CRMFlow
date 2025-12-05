@@ -1,16 +1,18 @@
 import { z } from "zod";
-import { LineItem } from "@/lib/schemas/lineItem";
-import { apiClient, api, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "../lib/api";
+import { apiClient, apiPostWithReturn, apiPatchWithReturn, normalizeApiData } from "../lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { USE_MOCKS } from "@/lib/debug";
 import { syncDealToCalendar, removeDealFromCalendar, DealCalendarEvent } from "@/lib/google-calendar";
-import { handleError, createBusinessLogicError, createAPIError } from "@/lib/errorHandler";
-import { invalidateDealQueries, createOptimizedQueryClient } from "@/lib/queryCache";
+import { handleError } from "@/lib/errorHandler";
+import { invalidateDealQueries } from "@/lib/queryCache";
 import { logger } from "@/lib/logger";
-import { normalizeApiResponse, handleApiError, createMockResponse, handleMockApiCall } from "@/lib/sharedUtils";
-import { executeApiWithRecovery, executeCalendarSyncWithRecovery } from "@/lib/errorRecovery";
+import { executeCalendarSyncWithRecovery } from "@/lib/errorRecovery";
 import { isValidUuid } from "@/lib/validation";
+import { getPipelineIdFromStageId, getFirstStageIdFromPipeline } from "@/lib/stageHelpers";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { getEntityCacheConfig, defaultQueryOptions } from "@/lib/queryCacheConfig";
+import { supabase } from "@/integrations/supabase/client";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -38,14 +40,6 @@ export const Deal = z.object({
   updated_at: z.string(),
 });
 export type Deal = z.infer<typeof Deal>;
-
-// Robust response schema that handles multiple formats
-const DealsResponse = z.union([
-  z.array(Deal),
-  z.object({ data: z.array(Deal), total: z.number().optional(), page: z.number().optional(), limit: z.number().optional(), totalPages: z.number().optional() }),
-  z.object({ items: z.array(Deal) }),
-  z.object({ results: z.array(Deal) }),
-]);
 
 export async function fetchDeals(params: {
   page?: number;
@@ -206,6 +200,24 @@ export async function deleteDeal(id: string): Promise<void> {
     await apiClient.patch(`/deals?id=eq.${id}`, {
       deleted_at: new Date().toISOString()
     });
+
+    // Clean up tasks that reference this deal
+    // Nulstil related_type og related_id for tasks der refererer til den slettede deal
+    const { error: tasksError } = await supabase
+      .from('tasks')
+      .update({
+        related_type: null,
+        related_id: null
+      })
+      .eq('related_type', 'deal')
+      .eq('related_id', id);
+
+    if (tasksError) {
+      logger.warn(`[deleteDeal] Failed to cleanup tasks for deal ${id}:`, tasksError);
+      // Don't throw - deal deletion succeeded, task cleanup is best-effort
+    } else {
+      logger.debug(`[deleteDeal] Cleaned up task references for deal ${id}`);
+    }
   } catch (error) {
     throw handleError(error, `deleteDeal(${id})`);
   }
@@ -238,6 +250,125 @@ export async function fetchDeletedDeals(limit: number = 50) {
   } catch (error) {
     logger.error("Failed to fetch deleted deals", { error }, 'DeletedDeals');
     throw new Error("Failed to fetch deleted deals");
+  }
+}
+
+// Check deal dependencies before delete
+export interface DealDependencies {
+  hasActiveItems: boolean;
+  activeQuotes: number;
+  activeOrders: number;
+  activeInvoices: number;
+  inactiveQuotes: number;
+  inactiveOrders: number;
+  inactiveInvoices: number;
+}
+
+export async function checkDealDependencies(dealId: string): Promise<DealDependencies> {
+  if (USE_MOCKS) {
+    // Mock implementation - return empty dependencies
+    return {
+      hasActiveItems: false,
+      activeQuotes: 0,
+      activeOrders: 0,
+      activeInvoices: 0,
+      inactiveQuotes: 0,
+      inactiveOrders: 0,
+      inactiveInvoices: 0,
+    };
+  }
+
+  try {
+    // Fetch quotes for this deal - explicitly filter out soft-deleted quotes
+    // Use both deleted_at=is.null AND ensure we're only getting active records
+    const quotesResponse = await apiClient.get(
+      `/quotes?deal_id=eq.${dealId}&deleted_at=is.null&select=id,status,deleted_at`
+    );
+    const quotesRaw = normalizeApiData(quotesResponse);
+    const quotes = Array.isArray(quotesRaw) ? quotesRaw : [];
+    
+    // Double-check: filter out any quotes with deleted_at set (defensive programming)
+    const activeQuotesList = quotes.filter((q: any) => 
+      !q.deleted_at && (q.status === 'sent' || q.status === 'accepted')
+    );
+    const activeQuotes = activeQuotesList.length;
+    const inactiveQuotes = quotes.filter((q: any) => !q.deleted_at).length - activeQuotes;
+
+    // Log for debugging if we find quotes
+    if (quotes.length > 0) {
+      logger.debug(`[checkDealDependencies] Found ${quotes.length} quotes for deal ${dealId}`, {
+        dealId,
+        quotes: quotes.map((q: any) => ({ id: q.id, status: q.status, deleted_at: q.deleted_at }))
+      });
+    }
+
+    // Fetch orders for this deal - explicitly filter out soft-deleted orders
+    const ordersResponse = await apiClient.get(
+      `/orders?deal_id=eq.${dealId}&deleted_at=is.null&select=id,status,deleted_at`
+    );
+    const ordersRaw = normalizeApiData(ordersResponse);
+    const orders = Array.isArray(ordersRaw) ? ordersRaw : [];
+    
+    // Double-check: filter out any orders with deleted_at set
+    const activeOrdersList = orders.filter((o: any) => 
+      !o.deleted_at && (o.status === 'accepted' || o.status === 'invoiced' || o.status === 'backorder')
+    );
+    const activeOrders = activeOrdersList.length;
+    const inactiveOrders = orders.filter((o: any) => !o.deleted_at).length - activeOrders;
+
+    // Log for debugging if we find orders
+    if (orders.length > 0) {
+      logger.debug(`[checkDealDependencies] Found ${orders.length} orders for deal ${dealId}`, {
+        dealId,
+        orders: orders.map((o: any) => ({ id: o.id, status: o.status, deleted_at: o.deleted_at }))
+      });
+    }
+
+    // Fetch invoices for this deal - explicitly filter out soft-deleted invoices
+    const invoicesResponse = await apiClient.get(
+      `/invoices?deal_id=eq.${dealId}&deleted_at=is.null&select=id,status,deleted_at`
+    );
+    const invoicesRaw = normalizeApiData(invoicesResponse);
+    const invoices = Array.isArray(invoicesRaw) ? invoicesRaw : [];
+    
+    // Double-check: filter out any invoices with deleted_at set
+    const activeInvoicesList = invoices.filter((inv: any) => {
+      if (inv.deleted_at) return false;
+      const status = inv.status;
+      return status === 'sent' || status === 'paid' || status === 'overdue';
+    });
+    const activeInvoices = activeInvoicesList.length;
+    const inactiveInvoices = invoices.filter((inv: any) => !inv.deleted_at).length - activeInvoices;
+
+    // Log for debugging if we find invoices
+    if (invoices.length > 0) {
+      logger.debug(`[checkDealDependencies] Found ${invoices.length} invoices for deal ${dealId}`, {
+        dealId,
+        invoices: invoices.map((inv: any) => ({ id: inv.id, status: inv.status, deleted_at: inv.deleted_at }))
+      });
+    }
+
+    const hasActiveItems = activeQuotes > 0 || activeOrders > 0 || activeInvoices > 0;
+
+    const result = {
+      hasActiveItems,
+      activeQuotes,
+      activeOrders,
+      activeInvoices,
+      inactiveQuotes,
+      inactiveOrders,
+      inactiveInvoices,
+    };
+
+    // Log the final result for debugging
+    if (hasActiveItems) {
+      logger.debug(`[checkDealDependencies] Deal ${dealId} has active items`, result);
+    }
+
+    return result;
+  } catch (error) {
+    logger.error("Failed to check deal dependencies", { error, dealId }, 'DealDependencies');
+    throw handleError(error, `checkDealDependencies(${dealId})`);
   }
 }
 
@@ -397,6 +528,52 @@ export async function createDeal(deal: Omit<Deal, 'id'>) {
   }
 }
 
+/**
+ * Duplicate a deal by copying all fields except id, created_at, updated_at
+ * Sets the stage to the first stage of the same pipeline
+ * @param deal - The deal to duplicate
+ * @returns The duplicated deal
+ */
+export async function duplicateDeal(deal: Deal): Promise<Deal> {
+  try {
+    // Get pipeline ID from the original deal's stage
+    const pipelineId = await getPipelineIdFromStageId(deal.stage_id);
+    if (!pipelineId) {
+      throw new Error("Could not find pipeline for the original deal's stage");
+    }
+
+    // Get first stage from the same pipeline
+    const firstStageId = await getFirstStageIdFromPipeline(pipelineId);
+    if (!firstStageId) {
+      throw new Error("Could not find first stage in the pipeline");
+    }
+
+    // Get current user for created_by
+    const { user } = useAuthStore.getState();
+
+    // Create new deal with copied fields
+    const duplicatedDeal = await createDeal({
+      title: `${deal.title} (Copy)`,
+      company_id: deal.company_id,
+      contact_id: deal.contact_id ?? null,
+      stage_id: firstStageId, // Set to first stage
+      position: 0, // Will be set by backend
+      currency: deal.currency,
+      expected_value_minor: deal.expected_value_minor,
+      close_date: deal.close_date ?? null,
+      probability: deal.probability ?? null,
+      owner_user_id: deal.owner_user_id ?? null,
+      created_by: user?.id ?? null,
+    });
+
+    logger.debug(`[duplicateDeal] Duplicated deal ${deal.id} to ${duplicatedDeal.id}`);
+    return duplicatedDeal;
+  } catch (error) {
+    logger.error(`[duplicateDeal] Failed to duplicate deal ${deal.id}:`, error);
+    throw handleError(error, 'duplicateDeal');
+  }
+}
+
 export async function rpcReorderDeal(dealId: string, newStageId: string, newIndex: number) {
   if (USE_MOCKS) {
     // Mock implementation for now
@@ -445,27 +622,37 @@ export function useDeals(params: {
   stage_id?: string;
   company_id?: string;
 } = {}) {
+  const cacheConfig = getEntityCacheConfig('deals');
   return useQuery({
     queryKey: qk.deals(params),
     queryFn: () => fetchDeals(params),
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: false,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
+    ...cacheConfig,
+    ...defaultQueryOptions,
   });
 }
 
 export function useDeal(id: string) {
+  const cacheConfig = getEntityCacheConfig('deal');
   return useQuery({
     queryKey: qk.deal(id),
     queryFn: () => fetchDeal(id),
     enabled: !!id && isValidUuid(id),
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    ...cacheConfig,
+    ...defaultQueryOptions,
+    // Don't retry on "not found" errors - these are expected for orphaned references
+    retry: (failureCount, error) => {
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('not found') || errorMessage.includes('does not exist')) {
+          return false;
+        }
+      }
+      // Use default retry behavior for other errors
+      return failureCount < 2;
+    },
+    // Reduce refetching for not-found deals
     refetchOnWindowFocus: false,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
+    refetchOnReconnect: false,
   });
 }
 
@@ -501,7 +688,7 @@ export function useUpdateDeal() {
       // Return a context object with the snapshotted value
       return { previousDeals, previousDeal };
     },
-    onError: (err, { id }, context) => {
+    onError: (_err, { id }, context) => {
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousDeals) {
         qc.setQueryData(qk.deals(), context.previousDeals);
@@ -513,7 +700,7 @@ export function useUpdateDeal() {
     onSuccess: () => {
       // Activity logging is handled in the component
     },
-    onSettled: (data, error, { id }) => {
+    onSettled: (_data, _error, { id }) => {
       // Use optimized invalidation
       invalidateDealQueries(qc, id);
     },
@@ -543,7 +730,7 @@ export function useDeleteDeal() {
       // Return a context object with the snapshotted value
       return { previousDeals };
     },
-    onError: (err, id, context) => {
+    onError: (_err, id, context) => {
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousDeals) {
         qc.setQueryData(qk.deals(), context.previousDeals);
@@ -552,9 +739,11 @@ export function useDeleteDeal() {
     onSuccess: () => {
       // Activity logging is handled in the component
     },
-    onSettled: (data, error, id) => {
+    onSettled: (_data, _error, id) => {
       // Use optimized invalidation
       invalidateDealQueries(qc, id);
+      // Invalidate tasks queries since task references have been cleaned up
+      qc.invalidateQueries({ queryKey: qk.tasks.all() });
     },
   });
 }
@@ -583,7 +772,7 @@ export function useMoveDeal() {
       logger.debug("[useMoveDeal] mutationFn called with:", { dealId, stageId, index });
       return rpcReorderDeal(dealId, stageId, index);
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       logger.debug("[useMoveDeal] Mutation succeeded, invalidating queries for deal:", variables.dealId);
       qc.invalidateQueries({ queryKey: qk.deals() });
       // Invalidate any stage summary hooks if they exist
@@ -600,8 +789,108 @@ export function useCreateDeal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createDeal,
-    onSuccess: (data) => {
+    onMutate: async (newDeal) => {
+      // Cancel any outgoing refetches
+      await qc.cancelQueries({ queryKey: qk.deals() });
+      
+      // If deal has company_id, also cancel company deals query
+      if (newDeal.company_id) {
+        await qc.cancelQueries({ queryKey: qk.companyDeals(newDeal.company_id) });
+      }
+
+      // Snapshot the previous values
+      const previousDeals = qc.getQueryData(qk.deals());
+      const previousCompanyDeals = newDeal.company_id 
+        ? qc.getQueryData(qk.companyDeals(newDeal.company_id))
+        : undefined;
+
+      // Optimistically create a temporary deal object
+      // We'll use a placeholder until we get the real response
+      // Note: We need to ensure company_id is not null for Deal type
+      if (!newDeal.company_id) {
+        // If no company_id, we can't create optimistic deal for company deals
+        // Just return context without optimistic update
+        return { previousDeals, previousCompanyDeals: undefined, companyId: undefined };
+      }
+
+      const optimisticDeal: Deal = {
+        id: `temp-${Date.now()}`,
+        title: newDeal.title,
+        stage_id: newDeal.stage_id,
+        company_id: newDeal.company_id, // Required field
+        contact_id: newDeal.contact_id || null,
+        position: 0,
+        currency: newDeal.currency || "DKK",
+        expected_value_minor: newDeal.expected_value_minor || 0,
+        close_date: newDeal.close_date || null,
+        owner_user_id: newDeal.owner_user_id || null,
+        probability: null,
+        created_by: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Optimistically update deals list
+      qc.setQueryData(qk.deals(), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: [optimisticDeal, ...old.data]
+        };
+      });
+
+      // Optimistically update company deals if company_id exists
+      if (newDeal.company_id) {
+        qc.setQueryData(qk.companyDeals(newDeal.company_id), (old: Deal[] | undefined) => {
+          if (!old) return [optimisticDeal];
+          return [optimisticDeal, ...old];
+        });
+      }
+
+      // Return context for rollback
+      return { previousDeals, previousCompanyDeals, companyId: newDeal.company_id };
+    },
+    onError: (_err, _newDeal, context) => {
+      // Rollback on error
+      if (context?.previousDeals) {
+        qc.setQueryData(qk.deals(), context.previousDeals);
+      }
+      if (context?.companyId && context?.previousCompanyDeals) {
+        qc.setQueryData(qk.companyDeals(context.companyId), context.previousCompanyDeals);
+      }
+    },
+    onSuccess: (data, variables) => {
+      // Replace optimistic deal with real data
+      qc.setQueryData(qk.deals(), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((deal: Deal) => 
+            deal.id.startsWith('temp-') && deal.title === variables.title
+              ? data
+              : deal
+          )
+        };
+      });
+
+      // Update company deals with real data
+      if (variables.company_id) {
+        qc.setQueryData(qk.companyDeals(variables.company_id), (old: Deal[] | undefined) => {
+          if (!old) return [data];
+          return old.map((deal: Deal) => 
+            deal.id.startsWith('temp-') && deal.title === variables.title
+              ? data
+              : deal
+          );
+        });
+      }
+
+      // Invalidate to ensure consistency
       qc.invalidateQueries({ queryKey: qk.deals() });
+      if (variables.company_id) {
+        qc.invalidateQueries({ queryKey: qk.companyDeals(variables.company_id) });
+      }
+
       // Log activity for deal creation
       import("@/services/activity").then(({ logActivity }) => {
         logActivity({
@@ -611,6 +900,28 @@ export function useCreateDeal() {
         });
       });
     }
+  });
+}
+
+export function useDuplicateDeal() {
+  const qc = useQueryClient();
+  return useMutation<Deal, Error, Deal>({
+    mutationFn: duplicateDeal,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: qk.deals() });
+      // Log activity for deal duplication
+      import("@/services/activity").then(({ logActivity }) => {
+        logActivity({
+          type: "deal_created",
+          dealId: data.id,
+          meta: {
+            title: data.title,
+            companyId: data.company_id,
+            duplicated: true,
+          },
+        }).catch((err) => logger.error("Failed to log deal duplication activity", err));
+      });
+    },
   });
 }
 

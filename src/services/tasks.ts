@@ -428,12 +428,34 @@ export function useCreateTask() {
 
     return useMutation({
         mutationFn: taskService.createTask,
-        onSuccess: () => {
+        onSuccess: (task) => {
             // Invalidate all task queries to ensure UI updates immediately
             queryClient.invalidateQueries({ queryKey: qk.tasks.all });
             queryClient.invalidateQueries({ queryKey: qk.tasks.list() });
             queryClient.invalidateQueries({ queryKey: qk.tasks.upcoming() });
             queryClient.invalidateQueries({ queryKey: qk.tasks.overdue() });
+            // Invalidate related entity queries
+            if (task.related_type && task.related_id) {
+                if (task.related_type === 'deal') {
+                    queryClient.invalidateQueries({ queryKey: qk.deal(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.deals() });
+                } else if (task.related_type === 'quote') {
+                    queryClient.invalidateQueries({ queryKey: qk.quote(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.quotes() });
+                } else if (task.related_type === 'order') {
+                    queryClient.invalidateQueries({ queryKey: qk.order(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.orders() });
+                } else if (task.related_type === 'invoice') {
+                    queryClient.invalidateQueries({ queryKey: qk.invoice(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.invoices() });
+                } else if (task.related_type === 'company') {
+                    queryClient.invalidateQueries({ queryKey: qk.company(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.companies() });
+                } else if (task.related_type === 'person') {
+                    queryClient.invalidateQueries({ queryKey: qk.person(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.people() });
+                }
+            }
         },
     });
 }
@@ -443,13 +465,35 @@ export function useUpdateTask() {
 
     return useMutation({
         mutationFn: taskService.updateTask,
-        onSuccess: (data) => {
+        onSuccess: (task) => {
             // Invalidate all task queries to ensure UI updates immediately
             queryClient.invalidateQueries({ queryKey: qk.tasks.all });
             queryClient.invalidateQueries({ queryKey: qk.tasks.list() });
-            queryClient.invalidateQueries({ queryKey: qk.tasks.detail(data.id) });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.detail(task.id) });
             queryClient.invalidateQueries({ queryKey: qk.tasks.upcoming() });
             queryClient.invalidateQueries({ queryKey: qk.tasks.overdue() });
+            // Invalidate related entity queries
+            if (task.related_type && task.related_id) {
+                if (task.related_type === 'deal') {
+                    queryClient.invalidateQueries({ queryKey: qk.deal(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.deals() });
+                } else if (task.related_type === 'quote') {
+                    queryClient.invalidateQueries({ queryKey: qk.quote(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.quotes() });
+                } else if (task.related_type === 'order') {
+                    queryClient.invalidateQueries({ queryKey: qk.order(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.orders() });
+                } else if (task.related_type === 'invoice') {
+                    queryClient.invalidateQueries({ queryKey: qk.invoice(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.invoices() });
+                } else if (task.related_type === 'company') {
+                    queryClient.invalidateQueries({ queryKey: qk.company(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.companies() });
+                } else if (task.related_type === 'person') {
+                    queryClient.invalidateQueries({ queryKey: qk.person(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.people() });
+                }
+            }
         },
     });
 }
@@ -458,13 +502,40 @@ export function useDeleteTask() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: taskService.deleteTask,
-        onSuccess: () => {
+        mutationFn: async (id: string) => {
+            // Fetch task before deletion to get related_type and related_id
+            const task = await taskService.getTask(id);
+            await taskService.deleteTask(id);
+            return task;
+        },
+        onSuccess: (task) => {
             // Invalidate all task queries to ensure UI updates immediately
             queryClient.invalidateQueries({ queryKey: qk.tasks.all });
             queryClient.invalidateQueries({ queryKey: qk.tasks.list() });
             queryClient.invalidateQueries({ queryKey: qk.tasks.upcoming() });
             queryClient.invalidateQueries({ queryKey: qk.tasks.overdue() });
+            // Invalidate related entity queries
+            if (task?.related_type && task.related_id) {
+                if (task.related_type === 'deal') {
+                    queryClient.invalidateQueries({ queryKey: qk.deal(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.deals() });
+                } else if (task.related_type === 'quote') {
+                    queryClient.invalidateQueries({ queryKey: qk.quote(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.quotes() });
+                } else if (task.related_type === 'order') {
+                    queryClient.invalidateQueries({ queryKey: qk.order(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.orders() });
+                } else if (task.related_type === 'invoice') {
+                    queryClient.invalidateQueries({ queryKey: qk.invoice(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.invoices() });
+                } else if (task.related_type === 'company') {
+                    queryClient.invalidateQueries({ queryKey: qk.company(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.companies() });
+                } else if (task.related_type === 'person') {
+                    queryClient.invalidateQueries({ queryKey: qk.person(task.related_id) });
+                    queryClient.invalidateQueries({ queryKey: qk.people() });
+                }
+            }
         },
     });
 }
@@ -478,6 +549,7 @@ export function useAddTaskComment() {
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: qk.tasks.comments(data.task_id) });
             queryClient.invalidateQueries({ queryKey: qk.tasks.activities(data.task_id) });
+            queryClient.invalidateQueries({ queryKey: qk.tasks.detail(data.task_id) });
         },
     });
 }

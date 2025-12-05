@@ -1,15 +1,43 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, DollarSign, Target, TrendingDown } from "lucide-react";
+import { TrendingUp, DollarSign, Target, TrendingDown, FileText, ShoppingCart } from "lucide-react";
 import { useCompanyRevenue } from "@/services/companyAnalytics";
 import { fromMinor, formatNumber } from "@/lib/money";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQueries } from "@tanstack/react-query";
+import { fetchQuotes } from "@/services/quotes";
+import { fetchOrders } from "@/services/orders";
+import { qk } from "@/lib/queryKeys";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 interface CompanyRevenueCardProps {
   companyId: string;
 }
 
 export function CompanyRevenueCard({ companyId }: CompanyRevenueCardProps) {
+  const navigate = useNavigate();
   const { data: revenue, isLoading } = useCompanyRevenue(companyId);
+  
+  // Fetch quote and order counts in parallel using useQueries to avoid N+1 problem
+  const [quotesQuery, ordersQuery] = useQueries({
+    queries: [
+      {
+        queryKey: qk.quotes({ company_id: companyId, limit: 1 }),
+        queryFn: () => fetchQuotes({ company_id: companyId, limit: 1 }),
+        enabled: !!companyId,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      },
+      {
+        queryKey: qk.orders({ company_id: companyId, limit: 1 }),
+        queryFn: () => fetchOrders({ company_id: companyId, limit: 1 }),
+        enabled: !!companyId,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      },
+    ],
+  });
+  
+  const quoteCount = quotesQuery.data?.total || 0;
+  const orderCount = ordersQuery.data?.total || 0;
 
   if (isLoading) {
     return (
@@ -104,6 +132,34 @@ export function CompanyRevenueCard({ companyId }: CompanyRevenueCardProps) {
               <span className="font-medium text-destructive">{formatNumber(revenue.lostDeals)}</span>
             </div>
           )}
+        </div>
+
+        {/* Quick Links to Quotes and Orders */}
+        <div className="pt-3 border-t space-y-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-between text-sm h-auto py-2"
+            onClick={() => navigate(`/quotes?company_id=${companyId}`)}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">View Quotes</span>
+            </div>
+            <span className="font-medium">{formatNumber(quoteCount)}</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-between text-sm h-auto py-2"
+            onClick={() => navigate(`/orders?company_id=${companyId}`)}
+          >
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">View Orders</span>
+            </div>
+            <span className="font-medium">{formatNumber(orderCount)}</span>
+          </Button>
         </div>
       </CardContent>
     </Card>

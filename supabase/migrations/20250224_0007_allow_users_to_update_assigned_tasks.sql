@@ -14,3 +14,7 @@ CREATE POLICY "Users can update tasks assigned to them"
 -- - "Admins and managers can update all tasks" (role-based)
 -- - New: "Users can update tasks assigned to them" (assigned_to = auth.uid()) - for ALL users regardless of role
 
+
+
+
+

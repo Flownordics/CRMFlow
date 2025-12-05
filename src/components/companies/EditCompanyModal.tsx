@@ -10,12 +10,14 @@ import { AccessibleDialogContent } from "@/components/ui/accessible-dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { useUpdateCompany } from "@/services/companies";
+import { useUpdateCompany, useDeleteCompany, checkCompanyDependencies, type CompanyDependencies } from "@/services/companies";
 import { toastBus } from "@/lib/toastBus";
 import { useI18n } from "@/lib/i18n";
-import { Mail } from "lucide-react";
+import { Mail, Trash2 } from "lucide-react";
 import { Company, companyUpdateSchema } from "@/lib/schemas/company";
 import { logger } from '@/lib/logger';
+import { formatPhoneNumber } from "@/lib/utils";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface EditCompanyModalProps {
   open: boolean;
@@ -26,6 +28,10 @@ interface EditCompanyModalProps {
 export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyModalProps) {
   const { t } = useI18n();
   const updateCompany = useUpdateCompany(company.id);
+  const deleteCompanyMutation = useDeleteCompany();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [companyDependencies, setCompanyDependencies] = useState<CompanyDependencies | null>(null);
+  const [isLoadingDependencies, setIsLoadingDependencies] = useState(false);
 
   const [formData, setFormData] = useState({
     name: company.name,
@@ -88,7 +94,63 @@ export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyMod
     }));
   };
 
+  const handleDeleteClick = async () => {
+    setIsLoadingDependencies(true);
+    try {
+      const dependencies = await checkCompanyDependencies(company.id);
+      setCompanyDependencies(dependencies);
+      setShowDeleteConfirm(true);
+    } catch (error) {
+      logger.error('Failed to check company dependencies:', error);
+      toastBus.emit({
+        title: t("common.error"),
+        description: "Failed to check company dependencies. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingDependencies(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteCompanyMutation.mutateAsync(company.id);
+
+      toastBus.emit({
+        title: t("companies.companyDeleted") || "Company Deleted",
+        description: `${company.name} has been moved to trash.`,
+        action: {
+          label: "Restore",
+          onClick: () => {
+            window.location.href = "/settings?tab=trash";
+          }
+        }
+      });
+
+      setShowDeleteConfirm(false);
+      onOpenChange(false);
+    } catch (error) {
+      logger.error("Failed to delete company:", error);
+      toastBus.emit({
+        title: t("common.error"),
+        description: t("companies.deleteError") || "Failed to delete company. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getDeleteDescription = () => {
+    if (!companyDependencies) return "";
+    
+    if (companyDependencies.hasActiveDeals) {
+      return `Cannot delete company "${company.name}". This company has ${companyDependencies.activeDealsCount} active deal${companyDependencies.activeDealsCount > 1 ? 's' : ''}. Please close or delete the deals first, then try again.`;
+    }
+    
+    return `This company will be moved to trash. You can restore it from Settings > Trash Bin.`;
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <AccessibleDialogContent
         className="max-w-2xl"
@@ -148,7 +210,10 @@ export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyMod
                   id="phone"
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  onChange={(e) => {
+                    const formatted = formatPhoneNumber(e.target.value);
+                    handleInputChange("phone", formatted);
+                  }}
                   placeholder="+45 12 34 56 78"
                 />
               </div>
@@ -218,21 +283,52 @@ export function EditCompanyModal({ open, onOpenChange, company }: EditCompanyMod
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-between">
             <Button
               type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={updateCompany.isPending}
+              variant="destructive"
+              onClick={handleDeleteClick}
+              disabled={updateCompany.isPending || deleteCompanyMutation.isPending || isLoadingDependencies}
             >
-              {t("common.cancel")}
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Company
             </Button>
-            <Button type="submit" disabled={updateCompany.isPending}>
-              {updateCompany.isPending ? t("common.saving") : t("common.saveChanges")}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={updateCompany.isPending}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button type="submit" disabled={updateCompany.isPending}>
+                {updateCompany.isPending ? t("common.saving") : t("common.saveChanges")}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </AccessibleDialogContent>
     </Dialog>
+    {showDeleteConfirm && companyDependencies && (
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        onOpenChange={(open) => {
+          setShowDeleteConfirm(open);
+          if (!open) {
+            setCompanyDependencies(null);
+          }
+        }}
+        title={companyDependencies.hasActiveDeals ? "Cannot Delete Company" : "Delete Company"}
+        description={getDeleteDescription()}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleDelete}
+        variant="destructive"
+        blocked={companyDependencies.hasActiveDeals}
+        showCloseOnly={companyDependencies.hasActiveDeals}
+      />
+    )}
+    </>
   );
 }

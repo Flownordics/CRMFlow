@@ -33,6 +33,9 @@ interface CreateEventDialogProps {
     isGoogleConnected?: boolean;
     defaultCompanyId?: string;
     defaultTitle?: string;
+    defaultQuoteId?: string;
+    defaultDealId?: string;
+    defaultOrderId?: string;
 }
 
 export function CreateEventDialog({
@@ -43,6 +46,9 @@ export function CreateEventDialog({
     isGoogleConnected = false,
     defaultCompanyId,
     defaultTitle,
+    defaultQuoteId,
+    defaultDealId,
+    defaultOrderId,
 }: CreateEventDialogProps) {
     const { t } = useI18n();
     const [title, setTitle] = useState("");
@@ -229,11 +235,20 @@ export function CreateEventDialog({
             if (defaultTitle) {
                 setTitle(defaultTitle);
             }
+            if (defaultQuoteId) {
+                setSelectedQuoteId(defaultQuoteId);
+            }
+            if (defaultDealId) {
+                setSelectedDealId(defaultDealId);
+            }
+            if (defaultOrderId) {
+                setSelectedOrderId(defaultOrderId);
+            }
         } else {
             // Reset form when dialog closes
             resetForm();
         }
-    }, [open, defaultCompanyId, defaultTitle]);
+    }, [open, defaultCompanyId, defaultTitle, defaultQuoteId, defaultDealId, defaultOrderId]);
 
     const isLoading = createNativeEvent.isPending;
 

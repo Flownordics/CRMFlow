@@ -1,17 +1,19 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { useDeal } from "@/services/deals";
 import { useCompanies } from "@/services/companies";
 import { useRelatedTasks } from "@/services/tasks";
 import { useUsers } from "@/services/users";
+import { useDeleteProject } from "@/services/projects";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Trash2 } from "lucide-react";
 import { Project } from "@/services/projects";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { toastBus } from "@/lib/toastBus";
 
 interface ProjectsTableProps {
   projects: Project[];
@@ -55,6 +57,8 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
 
 function ProjectTableRow({ project }: { project: Project }) {
   const navigate = useNavigate();
+  const deleteProject = useDeleteProject();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: deal } = useDeal(project.deal_id);
   const { data: companyData } = useCompanies({ q: deal?.company_id });
   const company = companyData?.data?.[0];
@@ -92,6 +96,23 @@ function ProjectTableRow({ project }: { project: Project }) {
     if (score >= 80) return 'bg-success/10 text-success dark:bg-success/20 dark:text-success';
     if (score >= 60) return 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning';
     return 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive';
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteProject.mutateAsync(project.id);
+      toastBus.emit({
+        title: "Project Deleted",
+        description: `Project "${project.name}" has been deleted.`,
+        variant: "success",
+      });
+    } catch (error: any) {
+      toastBus.emit({
+        title: "Error",
+        description: error.message || "Failed to delete project. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -155,13 +176,36 @@ function ProjectTableRow({ project }: { project: Project }) {
         </div>
       </td>
       <td className="px-4 py-3 text-right">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(`/projects/${project.id}`)}
-        >
-          View
-        </Button>
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/projects/${project.id}`)}
+          >
+            View
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDeleteDialogOpen(true);
+            }}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          title="Delete Project"
+          description={`Are you sure you want to delete "${project.name}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={handleDelete}
+          variant="destructive"
+        />
       </td>
     </tr>
   );

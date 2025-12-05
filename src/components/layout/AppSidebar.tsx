@@ -14,6 +14,7 @@ import {
   Home,
   Phone,
   FolderKanban,
+  Trash2,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ const navigationItems = [
   { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Accounting", url: "/accounting", icon: Calculator },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Trash Bin", url: "/settings?tab=trash", icon: Trash2 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

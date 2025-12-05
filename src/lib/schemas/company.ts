@@ -11,11 +11,31 @@ const websiteValidator = z.string().refine((val) => {
   message: "Indtast et gyldigt domæne (f.eks. flownordics.com) eller URL (f.eks. https://flownordics.com)"
 });
 
+// Helper to normalize email: convert empty strings and invalid emails to null
+const emailNormalizer = z.preprocess(
+  (val) => {
+    if (val === "" || val === null || val === undefined) return null;
+    // If it's a string, try to validate it - if invalid, convert to null
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (trimmed === "") return null;
+      // Basic email validation - if it doesn't look like an email, convert to null
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(trimmed)) {
+        return null; // Invalid email format, convert to null
+      }
+      return trimmed;
+    }
+    return val;
+  },
+  z.union([z.string().email(), z.null()]).optional()
+);
+
 export const companyReadSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
-  email: z.string().email().nullable().optional(),
-  invoiceEmail: z.string().email().nullable().optional(),
+  email: emailNormalizer,
+  invoiceEmail: emailNormalizer,
   vat: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),

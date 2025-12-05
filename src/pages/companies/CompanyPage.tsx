@@ -15,17 +15,25 @@ import { CreateDealModal } from "@/components/deals/CreateDealModal";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Users, Handshake, FileText, Activity } from "lucide-react";
+import { Building2, Users, Handshake, FileText, Activity, ShoppingCart } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyLogo";
+import { createDealWithStage } from "@/services/dealCreationHelpers";
+import { toastBus } from "@/lib/toastBus";
+import { logger } from "@/lib/logger";
+import { quickCreateQuoteAndNavigate, quickCreateOrderAndNavigate } from "@/services/quickCreateHelpers";
+import { useNavigate } from "react-router-dom";
+import { SectionErrorBoundary } from "@/components/fallbacks/SectionErrorBoundary";
 
 export default function CompanyPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { data: company, isLoading, error } = useCompany(id!);
   
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [createPersonModalOpen, setCreatePersonModalOpen] = useState(false);
   const [createDealModalOpen, setCreateDealModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   if (isLoading) {
     return (
@@ -57,9 +65,53 @@ export default function CompanyPage() {
     company.industry
   ].filter(Boolean).join(" • ");
 
+  const handleCreateQuote = async () => {
+    try {
+      setIsCreating(true);
+      await quickCreateQuoteAndNavigate(company.id, navigate);
+      toastBus.emit({
+        title: "Quote created",
+        description: "Opening quote editor...",
+        variant: "success",
+      });
+    } catch (error) {
+      logger.error("Failed to create quote:", error);
+      toastBus.emit({
+        title: "Failed to create quote",
+        description: error instanceof Error ? error.message : "Could not create quote. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCreateOrder = async () => {
+    try {
+      setIsCreating(true);
+      await quickCreateOrderAndNavigate(company.id, navigate);
+      toastBus.emit({
+        title: "Order created",
+        description: "Opening order editor...",
+        variant: "success",
+      });
+    } catch (error) {
+      logger.error("Failed to create order:", error);
+      toastBus.emit({
+        title: "Failed to create order",
+        description: error instanceof Error ? error.message : "Could not create order. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <PageHeader
+        showBreadcrumbs={true}
         title={
           <div className="flex items-center gap-3">
             <CompanyLogo company={company} size="lg" />
@@ -82,6 +134,22 @@ export default function CompanyPage() {
             >
               <Handshake className="h-4 w-4 mr-2" />
               {t("companies.addDeal")}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCreateQuote}
+              disabled={isCreating}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Create Quote
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCreateOrder}
+              disabled={isCreating}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Create Order
             </Button>
             <Button onClick={() => setEditModalOpen(true)}>
               {t("companies.editCompany")}
@@ -120,23 +188,33 @@ export default function CompanyPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <CompanyOverview company={company} onEdit={() => setEditModalOpen(true)} />
+          <SectionErrorBoundary sectionName="Company Overview">
+            <CompanyOverview company={company} onEdit={() => setEditModalOpen(true)} />
+          </SectionErrorBoundary>
         </TabsContent>
 
         <TabsContent value="people" className="space-y-6">
-          <CompanyPeople companyId={company.id} onAddPerson={() => setCreatePersonModalOpen(true)} />
+          <SectionErrorBoundary sectionName="Company People">
+            <CompanyPeople companyId={company.id} onAddPerson={() => setCreatePersonModalOpen(true)} />
+          </SectionErrorBoundary>
         </TabsContent>
 
         <TabsContent value="deals" className="space-y-6">
-          <CompanyDeals companyId={company.id} onAddDeal={() => setCreateDealModalOpen(true)} />
+          <SectionErrorBoundary sectionName="Company Deals">
+            <CompanyDeals companyId={company.id} onAddDeal={() => setCreateDealModalOpen(true)} />
+          </SectionErrorBoundary>
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-6">
-          <CompanyDocuments companyId={company.id} />
+          <SectionErrorBoundary sectionName="Company Documents">
+            <CompanyDocuments companyId={company.id} />
+          </SectionErrorBoundary>
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-6">
-          <CompanyActivityTimeline companyId={company.id} />
+          <SectionErrorBoundary sectionName="Company Activity">
+            <CompanyActivityTimeline companyId={company.id} />
+          </SectionErrorBoundary>
         </TabsContent>
       </Tabs>
 
@@ -156,7 +234,9 @@ export default function CompanyPage() {
       <CreateDealModal
         open={createDealModalOpen}
         onOpenChange={setCreateDealModalOpen}
+        defaultCompanyId={company.id}
       />
+
     </div>
   );
 }

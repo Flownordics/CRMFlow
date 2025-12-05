@@ -22,7 +22,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Plus, ChevronDown, ChevronUp, MoreVertical, FolderKanban } from "lucide-react";
@@ -64,6 +63,15 @@ const STAGE_LIMITS: Record<string, number> = {
 };
 
 const DEFAULT_STAGE_LIMIT = 50; // Default for other stages
+
+// Helper function to check if a stage is closed (won or lost)
+function isClosedStage(stageName: string | undefined): boolean {
+    if (!stageName) return false;
+    const lowerName = stageName.toLowerCase().trim();
+    // Check for common closed stage names (English and Danish)
+    const closedStageNames = ['won', 'lost', 'vundet', 'tabt', 'closed won', 'closed lost'];
+    return closedStageNames.includes(lowerName);
+}
 
 export function KanbanBoard({
     stages,
@@ -483,8 +491,11 @@ function DraggableDealBase({
     const theme = getStageTheme(stageName);
 
     // Calculate if deal is due soon (≤ 7 days from now)
-    const dueSoon = deal.closeDate && isValid(new Date(deal.closeDate)) &&
-        differenceInCalendarDays(new Date(deal.closeDate), new Date()) <= 7;
+    // Only show for active deals, not for closed (won/lost) deals
+    const isClosed = isClosedStage(stageName);
+    const dueSoon = !isClosed && deal.closeDate && isValid(new Date(deal.closeDate)) &&
+        differenceInCalendarDays(new Date(deal.closeDate), new Date()) <= 7 &&
+        differenceInCalendarDays(new Date(deal.closeDate), new Date()) >= 0; // Don't show for past dates
 
     const handleCardClick = (e: React.MouseEvent) => {
         // Don't open edit if clicking on dropdown menu

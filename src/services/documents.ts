@@ -366,8 +366,23 @@ export function useUploadDocument() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: ({ file, meta }: { file: File; meta: any }) => uploadDocument(file, meta),
-        onSuccess: () => {
+        onSuccess: (document) => {
             qc.invalidateQueries({ queryKey: qk.documents({}) });
+            // Invalidate related entity queries
+            if (document.company_id) {
+                qc.invalidateQueries({ queryKey: qk.company(document.company_id) });
+                qc.invalidateQueries({ queryKey: qk.companies() });
+                qc.invalidateQueries({ queryKey: qk.companyDocuments(document.company_id) });
+            }
+            if (document.deal_id) {
+                qc.invalidateQueries({ queryKey: qk.deal(document.deal_id) });
+                qc.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (document.person_id) {
+                qc.invalidateQueries({ queryKey: qk.person(document.person_id) });
+                qc.invalidateQueries({ queryKey: qk.people() });
+                qc.invalidateQueries({ queryKey: qk.personDocuments(document.person_id) });
+            }
             toastBus.emit({
                 title: "Upload Complete",
                 description: "Document has been uploaded successfully.",
@@ -388,8 +403,10 @@ export function useDeleteDocument() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: deleteDocument,
-        onSuccess: () => {
+        onSuccess: (_, id) => {
             qc.invalidateQueries({ queryKey: qk.documents({}) });
+            // Note: We can't invalidate company/deal/person queries here without fetching the document first
+            // But the document list refresh should be sufficient
             toastBus.emit({
                 title: "Document Deleted",
                 description: "Document has been deleted successfully.",
@@ -441,8 +458,23 @@ export function useUpdateDocumentRelations() {
     return useMutation({
         mutationFn: ({ id, relations }: { id: string; relations: any }) =>
             updateDocumentRelations(id, relations),
-        onSuccess: () => {
+        onSuccess: (document) => {
             qc.invalidateQueries({ queryKey: qk.documents({}) });
+            // Invalidate related entity queries
+            if (document.company_id) {
+                qc.invalidateQueries({ queryKey: qk.company(document.company_id) });
+                qc.invalidateQueries({ queryKey: qk.companies() });
+                qc.invalidateQueries({ queryKey: qk.companyDocuments(document.company_id) });
+            }
+            if (document.deal_id) {
+                qc.invalidateQueries({ queryKey: qk.deal(document.deal_id) });
+                qc.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (document.person_id) {
+                qc.invalidateQueries({ queryKey: qk.person(document.person_id) });
+                qc.invalidateQueries({ queryKey: qk.people() });
+                qc.invalidateQueries({ queryKey: qk.personDocuments(document.person_id) });
+            }
             toastBus.emit({
                 title: "Relations Updated",
                 description: "Document relations have been updated successfully.",

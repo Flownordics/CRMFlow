@@ -136,7 +136,7 @@ export function CreateDealModal({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <AccessibleDialogContent
-          className="sm:max-w-lg"
+          className="sm:max-w-2xl"
         >
           {/* 🔒 These must render on the very first paint, unconditionally */}
           <DialogHeader>

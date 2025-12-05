@@ -20,23 +20,26 @@ import { toastBus } from "@/lib/toastBus";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Send, CheckCircle, Download, Mail } from "lucide-react";
 import { logger } from '@/lib/logger';
+import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 
 interface SendQuoteDialogProps {
     quoteId: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onQuoteSent?: () => void;
 }
 
-export function SendQuoteDialog({ quoteId, open, onOpenChange }: SendQuoteDialogProps) {
+export function SendQuoteDialog({ quoteId, open, onOpenChange, onQuoteSent }: SendQuoteDialogProps) {
     const navigate = useNavigate();
     const { t } = useI18n();
     const [to, setTo] = useState("");
     const [cc, setCc] = useState("");
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
-    const [attachPdf, setAttachPdf] = useState(true);
+    const [attachPdf, setAttachPdf] = useState(false); // Default: use public link (not PDF attachment)
     const [error, setError] = useState<string | null>(null);
     const [idempotencyKey, setIdempotencyKey] = useState<string>("");
+    const [publicLink, setPublicLink] = useState<string | null>(null);
 
     const { data: quote } = useQuote(quoteId);
     const { data: companies } = useCompanies();
@@ -77,7 +80,7 @@ export function SendQuoteDialog({ quoteId, open, onOpenChange }: SendQuoteDialog
             // Pre-fill body
             setBody(`Dear Customer,
 
-Please find attached your quote ${quote.number || quoteId}.
+You can view your quote online by clicking the link in this email. You can also download it as PDF from the online view.
 
 Best regards,
 Your Sales Team`);
@@ -103,11 +106,14 @@ Your Sales Team`);
         setError(null);
 
         try {
-            await sendEmail.mutateAsync({
+            // Generate public link preview (will be generated in email service)
+            // For now, we'll just send the email - the service will generate the token
+            const result = await sendEmail.mutateAsync({
                 quoteId,
                 to: to.trim(),
-                subject: subject.trim() || `Quote ${quoteId}`,
+                subject: subject.trim() || `Quote ${quote?.number || generateFriendlyNumber(quoteId, 'quote')}`,
                 message: body.trim() || undefined,
+                attachPdf: attachPdf, // Pass attachPdf flag
             });
 
             // Log activity if quote has a deal
@@ -121,6 +127,9 @@ Your Sales Team`);
 
             // Close dialog on success
             onOpenChange(false);
+
+            // Notify parent component
+            onQuoteSent?.();
 
             // Reset form
             setTo("");
@@ -317,8 +326,11 @@ Your Sales Team`);
                                 disabled={sendEmail.isPending}
                             />
                             <Label htmlFor="attachPdf">
-                                Attach PDF (currently links to PDF page)
+                                Attach PDF (legacy mode - not recommended)
                             </Label>
+                            <p className="text-xs text-muted-foreground ml-2">
+                                By default, quote will be sent with a secure online link. Check this to attach PDF instead.
+                            </p>
                         </div>
                     </div>
 

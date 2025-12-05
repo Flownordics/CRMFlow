@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useProject, useUpdateProject } from "@/services/projects";
+import { useProject, useUpdateProject, useDeleteProject } from "@/services/projects";
 import { useDeal } from "@/services/deals";
 import { useCompanies } from "@/services/companies";
 import { useQuotes } from "@/services/quotes";
@@ -19,7 +19,8 @@ import { ProjectTeam } from "@/components/projects/ProjectTeam";
 import { formatMoneyMinor } from "@/lib/money";
 import { toastBus } from "@/lib/toastBus";
 import { format } from "date-fns";
-import { FolderKanban, ExternalLink, ArrowLeft, Calendar, User, TrendingUp, FileText, ShoppingCart, Receipt, Building2, Activity, Edit, MoreVertical, Download, Archive, CheckCircle2 } from "lucide-react";
+import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
+import { FolderKanban, ExternalLink, ArrowLeft, Calendar, User, TrendingUp, FileText, ShoppingCart, Receipt, Building2, Activity, Edit, MoreVertical, Download, Archive, CheckCircle2, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 const statusColors = {
   active: "bg-success/10 text-success dark:bg-success/20 dark:text-success",
@@ -51,7 +53,9 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const { data: project, isLoading, error } = useProject(id);
   const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Get deal from project
   const { data: deal } = useDeal(project?.deal_id);
@@ -162,6 +166,24 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleDelete = async () => {
+    try {
+      await deleteProject.mutateAsync(project.id);
+      toastBus.emit({
+        title: "Project Deleted",
+        description: `Project "${project.name}" has been deleted.`,
+        variant: "success",
+      });
+      navigate("/projects");
+    } catch (error: any) {
+      toastBus.emit({
+        title: "Error",
+        description: error.message || "Failed to delete project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -224,6 +246,14 @@ export default function ProjectDetail() {
               }}>
                 <Archive className="h-4 w-4 mr-2" />
                 Archive Project
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Project
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -445,7 +475,7 @@ export default function ProjectDetail() {
                       to={`/quotes/${quote.id}`}
                       className="block text-sm text-primary hover:underline"
                     >
-                      {quote.number || `Quote ${quote.id.slice(0, 8)}`}
+                      {quote.number || generateFriendlyNumber(quote.id, 'quote')}
                     </Link>
                   ))}
                   {quotes.length > 2 && (
@@ -473,7 +503,7 @@ export default function ProjectDetail() {
                       to={`/orders/${order.id}`}
                       className="block text-sm text-primary hover:underline"
                     >
-                      {order.number || `Order ${order.id.slice(0, 8)}`}
+                      {order.number || generateFriendlyNumber(order.id, 'order')}
                     </Link>
                   ))}
                   {orders.length > 2 && (
@@ -501,7 +531,7 @@ export default function ProjectDetail() {
                       to={`/invoices/${invoice.id}`}
                       className="block text-sm text-primary hover:underline"
                     >
-                      {invoice.number || `Invoice ${invoice.id.slice(0, 8)}`}
+                      {invoice.number || generateFriendlyNumber(invoice.id, 'invoice')}
                     </Link>
                   ))}
                   {invoices.length > 2 && (
@@ -538,14 +568,26 @@ export default function ProjectDetail() {
       </div>
 
       {project && (
-        <EditProjectDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          project={project}
-          onUpdated={() => {
-            // Project data will refresh via React Query
-          }}
-        />
+        <>
+          <EditProjectDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            project={project}
+            onUpdated={() => {
+              // Project data will refresh via React Query
+            }}
+          />
+          <ConfirmationDialog
+            open={isDeleteDialogOpen}
+            onOpenChange={setIsDeleteDialogOpen}
+            title="Delete Project"
+            description={`Are you sure you want to delete "${project.name}"? This action cannot be undone.`}
+            confirmText="Delete"
+            cancelText="Cancel"
+            onConfirm={handleDelete}
+            variant="destructive"
+          />
+        </>
       )}
     </div>
   );

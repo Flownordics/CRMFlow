@@ -505,6 +505,8 @@ export function useAddCompaniesToCallList(callListId: string) {
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: qk.callListItems(callListId) });
             qc.invalidateQueries({ queryKey: qk.callList(callListId) });
+            // Invalidate company queries since companies were added to call list
+            qc.invalidateQueries({ queryKey: qk.companies() });
         },
     });
 }
@@ -533,8 +535,12 @@ export function useAutoGenerateCallList() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: autoGenerateCallList,
-        onSuccess: () => {
+        onSuccess: (result) => {
             qc.invalidateQueries({ queryKey: qk.callLists() });
+            qc.invalidateQueries({ queryKey: qk.callList(result.callListId) });
+            qc.invalidateQueries({ queryKey: qk.callListItems(result.callListId) });
+            // Invalidate company queries since companies were added to call list
+            qc.invalidateQueries({ queryKey: qk.companies() });
         },
     });
 }

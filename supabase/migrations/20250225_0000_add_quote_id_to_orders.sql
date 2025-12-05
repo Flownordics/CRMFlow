@@ -13,3 +13,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_quote ON public.orders (quote_id);
 -- Add comment
 COMMENT ON COLUMN public.orders.quote_id IS 'Reference to the quote that this order was created from';
 
+
+
+
+

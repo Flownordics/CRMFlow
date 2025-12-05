@@ -387,9 +387,18 @@ export function useCreateEvent() {
 
     return useMutation({
         mutationFn: createEvent,
-        onSuccess: () => {
+        onSuccess: (event) => {
             // Invalidate events queries
             queryClient.invalidateQueries({ queryKey: qk.events() });
+            // Invalidate related entity queries
+            if (event.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(event.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (event.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(event.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
         onError: (error) => {
             logger.error('Create event error:', error);
@@ -407,9 +416,18 @@ export function useUpdateEvent() {
     return useMutation({
         mutationFn: ({ id, payload }: { id: string; payload: UpdateEventPayload }) =>
             updateEvent(id, payload),
-        onSuccess: () => {
+        onSuccess: (event) => {
             // Invalidate events queries
             queryClient.invalidateQueries({ queryKey: qk.events() });
+            // Invalidate related entity queries
+            if (event.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(event.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (event.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(event.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
             toastBus.emit({
                 title: "Success",
                 description: "Event updated successfully",
@@ -434,10 +452,33 @@ export function useDeleteEvent() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: deleteEvent,
-        onSuccess: () => {
+        mutationFn: async (id: string) => {
+            // Fetch event before deletion to get deal_id and company_id
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error("User not authenticated");
+            }
+            const { data: eventData } = await supabase
+                .from('events')
+                .select('deal_id, company_id')
+                .eq('id', id)
+                .eq('created_by', user.id)
+                .single();
+            await deleteEvent(id);
+            return eventData;
+        },
+        onSuccess: (event) => {
             // Invalidate events queries
             queryClient.invalidateQueries({ queryKey: qk.events() });
+            // Invalidate related entity queries
+            if (event?.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(event.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            if (event?.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(event.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
             toastBus.emit({
                 title: "Success",
                 description: "Event deleted successfully",

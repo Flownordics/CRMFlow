@@ -19,6 +19,7 @@ import { useI18n } from "@/lib/i18n";
 import { Invoice } from "@/services/invoices";
 import { CompanySelect } from "@/components/selects/CompanySelect";
 import { logger } from '@/lib/logger';
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface EditInvoiceDialogProps {
     invoice: Invoice;
@@ -31,6 +32,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange, onInvoiceUpdate
     const { t } = useI18n();
     const updateInvoice = useUpdateInvoice();
     const deleteInvoice = useDeleteInvoice();
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // Form state
     const [number, setNumber] = useState(invoice.number || "");
@@ -99,19 +101,22 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange, onInvoiceUpdate
     };
 
     const handleDelete = async () => {
-        if (!confirm("Are you sure you want to delete this invoice? This action cannot be undone.")) {
-            return;
-        }
-
         try {
             await deleteInvoice.mutateAsync(invoice.id);
 
             toastBus.emit({
                 title: "Invoice Deleted",
-                description: "Invoice has been deleted successfully",
-                variant: "success"
+                description: "Invoice has been moved to trash.",
+                variant: "success",
+                action: {
+                    label: "Restore",
+                    onClick: () => {
+                        window.location.href = "/settings?tab=trash";
+                    }
+                }
             });
 
+            setShowDeleteConfirm(false);
             onOpenChange(false);
             onInvoiceUpdated?.();
         } catch (error) {
@@ -124,7 +129,20 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange, onInvoiceUpdate
         }
     };
 
+    const getDeleteDescription = () => {
+        let description = "This invoice will be moved to trash. You can restore it from Settings > Trash Bin.";
+        
+        if (invoice.status === 'paid') {
+            description += "\n\nWarning: This invoice has been paid.";
+        } else if (invoice.status === 'sent') {
+            description += "\n\nWarning: This invoice has been sent to the customer.";
+        }
+        
+        return description;
+    };
+
     return (
+        <>
         <Dialog open={open} onOpenChange={onOpenChange}>
             <AccessibleDialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
@@ -231,10 +249,10 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange, onInvoiceUpdate
                         <Button
                             type="button"
                             variant="destructive"
-                            onClick={handleDelete}
+                            onClick={() => setShowDeleteConfirm(true)}
                             disabled={updateInvoice.isPending || deleteInvoice.isPending}
                         >
-                            {deleteInvoice.isPending ? "Deleting..." : "Delete Invoice"}
+                            Delete Invoice
                         </Button>
                         <div className="flex gap-2">
                             <Button
@@ -255,5 +273,18 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange, onInvoiceUpdate
                 </form>
             </AccessibleDialogContent>
         </Dialog>
+        {showDeleteConfirm && (
+            <ConfirmationDialog
+                open={showDeleteConfirm}
+                onOpenChange={setShowDeleteConfirm}
+                title="Delete Invoice"
+                description={getDeleteDescription()}
+                confirmText="Delete"
+                cancelText="Cancel"
+                onConfirm={handleDelete}
+                variant="destructive"
+            />
+        )}
+    </>
     );
 }

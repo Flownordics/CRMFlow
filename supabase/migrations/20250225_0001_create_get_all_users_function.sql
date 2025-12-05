@@ -40,3 +40,7 @@ GRANT EXECUTE ON FUNCTION public.get_all_users() TO authenticated;
 -- Add comment
 COMMENT ON FUNCTION public.get_all_users() IS 'Returns all active users for assignee dropdowns, including users without user_settings entries';
 
+
+
+
+

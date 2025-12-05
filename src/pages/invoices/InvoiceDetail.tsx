@@ -19,9 +19,10 @@ import { FormRow } from "@/components/forms/FormRow";
 import { LineItemsTable } from "@/components/lines/LineItemsTable";
 import { getInvoicePdfUrl } from "@/services/pdf";
 import { logPdfGenerated } from "@/services/activity";
-import { Plus, DollarSign, Receipt } from "lucide-react";
+import { Plus, DollarSign, Receipt, Bell } from "lucide-react";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 import { AddPaymentModal } from "@/components/invoices/AddPaymentModal";
+import { SendInvoiceDialog } from "@/components/invoices/SendInvoiceDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OpenPdfButton } from "@/components/common/OpenPdfButton";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +50,7 @@ export default function InvoiceDetail() {
   const { data: payments = [], isLoading: paymentsLoading } = useInvoicePayments(id);
   const [creating, setCreating] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
 
   // Mutations
   const updateInvoiceMutation = useUpdateInvoice();
@@ -56,6 +58,11 @@ export default function InvoiceDetail() {
   const deleteLineMutation = useDeleteInvoiceLine(id);
 
   const lines = invoice?.lines || [];
+
+  // Check if invoice is overdue
+  const isOverdue = invoice?.due_date 
+    ? new Date(invoice.due_date) < new Date() && invoice.balance_minor > 0
+    : false;
 
 
 
@@ -121,6 +128,20 @@ export default function InvoiceDetail() {
               </TooltipTrigger>
               <TooltipContent>Add payment to invoice</TooltipContent>
             </Tooltip>
+            {isOverdue && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={() => setReminderDialogOpen(true)}
+                  >
+                    <Bell className="mr-2 h-4 w-4" />
+                    Send Reminder
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Send payment reminder for overdue invoice</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         }
       />
@@ -496,6 +517,16 @@ export default function InvoiceDetail() {
         currency={invoice.currency}
         balanceMinor={invoice.balance_minor}
       />
+
+      {/* Reminder Dialog */}
+      {invoice && (
+        <SendInvoiceDialog
+          invoice={invoice}
+          open={reminderDialogOpen}
+          onOpenChange={setReminderDialogOpen}
+          isReminder={true}
+        />
+      )}
     </div>
   );
 }

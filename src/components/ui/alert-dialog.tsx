@@ -16,7 +16,7 @@ const AlertDialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-[9998] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[19999] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 pointer-events-auto",
       className,
     )}
     {...props}
@@ -34,7 +34,7 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-[9999] grid w-full gap-4 border bg-background shadow-lg duration-200 max-h-[100dvh] overflow-y-auto overflow-x-hidden",
+        "fixed z-[20000] grid w-full gap-4 border bg-background shadow-lg duration-200 max-h-[100dvh] overflow-y-auto overflow-x-hidden",
         "box-border",
         // Mobile: fullscreen with safe area
         // Extra padding to accommodate focus rings (ring-2 + ring-offset-2 = 10px per side needed)

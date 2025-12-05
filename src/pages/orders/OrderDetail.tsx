@@ -28,10 +28,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "@/services/dealStageAutomation";
 import { logger } from '@/lib/logger';
-import { useOrder, useUpdateOrderHeader, useUpsertOrderLine, useDeleteOrderLine } from "@/services/orders";
+import { useOrder, useUpdateOrderHeader, useUpsertOrderLine, useDeleteOrderLine, useDeleteOrder } from "@/services/orders";
 import { RelatedTasksList } from "@/components/tasks/RelatedTasksList";
 import { useProjectFromDeal } from "@/services/projects";
-import { FolderKanban } from "lucide-react";
+import { FolderKanban, Trash2 } from "lucide-react";
+import { SectionErrorBoundary } from "@/components/fallbacks/SectionErrorBoundary";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { toastBus } from "@/lib/toastBus";
 
 export default function OrderDetail() {
   const { id = "" } = useParams();
@@ -49,6 +52,8 @@ export default function OrderDetail() {
   const updateHeaderMutation = useUpdateOrderHeader(id);
   const upsertLineMutation = useUpsertOrderLine(id);
   const deleteLineMutation = useDeleteOrderLine(id);
+  const deleteOrderMutation = useDeleteOrder();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Loading and error states
   if (isLoading) {
@@ -202,9 +207,34 @@ export default function OrderDetail() {
     }
   };
 
+  const handleDelete = async () => {
+    try {
+      await deleteOrderMutation.mutateAsync(order.id);
+      toastBus.emit({
+        title: "Order Deleted",
+        description: `Order ${order.number || order.id} has been moved to trash.`,
+        variant: "success",
+        action: {
+          label: "Restore",
+          onClick: () => {
+            window.location.href = "/settings?tab=trash";
+          }
+        }
+      });
+      navigate("/orders");
+    } catch (error: any) {
+      toastBus.emit({
+        title: "Error",
+        description: error.message || "Failed to delete order. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       <PageHeader
+        showBreadcrumbs={true}
         title={`Order ${order.number ?? ""}`}
         actions={
           <div className="flex items-center gap-2">
@@ -223,15 +253,39 @@ export default function OrderDetail() {
               onLogged={(url) => logPdfGenerated("order", order.id, order.dealId, url)}
               label="Generate PDF"
             />
+            {order.status !== "delivered" && order.status !== "cancelled" && (
+              <Button
+                variant="outline"
+                onClick={handleMarkFulfilled}
+                className="flex items-center gap-2"
+              >
+                Mark Fulfilled
+              </Button>
+            )}
+            {(order.status === "delivered" || order.status === "confirmed") && (
+              <Button
+                variant="default"
+                onClick={handleConvertToInvoice}
+                disabled={isConverting}
+                className="flex items-center gap-2"
+              >
+                {isConverting ? "Converting..." : "Convert to Invoice"}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="flex items-center gap-2 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
           </div>
         }
       />
 
       <OrderEditorHeader
         order={order}
-        onOpenPdf={handlePdf}
-        onConvertToInvoice={handleConvertToInvoice}
-        onMarkFulfilled={handleMarkFulfilled}
         onStatusChange={handleStatusChange}
       />
 
@@ -276,14 +330,17 @@ export default function OrderDetail() {
       )}
 
       {/* Tasks Section */}
-      <RelatedTasksList
-        relatedType="order"
-        relatedId={order.id}
-        relatedTitle={`Order ${order.number ?? ""}`}
-      />
+      <SectionErrorBoundary sectionName="Related Tasks">
+        <RelatedTasksList
+          relatedType="order"
+          relatedId={order.id}
+          relatedTitle={`Order ${order.number ?? ""}`}
+        />
+      </SectionErrorBoundary>
 
       {/* Header fields */}
-      <div className="rounded-2xl border p-4 shadow-card">
+      <SectionErrorBoundary sectionName="Order Details">
+        <div className="rounded-2xl border p-4 shadow-card">
         <div className="grid gap-4 md:grid-cols-2">
           <FormRow
             label="Expected Delivery Date"
@@ -343,102 +400,105 @@ export default function OrderDetail() {
           />
         </div>
       </div>
+      </SectionErrorBoundary>
 
       {/* Lines table */}
-      <DataTable
-        toolbar={
-          <>
-            <div className="text-sm text-muted-foreground">
-              {lines.length} items
+      <SectionErrorBoundary sectionName="Order Line Items">
+        <DataTable
+          toolbar={
+            <>
+              <div className="text-sm text-muted-foreground">
+                {lines.length} items
+              </div>
+              <div className="flex-1" />
+              <Button
+                onClick={async () => {
+                  setCreating(true);
+                  try {
+                    await upsertLineMutation.mutateAsync({
+                      parentId: order.id,
+                      parentType: "order",
+                      description: "New Item",
+                      qty: 1,
+                      unitMinor: 0,
+                      taxRatePct: 25,
+                      discountPct: 0,
+                    });
+                    toast({
+                      title: "Line Added",
+                      description: "New line item has been added",
+                    });
+                  } catch (error) {
+                    logger.error("Failed to add line:", error);
+                    toast({
+                      title: "Failed to Add Line",
+                      description: "Could not add line item. Please try again.",
+                      variant: "destructive"
+                    });
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+                disabled={creating}
+              >
+                <Plus
+                  aria-hidden="true"
+                  focusable="false"
+                  className="mr-1 h-4 w-4"
+                />{" "}
+                Add Line
+              </Button>
+            </>
+          }
+        >
+          <LineItemsTable
+            currency={order.currency}
+            lines={lines}
+            onPatch={async (lineId, patch) => {
+              try {
+                await upsertLineMutation.mutateAsync({
+                  id: lineId,
+                  ...patch,
+                });
+                toast({
+                  title: "Line Updated",
+                  description: "Line item has been updated",
+                });
+              } catch (error) {
+                logger.error("Failed to update line:", error);
+                toast({
+                  title: "Update Failed",
+                  description: "Could not update line item",
+                  variant: "destructive"
+                });
+              }
+            }}
+            onDelete={async (lineId) => {
+              if (!window.confirm("Delete this line item?")) return;
+              
+              try {
+                await deleteLineMutation.mutateAsync(lineId);
+                toast({
+                  title: "Line Deleted",
+                  description: "Line item has been deleted",
+                });
+              } catch (error) {
+                logger.error("Failed to delete line:", error);
+                toast({
+                  title: "Delete Failed",
+                  description: "Could not delete line item",
+                  variant: "destructive"
+                });
+              }
+            }}
+          />
+          {lines.length === 0 && (
+            <div className="p-4 text-center text-muted-foreground">
+              No lines yet
             </div>
-            <div className="flex-1" />
-            <Button
-              onClick={async () => {
-                setCreating(true);
-                try {
-                  await upsertLineMutation.mutateAsync({
-                    parentId: order.id,
-                    parentType: "order",
-                    description: "New Item",
-                    qty: 1,
-                    unitMinor: 0,
-                    taxRatePct: 25,
-                    discountPct: 0,
-                  });
-                  toast({
-                    title: "Line Added",
-                    description: "New line item has been added",
-                  });
-                } catch (error) {
-                  logger.error("Failed to add line:", error);
-                  toast({
-                    title: "Failed to Add Line",
-                    description: "Could not add line item. Please try again.",
-                    variant: "destructive"
-                  });
-                } finally {
-                  setCreating(false);
-                }
-              }}
-              disabled={creating}
-            >
-              <Plus
-                aria-hidden="true"
-                focusable="false"
-                className="mr-1 h-4 w-4"
-              />{" "}
-              Add Line
-            </Button>
-          </>
-        }
-      >
-        <LineItemsTable
-          currency={order.currency}
-          lines={lines}
-          onPatch={async (lineId, patch) => {
-            try {
-              await upsertLineMutation.mutateAsync({
-                id: lineId,
-                ...patch,
-              });
-              toast({
-                title: "Line Updated",
-                description: "Line item has been updated",
-              });
-            } catch (error) {
-              logger.error("Failed to update line:", error);
-              toast({
-                title: "Update Failed",
-                description: "Could not update line item",
-                variant: "destructive"
-              });
-            }
-          }}
-          onDelete={async (lineId) => {
-            if (!window.confirm("Delete this line item?")) return;
-            
-            try {
-              await deleteLineMutation.mutateAsync(lineId);
-              toast({
-                title: "Line Deleted",
-                description: "Line item has been deleted",
-              });
-            } catch (error) {
-              logger.error("Failed to delete line:", error);
-              toast({
-                title: "Delete Failed",
-                description: "Could not delete line item",
-                variant: "destructive"
-              });
-            }
-          }}
-        />
-        {lines.length === 0 && (
-          <div className="p-4 text-center text-muted-foreground">
-            No lines yet
-          </div>
-        )}
-      </DataTable>
+          )}
+        </DataTable>
+      </SectionErrorBoundary>
 
       {/* Totals */}
       <div className="flex flex-col items-end gap-1">
@@ -463,6 +523,17 @@ export default function OrderDetail() {
           ← Back to orders
         </Link>
       </div>
+
+      <ConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        title="Delete Order"
+        description={`Are you sure you want to delete order ${order.number || order.id}? This will be moved to trash and can be restored from Settings > Trash Bin.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleDelete}
+        variant="destructive"
+      />
     </div>
   );
 }

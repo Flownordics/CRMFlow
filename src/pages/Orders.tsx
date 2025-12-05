@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { CreateOrderModal } from "@/components/orders/CreateOrderModal";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { quickCreateOrderAndNavigate } from "@/services/quickCreateHelpers";
+import { toastBus } from "@/lib/toastBus";
+import { logger } from "@/lib/logger";
 import {
   Plus,
   Search,
@@ -10,6 +12,7 @@ import {
   FileText,
   List,
   Grid3X3,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Order, OrderUI } from "@/services/orders";
-import { useOrders } from "@/services/orders";
+import { useOrders, useDeleteOrder } from "@/services/orders";
 import { getPdfUrl } from "@/services/PDFService";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
@@ -43,18 +46,20 @@ import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys";
 import { triggerDealStageAutomation } from "@/services/dealStageAutomation";
-import { logger } from '@/lib/logger';
 import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
 import { OrderStatusChart } from "@/components/orders/OrderStatusChart";
 import { OrderValueTrendChart } from "@/components/orders/OrderValueTrendChart";
 import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon } from "lucide-react";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const companyId = searchParams.get("company_id") || undefined;
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
-  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [localOrderUpdates, setLocalOrderUpdates] = useState<Record<string, Partial<OrderUI>>>({});
   const { toast } = useToast();
   const { getCompanyName } = useCompanyLookup();
@@ -63,6 +68,7 @@ const Orders: React.FC = () => {
   // Fetch ALL orders for accurate KPI calculations (no pagination needed)
   const { data: ordersData, isLoading, error, refetch } = useOrders({
     q: searchTerm,
+    company_id: companyId,
     limit: 9999  // Fetch all orders for KPIs and charts
   });
 
@@ -75,6 +81,11 @@ const Orders: React.FC = () => {
   }));
 
   const filteredOrders = ordersWithLocalUpdates.filter((order) => {
+    // Exclude soft-deleted orders (safety check - should already be filtered by API)
+    if (order.deleted_at) {
+      return false;
+    }
+    
     const matchesSearch = order.number
       ? order.number.toLowerCase().includes(searchTerm.toLowerCase())
       : true;
@@ -111,14 +122,33 @@ const Orders: React.FC = () => {
     }
   };
 
-  const handleDeleteOrder = (orderId: string) => {
-    // This function is not used in the current filteredOrders logic,
-    // but keeping it as it was in the original file.
-    // setOrders(orders.filter((o) => o.id !== orderId));
-    toast({
-      title: "Order Deleted",
-      description: "The order has been removed.",
-    });
+  const deleteOrder = useDeleteOrder();
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await deleteOrder.mutateAsync(orderId);
+      toastBus.emit({
+        title: "Order Deleted",
+        description: "Order has been moved to trash.",
+        variant: "success",
+        action: {
+          label: "Restore",
+          onClick: () => {
+            window.location.href = "/settings?tab=trash";
+          }
+        }
+      });
+      setDeleteOrderId(null);
+      // Refresh orders list to remove deleted order from kanban board
+      await refetch();
+    } catch (error: any) {
+      toastBus.emit({
+        title: "Error",
+        description: error.message || "Failed to delete order. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleStatusChange = async (orderId: string, newStatus: OrderUI["status"]) => {
@@ -153,7 +183,37 @@ const Orders: React.FC = () => {
         title="Orders"
         subtitle="From confirmation to fulfilment — status, dates and totals at a glance."
         actions={
-          <Button onClick={() => setCreateModalOpen(true)}>
+          <Button 
+            onClick={async () => {
+              if (!companyId) {
+                toastBus.emit({
+                  title: "Company required",
+                  description: "Please select a company first or create an order from a company page.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              try {
+                setIsCreating(true);
+                await quickCreateOrderAndNavigate(companyId, navigate);
+                toastBus.emit({
+                  title: "Order created",
+                  description: "Opening order editor...",
+                  variant: "success",
+                });
+              } catch (error) {
+                logger.error("Failed to create order:", error);
+                toastBus.emit({
+                  title: "Failed to create order",
+                  description: error instanceof Error ? error.message : "Could not create order. Please try again.",
+                  variant: "destructive",
+                });
+              } finally {
+                setIsCreating(false);
+              }
+            }}
+            disabled={isCreating}
+          >
             <Plus aria-hidden="true" className="mr-2 h-4 w-4" />
             New Order
           </Button>
@@ -249,7 +309,34 @@ const Orders: React.FC = () => {
       {filteredOrders.length === 0 ? (
         <div className="p-8">
           <OrdersEmptyState
-            onCreateOrder={() => setCreateModalOpen(true)}
+            onCreateOrder={async () => {
+              if (!companyId) {
+                toastBus.emit({
+                  title: "Company required",
+                  description: "Please select a company first or create an order from a company page.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              try {
+                setIsCreating(true);
+                await quickCreateOrderAndNavigate(companyId, navigate);
+                toastBus.emit({
+                  title: "Order created",
+                  description: "Opening order editor...",
+                  variant: "success",
+                });
+              } catch (error) {
+                logger.error("Failed to create order:", error);
+                toastBus.emit({
+                  title: "Failed to create order",
+                  description: error instanceof Error ? error.message : "Could not create order. Please try again.",
+                  variant: "destructive",
+                });
+              } finally {
+                setIsCreating(false);
+              }
+            }}
             onConvertFromQuote={() => navigate("/quotes")}
           />
         </div>
@@ -399,6 +486,19 @@ const Orders: React.FC = () => {
                         <TooltipContent>Open Editor</TooltipContent>
                       </Tooltip>
 
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteOrderId(order.id)}
+                            aria-label="Delete order"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete Order</TooltipContent>
+                      </Tooltip>
 
                     </div>
                   </TableCell>
@@ -451,10 +551,19 @@ const Orders: React.FC = () => {
         </div>
       )}
 
-      <CreateOrderModal
-        open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
-      />
+      {deleteOrderId && (
+        <ConfirmationDialog
+          open={!!deleteOrderId}
+          onOpenChange={(open) => !open && setDeleteOrderId(null)}
+          title="Delete Order"
+          description={`Are you sure you want to delete this order? This will be moved to trash and can be restored from Settings > Trash Bin.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={() => handleDeleteOrder(deleteOrderId)}
+          variant="destructive"
+        />
+      )}
+
     </div>
   );
 };

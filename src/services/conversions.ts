@@ -40,7 +40,7 @@ export type InvoiceResponse = z.infer<typeof InvoiceResponse>;
 export async function ensureOrderForQuote(quoteId: string): Promise<{ id: string }> {
   try {
     // 1) Check if order already exists for this quote
-    const { data: existing } = await apiClient.get(`/orders?quote_id=eq.${quoteId}&select=id&limit=1`);
+    const { data: existing } = await apiClient.get(`/orders?quote_id=eq.${quoteId}&deleted_at=is.null&select=id&limit=1`);
     if (Array.isArray(existing) && existing.length > 0) {
       logger.debug(`[ensureOrderForQuote] Order already exists for quote ${quoteId}:`, existing[0].id);
       return { id: existing[0].id };
@@ -99,13 +99,16 @@ export async function ensureOrderForQuote(quoteId: string): Promise<{ id: string
       }
     }
 
-    // 7) Delete the converted quote to avoid storage waste and confusion
+    // 7) Soft delete the converted quote to avoid storage waste and confusion
+    // Use soft delete instead of hard delete to maintain referential integrity
     try {
-      logger.debug(`[ensureOrderForQuote] Deleting converted quote: ${quote.id}`);
-      await apiClient.delete(`/quotes?id=eq.${quote.id}`);
-      logger.debug(`[ensureOrderForQuote] Quote deleted successfully`);
+      logger.debug(`[ensureOrderForQuote] Soft deleting converted quote: ${quote.id}`);
+      await apiClient.patch(`/quotes?id=eq.${quote.id}`, {
+        deleted_at: new Date().toISOString()
+      });
+      logger.debug(`[ensureOrderForQuote] Quote soft deleted successfully`);
     } catch (e) {
-      logger.warn("[ensureOrderForQuote] Failed to delete converted quote:", e);
+      logger.warn("[ensureOrderForQuote] Failed to soft delete converted quote:", e);
       // Don't throw - order creation was successful, quote deletion is cleanup
     }
 
@@ -477,6 +480,36 @@ export function useCreateInvoiceFromDeal() {
       toastBus.emit({
         title: "Invoice Creation Failed",
         description: error instanceof Error ? error.message : "Failed to create invoice from deal",
+        variant: "destructive"
+      });
+    }
+  });
+}
+
+export function useConvertQuoteToOrder() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: ensureOrderForQuote,
+    onSuccess: async (order, quoteId) => {
+      // Invalidate relevant queries
+      qc.invalidateQueries({ queryKey: qk.quotes() });
+      qc.invalidateQueries({ queryKey: qk.quote(quoteId) });
+      qc.invalidateQueries({ queryKey: qk.orders() });
+      qc.invalidateQueries({ queryKey: qk.order(order.id) });
+
+      toastBus.emit({
+        title: "Order Created",
+        description: "Quote has been converted to an order successfully.",
+        variant: "success"
+      });
+
+      return order;
+    },
+    onError: (error) => {
+      toastBus.emit({
+        title: "Conversion Failed",
+        description: error instanceof Error ? error.message : "Failed to convert quote to order",
         variant: "destructive"
       });
     }

@@ -9,12 +9,17 @@ import { formatCurrency } from '@/services/analytics';
 import { groupByMonth } from '@/lib/chartUtils';
 
 interface OrderValueTrendChartProps {
-  orders: Array<{ created_at: string; total_minor: number }>;
+  orders: Array<{ created_at: string; totalMinor?: number; total_minor?: number }>;
   height?: number;
 }
 
 export function OrderValueTrendChart({ orders, height = 300 }: OrderValueTrendChartProps) {
-  const monthlyData = groupByMonth(orders, 'created_at', 'total_minor', 'sum');
+  // Support both camelCase (totalMinor) and snake_case (total_minor) for compatibility
+  const ordersWithValue = orders.map(order => ({
+    ...order,
+    total_minor: order.totalMinor ?? order.total_minor ?? 0
+  }));
+  const monthlyData = groupByMonth(ordersWithValue, 'created_at', 'total_minor', 'sum');
 
   if (monthlyData.length === 0) {
     return (

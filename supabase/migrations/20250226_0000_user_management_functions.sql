@@ -153,3 +153,7 @@ GRANT EXECUTE ON FUNCTION public.deactivate_user(uuid) TO authenticated;
 -- Add comment
 COMMENT ON FUNCTION public.deactivate_user(uuid) IS 'Allows admins to deactivate users (soft delete) while preserving data';
 
+
+
+
+

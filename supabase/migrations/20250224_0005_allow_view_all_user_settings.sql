@@ -11,3 +11,7 @@ CREATE POLICY "Authenticated users can view all user settings"
 -- Note: The existing policies for INSERT/UPDATE/DELETE remain unchanged
 -- Users can still only modify their own settings
 
+
+
+
+

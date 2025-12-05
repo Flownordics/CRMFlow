@@ -10,8 +10,14 @@ export const UserWithProfileSchema = z.object({
   user_id: z.string().uuid(),
   email: z.string().email(),
   full_name: z.string().nullable(),
-  role: z.enum(['admin', 'manager', 'sales', 'support', 'viewer']),
-  is_active: z.boolean(),
+  role: z.preprocess(
+    (val) => val ?? 'sales',
+    z.enum(['admin', 'manager', 'sales', 'support', 'viewer'])
+  ),
+  is_active: z.preprocess(
+    (val) => val ?? true,
+    z.boolean()
+  ),
   avatar_url: z.string().nullable(),
   created_at: z.string(),
   last_sign_in_at: z.string().nullable(),

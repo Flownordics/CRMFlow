@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { usePerson } from "@/services/people";
 import { useI18n } from "@/lib/i18n";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2, Plus, FileText, ShoppingCart } from "lucide-react";
 import { PersonOverview } from "@/components/people/PersonOverview";
 import { PersonDeals } from "@/components/people/PersonDeals";
 import { PersonDocuments } from "@/components/people/PersonDocuments";
@@ -15,6 +15,11 @@ import { PersonActivity } from "@/components/people/PersonActivity";
 import { EditPersonModal } from "@/components/people/EditPersonModal";
 import { DeletePersonDialog } from "@/components/people/DeletePersonDialog";
 import { CreateDealModal } from "@/components/deals/CreateDealModal";
+import { createDealWithStage } from "@/services/dealCreationHelpers";
+import { toastBus } from "@/lib/toastBus";
+import { logger } from "@/lib/logger";
+import { quickCreateQuoteAndNavigate, quickCreateOrderAndNavigate } from "@/services/quickCreateHelpers";
+import { SectionErrorBoundary } from "@/components/fallbacks/SectionErrorBoundary";
 
 export default function PersonPage() {
     const { id } = useParams<{ id: string }>();
@@ -23,6 +28,7 @@ export default function PersonPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isCreateDealModalOpen, setIsCreateDealModalOpen] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
 
     const { data: person, isLoading, isError } = usePerson(id!);
 
@@ -53,10 +59,72 @@ export default function PersonPage() {
         navigate("/people");
     };
 
+    const handleCreateQuote = async () => {
+        if (!person.companyId) {
+            toastBus.emit({
+                title: "Company required",
+                description: "This person must be assigned to a company before creating a quote.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            setIsCreating(true);
+            await quickCreateQuoteAndNavigate(person.companyId, navigate, person.id);
+            toastBus.emit({
+                title: "Quote created",
+                description: "Opening quote editor...",
+                variant: "success",
+            });
+        } catch (error) {
+            logger.error("Failed to create quote:", error);
+            toastBus.emit({
+                title: "Failed to create quote",
+                description: error instanceof Error ? error.message : "Could not create quote. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    const handleCreateOrder = async () => {
+        if (!person.companyId) {
+            toastBus.emit({
+                title: "Company required",
+                description: "This person must be assigned to a company before creating an order.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            setIsCreating(true);
+            await quickCreateOrderAndNavigate(person.companyId, navigate, person.id);
+            toastBus.emit({
+                title: "Order created",
+                description: "Opening order editor...",
+                variant: "success",
+            });
+        } catch (error) {
+            logger.error("Failed to create order:", error);
+            toastBus.emit({
+                title: "Failed to create order",
+                description: error instanceof Error ? error.message : "Could not create order. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+
     return (
         <div className="space-y-6 p-6">
             {/* Header */}
             <PageHeader
+                showBreadcrumbs={true}
                 title={`${person.firstName} ${person.lastName}`}
                 subtitle={
                     <div className="flex items-center gap-2">
@@ -106,6 +174,26 @@ export default function PersonPage() {
                             {t("people.addDeal")}
                         </Button>
                         <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCreateQuote}
+                            disabled={isCreating || !person.companyId}
+                            aria-label="Create Quote"
+                        >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Create Quote
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCreateOrder}
+                            disabled={isCreating || !person.companyId}
+                            aria-label="Create Order"
+                        >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Create Order
+                        </Button>
+                        <Button
                             variant="destructive"
                             size="sm"
                             onClick={() => setIsDeleteDialogOpen(true)}
@@ -131,19 +219,27 @@ export default function PersonPage() {
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6">
-                    <PersonOverview person={person} />
+                    <SectionErrorBoundary sectionName="Person Overview">
+                        <PersonOverview person={person} />
+                    </SectionErrorBoundary>
                 </TabsContent>
 
                 <TabsContent value="deals" className="space-y-6">
-                    <PersonDeals personId={person.id} />
+                    <SectionErrorBoundary sectionName="Person Deals">
+                        <PersonDeals personId={person.id} />
+                    </SectionErrorBoundary>
                 </TabsContent>
 
                 <TabsContent value="documents" className="space-y-6">
-                    <PersonDocuments personId={person.id} />
+                    <SectionErrorBoundary sectionName="Person Documents">
+                        <PersonDocuments personId={person.id} />
+                    </SectionErrorBoundary>
                 </TabsContent>
 
                 <TabsContent value="activity" className="space-y-6">
-                    <PersonActivity personId={person.id} />
+                    <SectionErrorBoundary sectionName="Person Activity">
+                        <PersonActivity personId={person.id} />
+                    </SectionErrorBoundary>
                 </TabsContent>
             </Tabs>
 
@@ -167,6 +263,7 @@ export default function PersonPage() {
                 onOpenChange={setIsCreateDealModalOpen}
                 defaultCompanyId={person.companyId}
             />
+
         </div>
     );
 }

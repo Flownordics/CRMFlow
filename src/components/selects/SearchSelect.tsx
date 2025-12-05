@@ -136,7 +136,7 @@ export function SearchSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] p-0 z-[10000]" 
+        className="w-auto min-w-[300px] sm:min-w-[400px] max-w-[90vw] sm:max-w-[600px] p-0 z-[10000]" 
         align="start"
         sideOffset={4}
       >

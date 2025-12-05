@@ -68,3 +68,7 @@ WHERE deal_id IS NOT NULL;
 -- Note: Invoices can have multiple per deal (for partial invoicing)
 -- No constraint needed on invoices.deal_id
 
+
+
+
+

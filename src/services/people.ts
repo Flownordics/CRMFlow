@@ -6,6 +6,7 @@ import { Person, PersonCreate, personReadSchema, type Person as PersonCamelCase 
 import { USE_MOCKS } from "@/lib/debug";
 import { logger } from '@/lib/logger';
 import { isValidUuid } from "@/lib/validation";
+import { getEntityCacheConfig, defaultQueryOptions } from "@/lib/queryCacheConfig";
 
 // Response type for paginated results
 export type PaginatedResponse<T> = {
@@ -447,9 +448,12 @@ export function usePeople(params: {
     companyId?: string;
     title?: string;
 } = {}) {
+    const cacheConfig = getEntityCacheConfig('people');
     return useQuery({
         queryKey: qk.people(params),
-        queryFn: () => fetchPeople(params)
+        queryFn: () => fetchPeople(params),
+        ...cacheConfig,
+        ...defaultQueryOptions,
     });
 }
 
@@ -487,10 +491,13 @@ export function usePeopleStats() {
 }
 
 export function usePerson(id: string) {
+    const cacheConfig = getEntityCacheConfig('person');
     return useQuery({
         queryKey: qk.person(id),
         queryFn: () => fetchPersonById(id),
-        enabled: !!id && isValidUuid(id)
+        enabled: !!id && isValidUuid(id),
+        ...cacheConfig,
+        ...defaultQueryOptions,
     });
 }
 
@@ -529,7 +536,11 @@ export function useCreatePerson() {
             // Invalidate people list for the specific company
             if (newPerson.company_id) {
                 qc.invalidateQueries({ queryKey: qk.people({ company_id: newPerson.company_id }) });
+                qc.invalidateQueries({ queryKey: qk.companyPeople(newPerson.company_id) });
+                qc.invalidateQueries({ queryKey: qk.company(newPerson.company_id) });
             }
+            // Invalidate stats
+            qc.invalidateQueries({ queryKey: ['people', 'stats'] });
         }
     });
 }
@@ -538,13 +549,22 @@ export function useUpdatePerson(id: string) {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: (p: Partial<Person>) => updatePerson(id, p),
-        onSuccess: () => {
+        onSuccess: async (updatedPerson) => {
             qc.invalidateQueries({ queryKey: qk.person(id) });
             qc.invalidateQueries({ queryKey: qk.people() });
             qc.invalidateQueries({ queryKey: qk.companies() });
             qc.invalidateQueries({ queryKey: qk.personDeals(id) });
             qc.invalidateQueries({ queryKey: qk.personDocuments(id) });
             qc.invalidateQueries({ queryKey: qk.personActivities(id) });
+            // Invalidate stats
+            qc.invalidateQueries({ queryKey: ['people', 'stats'] });
+            // If company_id changed, invalidate both old and new company people lists
+            // We need to fetch the person to get the old company_id
+            const person = await fetchPersonById(id);
+            if (person.company_id) {
+                qc.invalidateQueries({ queryKey: qk.companyPeople(person.company_id) });
+                qc.invalidateQueries({ queryKey: qk.company(person.company_id) });
+            }
         }
     });
 }
@@ -553,13 +573,26 @@ export function useDeletePerson() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: deletePerson,
-        onSuccess: (_, id) => {
+        onSuccess: async (_, id) => {
             qc.invalidateQueries({ queryKey: qk.people() });
             qc.invalidateQueries({ queryKey: qk.companies() });
             qc.invalidateQueries({ queryKey: qk.person(id) });
             qc.invalidateQueries({ queryKey: qk.personDeals(id) });
             qc.invalidateQueries({ queryKey: qk.personDocuments(id) });
             qc.invalidateQueries({ queryKey: qk.personActivities(id) });
+            // Invalidate stats
+            qc.invalidateQueries({ queryKey: ['people', 'stats'] });
+            // Invalidate company people list if person had a company
+            try {
+                const person = await fetchPersonById(id);
+                if (person.company_id) {
+                    qc.invalidateQueries({ queryKey: qk.companyPeople(person.company_id) });
+                    qc.invalidateQueries({ queryKey: qk.company(person.company_id) });
+                }
+            } catch (error) {
+                // Person might already be deleted, just invalidate all company people queries
+                qc.invalidateQueries({ queryKey: qk.companyPeople(id) });
+            }
         }
     });
 }
@@ -568,10 +601,23 @@ export function useRestorePerson() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: restorePerson,
-        onSuccess: (_, id) => {
+        onSuccess: async (_, id) => {
             qc.invalidateQueries({ queryKey: qk.people() });
             qc.invalidateQueries({ queryKey: qk.companies() });
             qc.invalidateQueries({ queryKey: qk.person(id) });
+            // Invalidate stats
+            qc.invalidateQueries({ queryKey: ['people', 'stats'] });
+            // Invalidate company people list if person has a company
+            try {
+                const person = await fetchPersonById(id);
+                if (person.company_id) {
+                    qc.invalidateQueries({ queryKey: qk.companyPeople(person.company_id) });
+                    qc.invalidateQueries({ queryKey: qk.company(person.company_id) });
+                }
+            } catch (error) {
+                // If fetch fails, just invalidate all
+                qc.invalidateQueries({ queryKey: qk.companyPeople(id) });
+            }
         }
     });
 }

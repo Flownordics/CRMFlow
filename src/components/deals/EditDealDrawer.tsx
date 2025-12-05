@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Deal } from "@/services/deals";
 import { Stage } from "@/services/pipelines";
-import { useUpdateDeal, useDeleteDeal } from "@/services/deals";
+import { useUpdateDeal, useDeleteDeal, checkDealDependencies, type DealDependencies } from "@/services/deals";
 import { useCompany } from "@/services/companies";
 import { usePerson } from "@/services/people";
 import { logDealUpdated, logDealDeleted } from "@/services/activity";
@@ -14,7 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AccessibleDialogContent } from "@/components/ui/accessible-dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,9 @@ export function EditDealDrawer({ open, onOpenChange, deal, stages, stageProbPctB
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteDealTitle, setDeleteDealTitle] = useState<string | null>(null);
+    const [dealDependencies, setDealDependencies] = useState<DealDependencies | null>(null);
+    const [isLoadingDependencies, setIsLoadingDependencies] = useState(false);
     const [personModalOpen, setPersonModalOpen] = useState(false);
     const [pendingPersonName, setPendingPersonName] = useState("");
 
@@ -165,23 +168,105 @@ export function EditDealDrawer({ open, onOpenChange, deal, stages, stageProbPctB
             // Log activity
             await logDealDeleted(deal.id);
 
-            toastBus.emit({ title: "Success", description: "Deal deleted successfully", variant: "success" });
-            onOpenChange(false);
+            toastBus.emit({ 
+                title: "Success", 
+                description: "Deal moved to trash.",
+                variant: "success",
+                action: {
+                    label: "Restore",
+                    onClick: () => {
+                        window.location.href = "/settings?tab=trash";
+                    }
+                }
+            });
             setShowDeleteConfirm(false);
+            onOpenChange(false);
         } catch (error) {
             logger.error("Failed to delete deal:", error);
             toastBus.emit({ title: "Error", description: "Failed to delete deal", variant: "destructive" });
+            setShowDeleteConfirm(false);
         }
     };
 
-    // Don't render if no deal is selected
-    if (!deal) return null;
 
     return (
         <>
+            {/* Delete Confirmation Dialog - Render outside main dialog check to ensure it stays mounted */}
+            {showDeleteConfirm && dealDependencies && (
+                <ConfirmationDialog
+                    open={showDeleteConfirm}
+                    onOpenChange={(open) => {
+                        setShowDeleteConfirm(open);
+                        if (!open) {
+                            setDeleteDealTitle(null);
+                            setDealDependencies(null);
+                        }
+                    }}
+                    title={dealDependencies.hasActiveItems ? "Cannot Delete Deal" : "Are you sure?"}
+                    description={(() => {
+                        const dealName = deleteDealTitle || deal?.title || 'this deal';
+                        
+                        if (dealDependencies.hasActiveItems) {
+                            // Blocked delete message
+                            const parts: string[] = [
+                                `Cannot delete deal "${dealName}". This deal has active business items:`
+                            ];
+                            
+                            if (dealDependencies.activeQuotes > 0) {
+                                parts.push(`\n- ${dealDependencies.activeQuotes} active quote${dealDependencies.activeQuotes > 1 ? 's' : ''} (sent/accepted)`);
+                            }
+                            if (dealDependencies.activeOrders > 0) {
+                                parts.push(`\n- ${dealDependencies.activeOrders} active order${dealDependencies.activeOrders > 1 ? 's' : ''} (accepted/invoiced/backorder)`);
+                            }
+                            if (dealDependencies.activeInvoices > 0) {
+                                parts.push(`\n- ${dealDependencies.activeInvoices} active invoice${dealDependencies.activeInvoices > 1 ? 's' : ''} (sent/paid/overdue)`);
+                            }
+                            
+                            parts.push(`\n\nPlease complete, cancel, or delete these items first, then try again.`);
+                            return parts.join('');
+                        }
+                        
+                        // Allowed delete message
+                        const parts: string[] = [
+                            `This deal will be moved to trash. You can restore it from Settings > Trash Bin.`
+                        ];
+                        
+                        const inactiveCount = dealDependencies.inactiveQuotes + dealDependencies.inactiveOrders + dealDependencies.inactiveInvoices;
+                        if (inactiveCount > 0) {
+                            const inactiveParts: string[] = [];
+                            if (dealDependencies.inactiveQuotes > 0) {
+                                inactiveParts.push(`${dealDependencies.inactiveQuotes} draft/cancelled quote${dealDependencies.inactiveQuotes > 1 ? 's' : ''}`);
+                            }
+                            if (dealDependencies.inactiveOrders > 0) {
+                                inactiveParts.push(`${dealDependencies.inactiveOrders} draft/cancelled order${dealDependencies.inactiveOrders > 1 ? 's' : ''}`);
+                            }
+                            if (dealDependencies.inactiveInvoices > 0) {
+                                inactiveParts.push(`${dealDependencies.inactiveInvoices} draft invoice${dealDependencies.inactiveInvoices > 1 ? 's' : ''}`);
+                            }
+                            
+                            if (inactiveParts.length > 0) {
+                                parts.push(`\n\nNote: ${inactiveParts.join(', ')} will lose their deal reference, but can still be viewed independently.`);
+                            }
+                        }
+                        
+                        return parts.join('');
+                    })()}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    onConfirm={handleDelete}
+                    variant="destructive"
+                    blocked={dealDependencies.hasActiveItems}
+                    showCloseOnly={dealDependencies.hasActiveItems}
+                />
+            )}
+
+            {!deal ? null : (
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <AccessibleDialogContent
-                    className="sm:max-w-[500px]"
+                    className={cn(
+                        "sm:max-w-[500px]",
+                        showDeleteConfirm && "pointer-events-none"
+                    )}
                 >
                     {/* 🔒 These must render on the very first paint, unconditionally */}
                     <DialogHeader>
@@ -328,29 +413,36 @@ export function EditDealDrawer({ open, onOpenChange, deal, stages, stageProbPctB
                     </div>
 
                     <DialogFooter className="flex justify-between">
-                        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" type="button">
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the deal
-                                        "{deal.title}".
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                        Delete
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        <Button 
+                            variant="destructive" 
+                            type="button"
+                            onClick={async () => {
+                                if (!deal) return;
+                                
+                                logger.debug("Delete button clicked, checking dependencies");
+                                setIsLoadingDependencies(true);
+                                setDeleteDealTitle(deal.title);
+                                
+                                try {
+                                    const deps = await checkDealDependencies(deal.id);
+                                    setDealDependencies(deps);
+                                    setShowDeleteConfirm(true);
+                                } catch (error) {
+                                    logger.error("Failed to check deal dependencies:", error);
+                                    toastBus.emit({ 
+                                        title: "Error", 
+                                        description: "Failed to check deal dependencies. Please try again.", 
+                                        variant: "destructive" 
+                                    });
+                                } finally {
+                                    setIsLoadingDependencies(false);
+                                }
+                            }}
+                            disabled={isLoadingDependencies}
+                        >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {isLoadingDependencies ? "Checking..." : "Delete"}
+                        </Button>
 
                         <div className="flex gap-2">
                             <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -366,6 +458,7 @@ export function EditDealDrawer({ open, onOpenChange, deal, stages, stageProbPctB
                     </DialogFooter>
                 </AccessibleDialogContent>
             </Dialog>
+            )}
 
             {/* Inline Person Creation Modal */}
             <PersonModal

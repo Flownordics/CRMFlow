@@ -26,7 +26,7 @@ import { useCompanyLookup } from "@/hooks/useCompanyLookup";
 import { useToast } from "@/hooks/use-toast";
 
 // Import Invoices page
-import InvoicesView from "@/pages/Invoices";
+import Invoices from "@/pages/Invoices";
 
 export default function AccountingPage() {
   const { toast } = useToast();
@@ -253,7 +253,7 @@ export default function AccountingPage() {
 
         {/* Invoices Tab Content */}
         <TabsContent value="invoices" className="mt-6">
-          <InvoicesView embedded={true} />
+          <Invoices embedded={true} />
         </TabsContent>
       </Tabs>
     </div>

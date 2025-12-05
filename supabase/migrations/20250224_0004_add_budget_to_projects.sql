@@ -9,3 +9,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_budget_minor ON public.projects(budget_m
 -- Add comment
 COMMENT ON COLUMN public.projects.budget_minor IS 'Project budget in minor currency units (e.g., øre for DKK)';
 
+
+
+
+

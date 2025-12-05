@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useDeal, useUpdateDeal, syncDealToOwnerCalendar, removeDealFromOwnerCalendar } from "@/services/deals";
+import { useDeal, useUpdateDeal, useDuplicateDeal, syncDealToOwnerCalendar, removeDealFromOwnerCalendar } from "@/services/deals";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/tables/DataTable";
 import { LineItemsTable } from "@/components/lines/LineItemsTable";
@@ -20,9 +20,14 @@ import { DealAccountingSummary } from "@/components/deals/DealAccountingSummary"
 import { RelatedTasksList } from "@/components/tasks/RelatedTasksList";
 import { useProjectFromDeal } from "@/services/projects";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
-import { FolderKanban, FileText, ShoppingCart } from "lucide-react";
-import { useQuotes } from "@/services/quotes";
-import { useOrders } from "@/services/orders";
+import { FolderKanban, FileText, ShoppingCart, CheckSquare2, Copy } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
+import { fetchQuotes } from "@/services/quotes";
+import { fetchOrders } from "@/services/orders";
+import { qk } from "@/lib/queryKeys";
+import { TaskForm } from "@/components/tasks/TaskForm";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { SectionErrorBoundary } from "@/components/fallbacks/SectionErrorBoundary";
 
 export default function DealDetail() {
   const { id = "" } = useParams();
@@ -31,16 +36,35 @@ export default function DealDetail() {
   const { data: deal, isLoading, error } = useDeal(id);
   const { data: company } = useCompanies({ q: deal?.company_id });
   const updateDeal = useUpdateDeal(id);
-  const [busy, setBusy] = useState<null | "quote" | "order" | "invoice">(null);
+  const duplicateDeal = useDuplicateDeal();
+  const [busy, setBusy] = useState<null | "quote" | "order" | "invoice" | "duplicate">(null);
   const [closeDate, setCloseDate] = useState<Date | null>(deal?.close_date ? new Date(deal.close_date) : null);
   const { data: project, isLoading: isLoadingProject } = useProjectFromDeal(deal?.id);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   
-  // Check if deal already has a quote or order
-  const { data: quotesData } = useQuotes({ dealId: deal?.id });
-  const { data: ordersData } = useOrders({ dealId: deal?.id });
-  const existingQuote = quotesData?.data?.[0];
-  const existingOrder = ordersData?.data?.[0];
+  // Fetch quotes and orders in parallel using useQueries to avoid N+1 problem
+  const results = useQueries({
+    queries: [
+      {
+        queryKey: qk.quotes({ dealId: deal?.id, limit: 1 }),
+        queryFn: () => fetchQuotes({ dealId: deal?.id, limit: 1 }),
+        enabled: !!deal?.id,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      },
+      {
+        queryKey: qk.orders({ dealId: deal?.id, limit: 1 }),
+        queryFn: () => fetchOrders({ dealId: deal?.id, limit: 1 }),
+        enabled: !!deal?.id,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      },
+    ],
+  });
+  
+  const quotesQuery = results[0];
+  const ordersQuery = results[1];
+  const existingQuote = quotesQuery.data?.data?.[0];
+  const existingOrder = ordersQuery.data?.data?.[0];
 
   // Update local state when deal data changes
   useEffect(() => {
@@ -109,6 +133,19 @@ export default function DealDetail() {
     }
   };
 
+  // Redirect to deals list if deal is not found
+  useEffect(() => {
+    if (!isLoading && (error || !deal)) {
+      const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
+      const isNotFound = errorMessage.includes('not found') || errorMessage.includes('does not exist');
+      
+      if (isNotFound || (!error && !deal)) {
+        logger.debug('[DealDetail] Deal not found, redirecting to deals list', { id });
+        nav('/deals');
+      }
+    }
+  }, [isLoading, error, deal, id, nav]);
+
   if (isLoading) return <div className="p-6">Indlæser deal…</div>;
   if (error || !deal)
     return (
@@ -150,6 +187,31 @@ export default function DealDetail() {
     }
   }
 
+  async function handleDuplicateDeal() {
+    if (!deal) return;
+
+    try {
+      setBusy("duplicate");
+      const duplicatedDeal = await duplicateDeal.mutateAsync(deal);
+      toastBus.emit({
+        title: "Deal duplicated",
+        description: "Deal has been duplicated successfully",
+        variant: "success"
+      });
+      // Navigate to the new deal
+      nav(`/deals/${duplicatedDeal.id}`);
+    } catch (error) {
+      logger.error("Failed to duplicate deal:", error);
+      toastBus.emit({
+        title: "Failed to duplicate deal",
+        description: error instanceof Error ? error.message : "Could not duplicate deal. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   // Simple CTA-regler (MVP) – vis hvilke næste steps, baseret på stage-navn
   // Only show "Create Quote" if no quote exists yet
   const showQuote = (!existingQuote && (/proposal|offer|tilbud/i.test(deal.stage_id ?? "") || true));
@@ -159,56 +221,80 @@ export default function DealDetail() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-h1">{deal.title}</h1>
-        <div className="flex gap-2">
-          {deal && !isLoadingProject && (
-            project ? (
-              <Button variant="outline" onClick={() => nav(`/projects/${project.id}`)}>
-                <FolderKanban className="h-4 w-4 mr-2" />
-                View Project
+      <PageHeader
+        showBreadcrumbs={true}
+        title={deal.title}
+        actions={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDuplicateDeal}
+              disabled={busy === "duplicate" || duplicateDeal.isPending}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              {busy === "duplicate" || duplicateDeal.isPending ? "Duplicating..." : "Duplicate Deal"}
+            </Button>
+            <Button variant="outline" onClick={() => setIsTaskFormOpen(true)}>
+              <CheckSquare2 className="h-4 w-4 mr-2" />
+              Create Task
+            </Button>
+            {deal && !isLoadingProject && (
+              project ? (
+                <Button variant="outline" onClick={() => nav(`/projects/${project.id}`)}>
+                  <FolderKanban className="h-4 w-4 mr-2" />
+                  View Project
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => setCreateProjectDialogOpen(true)}>
+                  <FolderKanban className="h-4 w-4 mr-2" />
+                  Create Project
+                </Button>
+              )
+            )}
+            {existingQuote ? (
+              <Button variant="outline" onClick={() => nav(`/quotes/${existingQuote.id}`)}>
+                <FileText className="h-4 w-4 mr-2" />
+                View Quote
               </Button>
-            ) : (
-              <Button variant="outline" onClick={() => setCreateProjectDialogOpen(true)}>
-                <FolderKanban className="h-4 w-4 mr-2" />
-                Create Project
+            ) : showQuote && (
+              <Button onClick={() => handleCreate("quote")} disabled={!!busy}>
+                {busy === "quote" ? "Opretter…" : "Create Quote"}
               </Button>
-            )
-          )}
-          {existingQuote ? (
-            <Button variant="outline" onClick={() => nav(`/quotes/${existingQuote.id}`)}>
-              <FileText className="h-4 w-4 mr-2" />
-              View Quote
-            </Button>
-          ) : showQuote && (
-            <Button onClick={() => handleCreate("quote")} disabled={!!busy}>
-              {busy === "quote" ? "Opretter…" : "Create Quote"}
-            </Button>
-          )}
-          {existingOrder ? (
-            <Button variant="outline" onClick={() => nav(`/orders/${existingOrder.id}`)}>
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              View Order
-            </Button>
-          ) : showOrder && (
-            <Button variant="outline" onClick={() => handleCreate("order")} disabled={!!busy}>
-              {busy === "order" ? "Opretter…" : "Create Order"}
-            </Button>
-          )}
-          {showInvoice && (
-            <Button variant="outline" onClick={() => handleCreate("invoice")} disabled={!!busy}>
-              {busy === "invoice" ? "Opretter…" : "Create Invoice"}
-            </Button>
-          )}
-        </div>
-      </div>
+            )}
+            {existingOrder ? (
+              <Button variant="outline" onClick={() => nav(`/orders/${existingOrder.id}`)}>
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                View Order
+              </Button>
+            ) : showOrder && (
+              <Button variant="outline" onClick={() => handleCreate("order")} disabled={!!busy}>
+                {busy === "order" ? "Opretter…" : "Create Order"}
+              </Button>
+            )}
+            {showInvoice && (
+              <Button variant="outline" onClick={() => handleCreate("invoice")} disabled={!!busy}>
+                {busy === "invoice" ? "Opretter…" : "Create Invoice"}
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       {deal && (
-        <CreateProjectDialog
-          open={createProjectDialogOpen}
-          onOpenChange={setCreateProjectDialogOpen}
-          dealId={deal.id}
-        />
+        <>
+          <CreateProjectDialog
+            open={createProjectDialogOpen}
+            onOpenChange={setCreateProjectDialogOpen}
+            dealId={deal.id}
+          />
+          <TaskForm
+            open={isTaskFormOpen}
+            onOpenChange={setIsTaskFormOpen}
+            relatedType="deal"
+            relatedId={deal.id}
+            relatedTitle={deal.title}
+          />
+        </>
       )}
 
       <div className="rounded-2xl border p-4 shadow-card">
@@ -253,20 +339,26 @@ export default function DealDetail() {
       </div>
 
       {/* Deal to Cash Summary */}
-      <DealAccountingSummary dealId={deal.id} currency={deal.currency} />
+      <SectionErrorBoundary sectionName="Deal Accounting Summary">
+        <DealAccountingSummary dealId={deal.id} currency={deal.currency} />
+      </SectionErrorBoundary>
 
       {/* (Næste punkt) Activity timeline UI */}
-      <div className="rounded-2xl border p-4 shadow-card">
-        <h2 className="text-lg font-semibold mb-2">Activity</h2>
-        <DealActivityList dealId={deal.id} />
-      </div>
+      <SectionErrorBoundary sectionName="Deal Activity">
+        <div className="rounded-2xl border p-4 shadow-card">
+          <h2 className="text-lg font-semibold mb-2">Activity</h2>
+          <DealActivityList dealId={deal.id} />
+        </div>
+      </SectionErrorBoundary>
 
       {/* Tasks Section */}
-      <RelatedTasksList
-        relatedType="deal"
-        relatedId={deal.id}
-        relatedTitle={deal.title}
-      />
+      <SectionErrorBoundary sectionName="Related Tasks">
+        <RelatedTasksList
+          relatedType="deal"
+          relatedId={deal.id}
+          relatedTitle={deal.title}
+        />
+      </SectionErrorBoundary>
 
       <div className="text-sm">
         <Link className="underline" to="/deals">

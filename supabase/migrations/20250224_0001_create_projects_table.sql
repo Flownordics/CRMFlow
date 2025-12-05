@@ -48,3 +48,7 @@ CREATE POLICY "Allow authenticated users to manage projects" ON public.projects
 -- Grant permissions to authenticated users
 GRANT ALL ON public.projects TO authenticated;
 
+
+
+
+

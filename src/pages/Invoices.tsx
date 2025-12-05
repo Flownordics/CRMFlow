@@ -51,6 +51,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { formatMoneyMinor } from "@/lib/money";
 import { useCompanyLookup } from "@/hooks/useCompanyLookup";
+import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
 import { InvoiceStatusChart } from "@/components/invoices/InvoiceStatusChart";
 import { InvoiceAgingChart } from "@/components/invoices/InvoiceAgingChart";
@@ -337,7 +338,7 @@ const Invoices: React.FC<InvoicesProps> = ({ embedded = false }) => {
                   <TableCell>
                     <div className="inline-flex items-center gap-2">
                       <Icon className={cn("h-4 w-4", tokenText(theme.color))} aria-hidden="true" focusable="false" />
-                      <span className="font-medium">{invoice.number ?? "—"}</span>
+                      <span className="font-medium">{invoice.number ?? generateFriendlyNumber(invoice.id, 'invoice')}</span>
                     </div>
                   </TableCell>
                   <TableCell className="truncate">

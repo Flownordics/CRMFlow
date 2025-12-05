@@ -18,17 +18,19 @@ import { usePeople } from "@/services/people";
 import { toastBus } from "@/lib/toastBus";
 import { useI18n } from "@/lib/i18n";
 import { Invoice } from "@/services/invoices";
-import { Mail, AlertCircle, CheckCircle } from "lucide-react";
+import { Mail, AlertCircle, CheckCircle, Bell } from "lucide-react";
 import { logger } from '@/lib/logger';
+import { formatMoneyMinor } from "@/lib/money";
 
 interface SendInvoiceDialogProps {
     invoice: Invoice;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onInvoiceSent?: () => void;
+    isReminder?: boolean;
 }
 
-export function SendInvoiceDialog({ invoice, open, onOpenChange, onInvoiceSent }: SendInvoiceDialogProps) {
+export function SendInvoiceDialog({ invoice, open, onOpenChange, onInvoiceSent, isReminder = false }: SendInvoiceDialogProps) {
     const { t } = useI18n();
     const [to, setTo] = useState("");
     const [subject, setSubject] = useState(`Invoice ${invoice.number || invoice.id}`);
@@ -61,18 +63,41 @@ export function SendInvoiceDialog({ invoice, open, onOpenChange, onInvoiceSent }
             setTo(contactEmail || companyEmail || "");
 
             // Pre-fill subject
-            setSubject(`Invoice ${invoice.number || invoice.id}`);
+            if (isReminder) {
+                setSubject(`Reminder: Payment Due for Invoice ${invoice.number || invoice.id}`);
+            } else {
+                setSubject(`Invoice ${invoice.number || invoice.id}`);
+            }
 
             // Pre-fill message
-            setMessage(`Dear Customer,
+            if (isReminder) {
+                const dueDate = invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'the due date';
+                const balance = formatMoneyMinor(invoice.balance_minor, invoice.currency);
+                setMessage(`Dear Customer,
+
+This is a friendly reminder that payment is overdue for invoice ${invoice.number || invoice.id}.
+
+Invoice Details:
+- Invoice Number: ${invoice.number || invoice.id}
+- Due Date: ${dueDate}
+- Outstanding Balance: ${balance}
+
+Please arrange payment at your earliest convenience. If you have already made the payment, please disregard this reminder.
+
+Thank you for your attention to this matter.
+
+Best regards`);
+            } else {
+                setMessage(`Dear Customer,
 
 Please find attached your invoice ${invoice.number || invoice.id}.
 
 Thank you for your business!
 
 Best regards`);
+            }
         }
-    }, [invoice, open, companies, people]);
+    }, [invoice, open, companies, people, isReminder]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -95,8 +120,10 @@ Best regards`);
 
             if (result.success) {
                 toastBus.emit({
-                    title: "Invoice Sent",
-                    description: `Invoice has been sent to ${to.trim()}`,
+                    title: isReminder ? "Reminder Sent" : "Invoice Sent",
+                    description: isReminder 
+                        ? `Payment reminder has been sent to ${to.trim()}`
+                        : `Invoice has been sent to ${to.trim()}`,
                     variant: "success"
                 });
 
@@ -122,7 +149,7 @@ Best regards`);
     const handleClose = () => {
         if (!isLoading) {
             setTo("");
-            setSubject(`Invoice ${invoice.number || invoice.id}`);
+            setSubject(isReminder ? `Reminder: Payment Due for Invoice ${invoice.number || invoice.id}` : `Invoice ${invoice.number || invoice.id}`);
             setMessage("");
             setError(null);
             onOpenChange(false);
@@ -134,11 +161,22 @@ Best regards`);
             <AccessibleDialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Mail className="h-5 w-5" />
-                        Send Invoice
+                        {isReminder ? (
+                            <>
+                                <Bell className="h-5 w-5" />
+                                Send Payment Reminder
+                            </>
+                        ) : (
+                            <>
+                                <Mail className="h-5 w-5" />
+                                Send Invoice
+                            </>
+                        )}
                     </DialogTitle>
                     <DialogDescription>
-                        Send invoice {invoice.number || invoice.id} via email
+                        {isReminder 
+                            ? `Send payment reminder for invoice ${invoice.number || invoice.id} via email`
+                            : `Send invoice ${invoice.number || invoice.id} via email`}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -250,8 +288,17 @@ Best regards`);
                                 </>
                             ) : (
                                 <>
-                                    <Mail className="h-4 w-4 mr-2" />
-                                    Send Invoice
+                                    {isReminder ? (
+                                        <>
+                                            <Bell className="h-4 w-4 mr-2" />
+                                            Send Reminder
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Mail className="h-4 w-4 mr-2" />
+                                            Send Invoice
+                                        </>
+                                    )}
                                 </>
                             )}
                         </Button>

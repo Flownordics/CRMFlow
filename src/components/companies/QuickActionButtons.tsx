@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { CreateEventDialog } from "@/components/calendar/CreateEventDialog";
 import { CreateDealModal } from "@/components/deals/CreateDealModal";
-import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
+import { quickCreateQuoteAndNavigate } from "@/services/quickCreateHelpers";
+import { toastBus } from "@/lib/toastBus";
+import { logger } from "@/lib/logger";
 import { useUpdateCompany, fetchCompany } from "@/services/companies";
 import { lookupCvr, mergeCvrWithExistingCompany } from "@/services/cvrLookup";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,7 +31,7 @@ export function QuickActionButtons({ companyId, companyName, companyEmail, compa
   const [logCallDialogOpen, setLogCallDialogOpen] = useState(false);
   const [scheduleMeetingDialogOpen, setScheduleMeetingDialogOpen] = useState(false);
   const [createDealModalOpen, setCreateDealModalOpen] = useState(false);
-  const [createQuoteModalOpen, setCreateQuoteModalOpen] = useState(false);
+  const [isCreatingQuote, setIsCreatingQuote] = useState(false);
   const [callOutcome, setCallOutcome] = useState<string>("");
   const [callNotes, setCallNotes] = useState("");
   const [isCvrSyncing, setIsCvrSyncing] = useState(false);
@@ -77,8 +79,25 @@ export function QuickActionButtons({ companyId, companyName, companyEmail, compa
     setCreateDealModalOpen(true);
   };
 
-  const handleCreateQuote = () => {
-    setCreateQuoteModalOpen(true);
+  const handleCreateQuote = async () => {
+    try {
+      setIsCreatingQuote(true);
+      await quickCreateQuoteAndNavigate(companyId, navigate);
+      toastBus.emit({
+        title: "Quote created",
+        description: "Opening quote editor...",
+        variant: "success",
+      });
+    } catch (error) {
+      logger.error("Failed to create quote:", error);
+      toastBus.emit({
+        title: "Failed to create quote",
+        description: error instanceof Error ? error.message : "Could not create quote. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingQuote(false);
+    }
   };
 
   const handleCvrSync = async () => {
@@ -145,6 +164,7 @@ export function QuickActionButtons({ companyId, companyName, companyEmail, compa
       icon: FileText,
       onClick: handleCreateQuote,
       variant: "outline" as const,
+      disabled: isCreatingQuote,
     },
     {
       label: "CVR Sync",
@@ -253,13 +273,6 @@ export function QuickActionButtons({ companyId, companyName, companyEmail, compa
         defaultCompanyId={companyId}
       />
 
-      {/* Create Quote Modal */}
-      <CreateQuoteModal
-        open={createQuoteModalOpen}
-        onOpenChange={setCreateQuoteModalOpen}
-        defaultCompanyId={companyId}
-        defaultTitle={`Quote for ${companyName}`}
-      />
     </>
   );
 }

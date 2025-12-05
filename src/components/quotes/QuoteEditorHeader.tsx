@@ -3,6 +3,7 @@ import { formatMoneyMinor } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Quote } from "@/services/quotes";
+import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 
 interface QuoteEditorHeaderProps {
     quote: Quote;
@@ -23,7 +24,7 @@ export function QuoteEditorHeader({ quote, onSend, onOpenPdf, onConvert }: Quote
                     <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                     {quote.status}
                 </span>
-                <div className="font-medium truncate">{quote.number ?? "Quote"}</div>
+                <div className="font-medium truncate">{quote.number ?? generateFriendlyNumber(quote.id, 'quote')}</div>
                 <div className="text-sm text-muted-foreground truncate">
                     {quote.notes ?? "—"}
                 </div>

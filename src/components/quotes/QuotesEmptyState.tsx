@@ -1,6 +1,7 @@
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { EmptyState } from "@/components/EmptyState";
 
 interface QuotesEmptyStateProps {
     title?: string;
@@ -17,16 +18,7 @@ export function QuotesEmptyState({
     actionLink = "/quotes/new",
     onCreateClick
 }: QuotesEmptyStateProps) {
-    return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="rounded-full bg-muted/10 p-4 mb-4">
-                <FileText className="h-12 w-12 text-muted-foreground" aria-hidden="true" />
-            </div>
-
-            <h3 className="text-lg font-semibold mb-2">{title}</h3>
-            <p className="text-muted-foreground mb-6 max-w-md">{description}</p>
-
-            {onCreateClick ? (
+    const actionButton = onCreateClick ? (
                 <Button onClick={onCreateClick}>
                     <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
                     {actionText}
@@ -38,7 +30,14 @@ export function QuotesEmptyState({
                         {actionText}
                     </Link>
                 </Button>
-            )}
-        </div>
+    );
+
+    return (
+        <EmptyState
+            icon={FileText}
+            title={title}
+            description={description}
+            action={actionButton}
+        />
     );
 }

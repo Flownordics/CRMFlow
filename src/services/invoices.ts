@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toastBus } from "@/lib/toastBus";
 import { logger } from '@/lib/logger';
 import { isValidUuid } from "@/lib/validation";
+import { getEntityCacheConfig, defaultQueryOptions } from "@/lib/queryCacheConfig";
 
 // Schemas
 export const Invoice = z.object({
@@ -237,10 +238,12 @@ export function useInvoices(params: {
     status?: string;
     company_id?: string;
 } = {}) {
+    const cacheConfig = getEntityCacheConfig('invoices');
     return useQuery({
         queryKey: qk.invoices(params),
         queryFn: () => fetchInvoices(params),
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        ...cacheConfig,
+        ...defaultQueryOptions,
     });
 }
 
@@ -269,10 +272,13 @@ export function useCreateInvoice() {
 }
 
 export function useInvoice(id: string) {
+    const cacheConfig = getEntityCacheConfig('invoice');
     return useQuery({
         queryKey: qk.invoice(id),
         queryFn: () => fetchInvoice(id),
         enabled: !!id && isValidUuid(id),
+        ...cacheConfig,
+        ...defaultQueryOptions,
     });
 }
 
@@ -312,7 +318,50 @@ export function useUpdateInvoice() {
     return useMutation({
         mutationFn: ({ id, payload }: { id: string; payload: Parameters<typeof updateInvoice>[1] }) =>
             updateInvoice(id, payload),
+        onMutate: async ({ id, payload }) => {
+            // Cancel any outgoing refetches
+            await queryClient.cancelQueries({ queryKey: qk.invoice(id) });
+            await queryClient.cancelQueries({ queryKey: qk.invoices() });
+            await queryClient.cancelQueries({ queryKey: qk.overdueInvoices() });
+            await queryClient.cancelQueries({ queryKey: qk.recentInvoices() });
+
+            // Snapshot the previous value
+            const previousInvoice = queryClient.getQueryData<Invoice>(qk.invoice(id));
+            const previousInvoices = queryClient.getQueryData(qk.invoices());
+
+            // Optimistically update invoice
+            if (previousInvoice) {
+                queryClient.setQueryData<Invoice>(qk.invoice(id), (old) => {
+                    if (!old) return old;
+                    return { ...old, ...payload };
+                });
+            }
+
+            // Optimistically update invoices list
+            queryClient.setQueryData(qk.invoices(), (old: any) => {
+                if (!old?.data) return old;
+                return {
+                    ...old,
+                    data: old.data.map((invoice: Invoice) =>
+                        invoice.id === id ? { ...invoice, ...payload } : invoice
+                    )
+                };
+            });
+
+            // Return context for rollback
+            return { previousInvoice, previousInvoices };
+        },
+        onError: (_err, { id }, context) => {
+            // Rollback on error
+            if (context?.previousInvoice) {
+                queryClient.setQueryData(qk.invoice(id), context.previousInvoice);
+            }
+            if (context?.previousInvoices) {
+                queryClient.setQueryData(qk.invoices(), context.previousInvoices);
+            }
+        },
         onSuccess: async (updatedInvoice, { id, payload }) => {
+            // Invalidate to ensure consistency with server
             queryClient.invalidateQueries({ queryKey: qk.invoice(id) });
             queryClient.invalidateQueries({ queryKey: qk.invoices() });
             queryClient.invalidateQueries({ queryKey: qk.accounting() });

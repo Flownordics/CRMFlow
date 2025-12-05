@@ -272,6 +272,20 @@ export class ErrorHandler {
     private logError(error: Error, context?: string): void {
         const logContext = context ? `[${context}]` : '';
 
+        // Check for "not found" errors - these are expected in some cases (orphaned references)
+        // and should be logged at a lower level to reduce console noise
+        const isNotFoundError = error.message.toLowerCase().includes('not found') ||
+            error.message.toLowerCase().includes('does not exist');
+
+        // Handle "not found" errors first - regardless of error type
+        if (isNotFoundError) {
+            // Log "not found" errors as debug messages since they're often expected (orphaned references)
+            // This reduces console noise for expected scenarios like deleted deals/projects
+            logger.debug(`${logContext} Not Found:`, error);
+            return;
+        }
+
+        // Handle other errors by type
         if (error instanceof APIError) {
             if (error.status && error.status >= 500) {
                 logger.error(`${logContext} API Error:`, error);

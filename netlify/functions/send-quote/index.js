@@ -29,14 +29,16 @@ export const handler = async (event, context) => {
 
     try {
         const body = JSON.parse(event.body);
-        const { quoteId, quote_id, recipient_email, to, subject, message } = body;
+        const { quoteId, quote_id, recipient_email, to, subject, message, public_url, token_id, attach_pdf } = body;
 
         // Support both quoteId and quote_id for compatibility
         const quoteIdValue = quoteId || quote_id;
         const recipientEmail = recipient_email || to;
+        const publicUrl = public_url; // Public URL for quote access
+        const attachPdf = attach_pdf === true; // Flag for backward compatibility
 
-        console.log('Request body:', { quoteId, quote_id, recipient_email, to, subject, message });
-        console.log('Parsed values:', { quoteIdValue, recipientEmail });
+        console.log('Request body:', { quoteId, quote_id, recipient_email, to, subject, message, public_url, attach_pdf });
+        console.log('Parsed values:', { quoteIdValue, recipientEmail, publicUrl, attachPdf });
 
         if (!quoteIdValue || !recipientEmail || !subject) {
             return {
@@ -350,70 +352,91 @@ export const handler = async (event, context) => {
             console.log('Token is still valid, using existing token');
         }
 
-        // Generate PDF quote first using Netlify function
-        console.log('Generating PDF quote for quote ID:', quoteIdValue);
-        console.log('PDF generator URL: https://crmflow-app.netlify.app/.netlify/functions/pdf-html');
+        // Check if public_url is provided and attachPdf is not true (new flow with public portal)
+        // If attachPdf is true or publicUrl is not provided, fall back to PDF attachment (backward compatibility)
+        const usePublicLink = !!publicUrl && !attachPdf;
+        console.log('Email sending mode decision:', {
+            usePublicLink,
+            hasPublicUrl: !!publicUrl,
+            publicUrl: publicUrl,
+            attachPdf: attachPdf,
+            attach_pdf: attach_pdf
+        });
+        console.log('Email sending mode:', usePublicLink ? 'Public link' : 'PDF attachment (legacy)');
 
         let pdfBase64 = null;
         let pdfFilename = `quote-${quoteIdValue}.pdf`;
 
-        try {
-            console.log('Attempting PDF generation...');
-            const pdfRequestBody = {
-                type: 'quote',
-                data: { id: quoteIdValue },
-                user: { id: user.id }
-            };
-            console.log('PDF request body:', JSON.stringify(pdfRequestBody));
+        // Only generate PDF if public_url is not provided (backward compatibility)
+        if (!usePublicLink) {
+            console.log('Generating PDF quote for quote ID:', quoteIdValue);
+            try {
+                console.log('Attempting PDF generation...');
+                const pdfRequestBody = {
+                    type: 'quote',
+                    data: { id: quoteIdValue },
+                    user: { id: user.id }
+                };
 
-            // Use Netlify Function for PDF generation (React PDF)
-            const netlifyFunctionUrl = 'https://crmflow-app.netlify.app/.netlify/functions/pdf-react';
-            console.log('PDF generator URL:', netlifyFunctionUrl);
+                // Use Netlify Function for PDF generation (React PDF)
+                const netlifyFunctionUrl = 'https://crmflow-app.netlify.app/.netlify/functions/pdf-react';
+                console.log('PDF generator URL:', netlifyFunctionUrl);
 
-            const pdfResponse = await fetch(netlifyFunctionUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`
-                },
-                body: JSON.stringify(pdfRequestBody)
-            });
+                const pdfResponse = await fetch(netlifyFunctionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify(pdfRequestBody)
+                });
 
-            console.log('PDF response status:', pdfResponse.status);
-            console.log('PDF response headers:', Object.fromEntries(pdfResponse.headers.entries()));
-
-            if (!pdfResponse.ok) {
-                const errorText = await pdfResponse.text();
-                console.error('PDF generation failed:', pdfResponse.status, pdfResponse.statusText, errorText);
+                if (!pdfResponse.ok) {
+                    const errorText = await pdfResponse.text();
+                    console.error('PDF generation failed:', pdfResponse.status, pdfResponse.statusText, errorText);
+                    return {
+                        statusCode: 400,
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            error: 'PDF generation failed',
+                            details: `PDF generation failed with status ${pdfResponse.status}: ${errorText}`
+                        })
+                    };
+                } else {
+                    const pdfData = await pdfResponse.json();
+                    pdfBase64 = pdfData.pdf;
+                    pdfFilename = pdfData.filename || pdfFilename;
+                    console.log('PDF generated successfully');
+                }
+            } catch (pdfError) {
+                console.error('PDF generation error:', pdfError);
                 return {
-                    statusCode: 400,
+                    statusCode: 500,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         error: 'PDF generation failed',
-                        details: `PDF generation failed with status ${pdfResponse.status}: ${errorText}`
+                        details: pdfError.message || 'Unknown PDF generation error'
                     })
                 };
-            } else {
-                // pdf-react returns JSON with base64 PDF already encoded
-                const pdfData = await pdfResponse.json();
-                pdfBase64 = pdfData.pdf; // Already base64 encoded!
-                pdfFilename = pdfData.filename || pdfFilename;
-                console.log('PDF generated successfully, base64 length:', pdfBase64.length, 'chars, filename:', pdfFilename);
             }
-        } catch (pdfError) {
-            console.error('PDF generation error:', pdfError);
-            return {
-                statusCode: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    error: 'PDF generation failed',
-                    details: pdfError.message || 'Unknown PDF generation error'
-                })
-            };
         }
 
         // Generate email content
-        const htmlContent = `
+        const htmlContent = usePublicLink
+            ? `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #333; margin-bottom: 20px;">Quote</h2>
+                ${message ? `<p style="margin-bottom: 20px;">${message.replace(/\n/g, '<br>')}</p>` : ''}
+                <p style="margin-bottom: 20px;">You can view your quote online by clicking the link below:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${publicUrl}" style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">View Quote Online</a>
+                </div>
+                <p style="margin-top: 20px; color: #666; font-size: 14px;">You can also download the quote as PDF from the online view.</p>
+                <p style="margin-top: 30px;">If you have any questions, please don't hesitate to contact us.</p>
+                <p style="margin-top: 20px;">Best regards,<br>Your Sales Team</p>
+            </div>
+        `
+            : `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2 style="color: #333;">Quote</h2>
                 <p>Please find your quote attached.</p>
@@ -423,7 +446,23 @@ export const handler = async (event, context) => {
             </div>
         `;
 
-        const textContent = `
+        const textContent = usePublicLink
+            ? `
+Quote
+
+${message || ''}
+
+You can view your quote online by clicking the following link:
+${publicUrl}
+
+You can also download the quote as PDF from the online view.
+
+If you have any questions, please don't hesitate to contact us.
+
+Best regards,
+Your Sales Team
+        `.trim()
+            : `
 Quote
 
 Please find your quote attached.
@@ -552,14 +591,15 @@ Your Sales Team
                 .from('email_logs')
                 .insert({
                     user_id: user.id,
-                    quote_id: quoteIdValue,
-                    recipient_email: recipientEmail,
+                    related_type: 'quote',
+                    related_id: quoteIdValue,
+                    to_email: recipientEmail,
                     subject: subject,
-                    message_id: messageId,
                     provider: 'gmail',
+                    provider_message_id: messageId,
                     status: 'sent',
-                    sent_at: new Date().toISOString(),
                 });
+            console.log('Email logged successfully to email_logs');
         } catch (logError) {
             console.warn('Failed to log email:', logError);
             // Don't fail the request if logging fails

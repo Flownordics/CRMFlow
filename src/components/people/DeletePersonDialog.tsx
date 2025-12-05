@@ -1,19 +1,8 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/lib/i18n";
 import { useDeletePerson } from "@/services/people";
 import { Person } from "@/lib/schemas/person";
 import { toastBus } from "@/lib/toastBus";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface DeletePersonDialogProps {
     person: Person;
@@ -25,17 +14,20 @@ interface DeletePersonDialogProps {
 export function DeletePersonDialog({ person, open, onOpenChange, onSuccess }: DeletePersonDialogProps) {
     const { t } = useI18n();
     const deletePerson = useDeletePerson();
-    const [isDeleting, setIsDeleting] = useState(false);
 
     const handleDelete = async () => {
-        setIsDeleting(true);
-
         try {
             await deletePerson.mutateAsync(person.id);
 
             toastBus.emit({
                 title: t("people.personDeleted"),
-                description: `${person.firstName} ${person.lastName} has been deleted successfully.`,
+                description: `${person.firstName} ${person.lastName} has been moved to trash.`,
+                action: {
+                    label: "Restore",
+                    onClick: () => {
+                        window.location.href = "/settings?tab=trash";
+                    }
+                }
             });
 
             onSuccess();
@@ -45,38 +37,23 @@ export function DeletePersonDialog({ person, open, onOpenChange, onSuccess }: De
                 description: t("people.deleteError"),
                 variant: "destructive",
             });
-        } finally {
-            setIsDeleting(false);
         }
     };
 
+    const description = person.companyId
+        ? `This person will be moved to trash. You can restore it from Settings > Trash Bin.\n\nNote: This person is associated with a company. Deleting them will remove this association.`
+        : `This person will be moved to trash. You can restore it from Settings > Trash Bin.`;
+
     return (
-        <AlertDialog open={open} onOpenChange={onOpenChange}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>{t("people.delete")}</AlertDialogTitle>
-                    <AlertDialogDescription id="person-delete-desc">
-                        {t("people.confirmDelete")} This action cannot be undone.
-                        {person.companyId && (
-                            <span className="block mt-2 text-sm text-muted-foreground">
-                                This person is associated with a company. Deleting them will remove this association.
-                            </span>
-                        )}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>
-                        {t("common.cancel")}
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                        onClick={handleDelete}
-                        disabled={isDeleting}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                        {isDeleting ? "Deleting..." : "Delete"}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmationDialog
+            open={open}
+            onOpenChange={onOpenChange}
+            title={t("people.delete") || "Delete Person"}
+            description={description}
+            confirmText="Delete"
+            cancelText={t("common.cancel") || "Cancel"}
+            onConfirm={handleDelete}
+            variant="destructive"
+        />
     );
 }

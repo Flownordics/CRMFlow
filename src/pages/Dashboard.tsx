@@ -20,9 +20,7 @@ import {
   AlertCircle,
   ArrowUp,
   ArrowDown,
-  Plus,
   Receipt,
-  ShoppingCart,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { cn } from "@/lib/utils";
@@ -37,7 +35,9 @@ import { EnhancedKPIs } from "@/components/dashboard/EnhancedKPIs";
 import { ForecastWidget } from "@/components/dashboard/ForecastWidget";
 import { CompaniesWidget } from "@/components/dashboard/CompaniesWidget";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { EmailActivityWidget } from "@/components/dashboard/EmailActivityWidget";
 import { DateRangeSelector, getInitialDateRange, type DateRange } from "@/components/dashboard/DateRangeSelector";
+import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 
 // Loading skeleton component
 function MetricCardSkeleton() {
@@ -97,34 +97,6 @@ export default function Dashboard() {
     },
   ];
 
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case 'deal':
-        navigate('/deals');
-        break;
-      case 'company':
-        navigate('/companies');
-        break;
-      case 'contact':
-        navigate('/people');
-        break;
-      case 'quote':
-        navigate('/quotes');
-        break;
-      case 'order':
-        navigate('/orders');
-        break;
-      case 'invoice':
-        navigate('/invoices');
-        break;
-      case 'task':
-        navigate('/tasks');
-        break;
-      default:
-        break;
-    }
-  };
-
   return (
     <div className="space-y-4 md:space-y-6 p-4 md:p-6">
       {/* Welcome Header */}
@@ -137,79 +109,12 @@ export default function Dashboard() {
         }
       />
 
-      {/* Quick Actions - Top Row */}
-      <Card className="rounded-2xl border shadow-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base md:text-lg">Quick Actions</CardTitle>
-          <CardDescription className="text-xs md:text-sm">Common tasks and shortcuts</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7">
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
-              onClick={() => handleQuickAction('deal')}
-            >
-              <Plus aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
-              <span className="text-xs">New Deal</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
-              onClick={() => handleQuickAction('company')}
-            >
-              <Building2 aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
-              <span className="text-xs">Company</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
-              onClick={() => handleQuickAction('contact')}
-            >
-              <Users aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
-              <span className="text-xs">Contact</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
-              onClick={() => handleQuickAction('quote')}
-            >
-              <FileText aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
-              <span className="text-xs">Quote</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
-              onClick={() => handleQuickAction('order')}
-            >
-              <ShoppingCart aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
-              <span className="text-xs">Order</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
-              onClick={() => handleQuickAction('invoice')}
-            >
-              <Receipt aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
-              <span className="text-xs">Invoice</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-20 flex-col gap-2 touch-manipulation active:scale-95"
-              onClick={() => handleQuickAction('task')}
-            >
-              <Calendar aria-hidden="true" className="h-5 w-5 md:h-6 md:w-6" />
-              <span className="text-xs">Task</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Second Row: Alerts, Forecast, Companies */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
+      {/* Second Row: Alerts, Forecast, Companies, Email Activity */}
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2 xl:grid-cols-4">
         <AlertsPanel />
         <ForecastWidget />
         <CompaniesWidget />
+        <EmailActivityWidget />
       </div>
 
       {/* Enhanced KPIs */}
@@ -312,7 +217,7 @@ export default function Dashboard() {
                 >
                   <div>
                     <div className="text-sm font-medium">
-                      {quote.number || `Quote ${quote.id.slice(0, 8)}`}
+                      {quote.number || generateFriendlyNumber(quote.id, 'quote')}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {quote.company_name} • {quote.status}
@@ -368,7 +273,7 @@ export default function Dashboard() {
                 >
                   <div>
                     <div className="text-sm font-medium">
-                      {invoice.number || `Invoice ${invoice.id.slice(0, 8)}`}
+                      {invoice.number || generateFriendlyNumber(invoice.id, 'invoice')}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {invoice.company_name} • {invoice.status}
@@ -446,10 +351,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Activity Feed - spans 2 columns on XL */}
-        <div className="xl:col-span-2">
-          <ActivityFeed />
-        </div>
+        {/* Activity Feed */}
+        <ActivityFeed />
       </div>
     </div>
   );

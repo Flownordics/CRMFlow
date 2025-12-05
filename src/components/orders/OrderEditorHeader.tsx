@@ -1,5 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getOrderStatusTheme, statusTokenBg, statusTokenText } from "./statusTheme";
 import { formatMoneyMinor } from "@/lib/money";
@@ -10,17 +8,11 @@ import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 
 interface OrderEditorHeaderProps {
     order: OrderUI;
-    onOpenPdf?: () => void;
-    onConvertToInvoice?: () => void;
-    onMarkFulfilled?: () => void;
     onStatusChange?: (status: OrderUI["status"]) => void;
 }
 
 export function OrderEditorHeader({
     order,
-    onOpenPdf,
-    onConvertToInvoice,
-    onMarkFulfilled,
     onStatusChange
 }: OrderEditorHeaderProps) {
     const { getCompanyName } = useCompanyLookup();
@@ -71,31 +63,6 @@ export function OrderEditorHeader({
                         {formatMoneyMinor(order.totalMinor, order.currency || "DKK")}
                     </div>
                 </div>
-
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="outline" onClick={onOpenPdf} aria-label="Open PDF">
-                            PDF
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Open PDF</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="secondary" onClick={onConvertToInvoice} aria-label="Convert to invoice">
-                            Convert
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Convert to invoice</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button onClick={onMarkFulfilled} aria-label="Mark as fulfilled">
-                            Fulfilled
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Mark as fulfilled</TooltipContent>
-                </Tooltip>
             </div>
         </div>
     );

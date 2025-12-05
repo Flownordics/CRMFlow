@@ -18,3 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_companies_cvr_status ON public.companies (cvr_sta
 -- Add comment to monthly_employment column
 COMMENT ON COLUMN public.companies.monthly_employment IS 'Stores monthly employment data from CVR API as JSON. Contains: yearMonth, fullTimeEquivalent, employees, lastUpdated';
 
+
+
+
+

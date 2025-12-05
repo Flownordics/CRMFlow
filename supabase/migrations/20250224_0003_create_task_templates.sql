@@ -54,3 +54,7 @@ CREATE POLICY "Allow authenticated users to manage task templates" ON public.tas
 -- Grant permissions
 GRANT ALL ON public.task_templates TO authenticated;
 
+
+
+
+

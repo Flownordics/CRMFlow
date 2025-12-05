@@ -3,8 +3,6 @@ import { usePipelines, useStageProbabilities } from "@/services/pipelines";
 import { KanbanBoard } from "@/components/deals/KanbanBoard";
 import { CreateDealModal } from "@/components/deals/CreateDealModal";
 import { EditDealDrawer } from "@/components/deals/EditDealDrawer";
-import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
-import { CreateOrderModal } from "@/components/orders/CreateOrderModal";
 import { DealsKpiHeader } from "@/components/deals/DealsKpiHeader";
 import { DealsStageLegend } from "@/components/deals/DealsStageLegend";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
@@ -23,7 +21,7 @@ import { Deal } from "@/services/deals";
 import { useDealsBoardData } from "@/hooks/useDealsBoardData";
 import { isIdempotent, markIdempotent, clearIdempotent, generateAutomationKey } from "@/services/idempotency";
 import { logActivity } from "@/services/activity";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { logger } from '@/lib/logger';
 import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/AnalyticsCard";
 import { DealValueDistributionChart } from "@/components/deals/DealValueDistributionChart";
@@ -90,10 +88,6 @@ export default function DealsBoard() {
   } | null>(null);
   const lastAutomationRef = useRef<{ id: string; at: number } | null>(null);
 
-  // Modal states (legacy - keeping for backward compatibility)
-  const [quoteOpen, setQuoteOpen] = useState(false);
-  const [orderOpen, setOrderOpen] = useState(false);
-  const [prefillDeal, setPrefillDeal] = useState<DealData | null>(null);
 
   // Edit drawer state
   const [editOpen, setEditOpen] = useState(false);
@@ -153,6 +147,50 @@ export default function DealsBoard() {
       });
     }
   };
+
+  // Auto-create order and redirect to editor
+  const handleAutoCreateOrder = async (deal: DealData) => {
+    try {
+      toastBus.emit({
+        title: "Creating order...",
+        description: "Please wait while we prepare your order",
+      });
+
+      const order = await createOrderFromDeal.mutateAsync(deal.id);
+      
+      toastBus.emit({
+        title: "Order created",
+        description: "Redirecting to order editor...",
+      });
+
+      // Log activity
+      await logActivity({
+        dealId: deal.id,
+        type: "doc_created",
+        meta: { docType: "order", orderId: order.id }
+      });
+
+      // Navigate to order editor
+      nav(`/orders/${order.id}`);
+    } catch (error: any) {
+      logger.error("[DealsBoard] Failed to auto-create order:", error);
+      toastBus.emit({
+        variant: "destructive",
+        title: "Failed to create order",
+        description: error?.message || "Could not create order automatically"
+      });
+    }
+  };
+
+  // Handle automation - auto-create order when deal moves to "won" stage
+  useEffect(() => {
+    if (automation && automation.type === 'order') {
+      const deal = automation.deal;
+      setAutomation(null); // Clear immediately to prevent re-triggering
+      handleAutoCreateOrder(deal);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [automation]);
 
   // Handle opening edit drawer
   const handleOpenEdit = (dealData: DealData) => {
@@ -264,7 +302,7 @@ export default function DealsBoard() {
       if (isProposal) {
         handleAutoCreateQuote(deal);
       } else if (isWon) {
-        setAutomation({ type: 'order', deal }); // Keep order modal for now
+        handleAutoCreateOrder(deal);
       }
     } else {
       logger.debug("[DealsBoard] No automation trigger for stage:", name);
@@ -471,80 +509,7 @@ export default function DealsBoard() {
         defaultStageId={stageForNew ?? undefined}
       />
 
-      {/* Automation Modals - Only for orders now, quotes are auto-created */}
-      {automation && automation.type === 'order' && (
-        <CreateOrderModal
-          open={true}
-          onOpenChange={(open) => {
-            if (!open) {
-              setAutomation(null);
-              // Clear idempotency key when modal is closed
-              const key = generateAutomationKey('order', automation.deal.id);
-              clearIdempotent(key);
-            }
-          }}
-          defaultDealId={automation.deal.id}
-          defaultCompanyId={automation.deal.companyId}
-          defaultContactId={automation.deal.contactId}
-          defaultCurrency={automation.deal.currency || "DKK"}
-          fromQuoteId={undefined}
-          expectedValueMinor={automation.deal.amountMinor}
-          defaultTitle={automation.deal.title}
-          defaultNotes={automation.deal.notes}
-          defaultTaxPct={automation.deal.taxPct}
-          defaultDeliveryDate={automation.deal.closeDate}
-          onSuccess={(order) => {
-            toastBus.emit({
-              title: t("order_created"),
-              description: t("order_created_from_deal")
-            });
-            // Log activity
-            logActivity({
-              type: 'order_created_from_deal',
-              dealId: automation.deal.id,
-              meta: { orderId: order.id }
-            });
-            setAutomation(null);
-            // Clear idempotency key on success
-            const key = generateAutomationKey('order', automation.deal.id);
-            clearIdempotent(key);
-          }}
-        />
-      )}
-
-      {/* Legacy Modals (keeping for backward compatibility) */}
-      {prefillDeal && (
-        <CreateQuoteModal
-          open={quoteOpen}
-          onOpenChange={(v) => { setQuoteOpen(v); if (!v) setPrefillDeal(null); }}
-          defaultDealId={prefillDeal.id}
-          defaultCompanyId={prefillDeal.companyId}
-          defaultContactId={prefillDeal.contactId}
-          defaultCurrency={prefillDeal.currency || "DKK"}
-          expectedValueMinor={prefillDeal.amountMinor}
-          defaultTitle={prefillDeal.title}
-          defaultNotes={prefillDeal.notes}
-          defaultTaxPct={prefillDeal.taxPct}
-          defaultValidUntil={prefillDeal.closeDate}
-        />
-      )}
-
-      {prefillDeal && (
-        <CreateOrderModal
-          open={orderOpen}
-          onOpenChange={(v) => { setOrderOpen(v); if (!v) setPrefillDeal(null); }}
-          defaultDealId={prefillDeal.id}
-          defaultCompanyId={prefillDeal.companyId}
-          defaultContactId={prefillDeal.contactId}
-          defaultCurrency={prefillDeal.currency || "DKK"}
-          fromQuoteId={undefined}
-          expectedValueMinor={prefillDeal.amountMinor}
-          defaultTitle={prefillDeal.title}
-          defaultNotes={prefillDeal.notes}
-          defaultTaxPct={prefillDeal.taxPct}
-          defaultDeliveryDate={prefillDeal.closeDate}
-        />
-      )}
+      {/* Automation - Auto-create and navigate directly to editor */}
 
       <EditDealDrawer
         open={editOpen}

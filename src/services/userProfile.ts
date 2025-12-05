@@ -37,7 +37,11 @@ export async function updateOwnProfile(
       throw new Error(`Failed to update profile: ${error.message}`);
     }
 
-    return data;
+    if (!data) {
+      throw new Error('No data returned from profile update');
+    }
+
+    return data as UserProfile;
   } catch (error) {
     logger.error('Error in updateOwnProfile:', error);
     throw error;

@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { CreateQuoteModal } from "@/components/quotes/CreateQuoteModal";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { quickCreateQuoteAndNavigate } from "@/services/quickCreateHelpers";
+import { toastBus } from "@/lib/toastBus";
+import { logger } from "@/lib/logger";
 import {
   Plus,
   Search,
@@ -25,7 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Quote } from "@/services/quotes";
-import { useQuotes, useQuoteStatusCounts } from "@/services/quotes";
+import { useQuotes, useQuoteStatusCounts, useDeleteQuote } from "@/services/quotes";
 import { generatePDF } from "@/lib/pdf";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useToast } from "@/hooks/use-toast";
@@ -47,22 +49,28 @@ import { AnalyticsCard, AnalyticsCardGrid } from "@/components/common/charts/Ana
 import { QuoteStatusChart } from "@/components/quotes/QuoteStatusChart";
 import { QuoteValueTrendChart } from "@/components/quotes/QuoteValueTrendChart";
 import { PieChart as PieChartIcon, TrendingUp as TrendingUpIcon } from "lucide-react";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 const Quotes: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const companyId = searchParams.get("company_id") || undefined;
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
-  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [deleteQuoteId, setDeleteQuoteId] = useState<string | null>(null);
   const { toast } = useToast();
   const { getCompanyName } = useCompanyLookup();
+  const deleteQuote = useDeleteQuote();
 
   // Fetch ALL quotes for accurate KPI calculations (no pagination needed for quotes)
   const { data: quotesData, isLoading, error, refetch } = useQuotes({
     q: searchTerm,
     status: statusFilter !== "all" ? statusFilter : undefined,
+    company_id: companyId,
     limit: 9999  // Fetch all quotes for KPIs and charts
   });
 
@@ -73,6 +81,11 @@ const Quotes: React.FC = () => {
   const totalQuotes = quotesData?.total || 0;
 
   const filteredQuotes = quotes.filter((quote) => {
+    // Exclude soft-deleted quotes (safety check - should already be filtered by API)
+    if (quote.deleted_at) {
+      return false;
+    }
+    
     // Automatically exclude accepted quotes since they become orders
     if (quote.status === "accepted") {
       return false;
@@ -128,14 +141,30 @@ const Quotes: React.FC = () => {
     setSendDialogOpen(true);
   };
 
-  const handleDeleteQuote = (quoteId: string) => {
-    // This function will need to be updated to use the actual API
-    // For now, it will just remove from the mock data
-    // setQuotes(quotes.filter((q) => q.id !== quoteId));
-    toast({
-      title: "Quote Deleted",
-      description: "The quote has been removed (mock).",
-    });
+  const handleDeleteQuote = async (quoteId: string) => {
+    try {
+      await deleteQuote.mutateAsync(quoteId);
+      toastBus.emit({
+        title: "Quote Deleted",
+        description: "Quote has been moved to trash.",
+        variant: "success",
+        action: {
+          label: "Restore",
+          onClick: () => {
+            window.location.href = "/settings?tab=trash";
+          }
+        }
+      });
+      setDeleteQuoteId(null);
+      // Refresh quotes list
+      await refetch();
+    } catch (error: any) {
+      toastBus.emit({
+        title: "Error",
+        description: error.message || "Failed to delete quote. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -145,7 +174,37 @@ const Quotes: React.FC = () => {
         title="Quotes"
         subtitle="Proposals at a glance — status, totals and quick actions."
         actions={
-          <Button onClick={() => setCreateModalOpen(true)}>
+          <Button 
+            onClick={async () => {
+              if (!companyId) {
+                toastBus.emit({
+                  title: "Company required",
+                  description: "Please select a company first or create a quote from a company page.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              try {
+                setIsCreating(true);
+                await quickCreateQuoteAndNavigate(companyId, navigate);
+                toastBus.emit({
+                  title: "Quote created",
+                  description: "Opening quote editor...",
+                  variant: "success",
+                });
+              } catch (error) {
+                logger.error("Failed to create quote:", error);
+                toastBus.emit({
+                  title: "Failed to create quote",
+                  description: error instanceof Error ? error.message : "Could not create quote. Please try again.",
+                  variant: "destructive",
+                });
+              } finally {
+                setIsCreating(false);
+              }
+            }}
+            disabled={isCreating}
+          >
             <Plus aria-hidden="true" className="mr-2 h-4 w-4" />
             New Quote
           </Button>
@@ -236,7 +295,36 @@ const Quotes: React.FC = () => {
       {/* Quotes View */}
       {filteredQuotes.length === 0 ? (
         <div className="p-8">
-          <QuotesEmptyState onCreateClick={() => setCreateModalOpen(true)} />
+          <QuotesEmptyState 
+            onCreateClick={async () => {
+              if (!companyId) {
+                toastBus.emit({
+                  title: "Company required",
+                  description: "Please select a company first or create a quote from a company page.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              try {
+                setIsCreating(true);
+                await quickCreateQuoteAndNavigate(companyId, navigate);
+                toastBus.emit({
+                  title: "Quote created",
+                  description: "Opening quote editor...",
+                  variant: "success",
+                });
+              } catch (error) {
+                logger.error("Failed to create quote:", error);
+                toastBus.emit({
+                  title: "Failed to create quote",
+                  description: error instanceof Error ? error.message : "Could not create quote. Please try again.",
+                  variant: "destructive",
+                });
+              } finally {
+                setIsCreating(false);
+              }
+            }}
+          />
         </div>
       ) : viewMode === "table" ? (
         <Table>
@@ -300,7 +388,7 @@ const Quotes: React.FC = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleGeneratePDF(quote)}
-                            aria-label={`Generate PDF for ${quote.number || quote.id}`}
+                            aria-label={`Generate PDF for ${quote.number || generateFriendlyNumber(quote.id, 'quote')}`}
                           >
                             <Download className="h-4 w-4" aria-hidden="true" />
                           </Button>
@@ -314,7 +402,7 @@ const Quotes: React.FC = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleSendQuote(quote)}
-                            aria-label={`Send quote ${quote.number || quote.id}`}
+                            aria-label={`Send quote ${quote.number || generateFriendlyNumber(quote.id, 'quote')}`}
                           >
                             <Mail className="h-4 w-4" aria-hidden="true" />
                           </Button>
@@ -328,7 +416,7 @@ const Quotes: React.FC = () => {
                             variant="ghost"
                             size="icon"
                             asChild
-                            aria-label={`View ${quote.number || quote.id}`}
+                            aria-label={`View ${quote.number || generateFriendlyNumber(quote.id, 'quote')}`}
                           >
                             <Link to={`/quotes/${quote.id}`}>
                               <Eye className="h-4 w-4" aria-hidden="true" />
@@ -345,7 +433,7 @@ const Quotes: React.FC = () => {
                             size="icon"
                             onClick={() => handleConvertToOrder(quote)}
                             disabled={quote.status === "accepted"}
-                            aria-label={`Convert ${quote.number || quote.id} to Order`}
+                            aria-label={`Convert ${quote.number || generateFriendlyNumber(quote.id, 'quote')} to Order`}
                           >
                             <FileText className="h-4 w-4" aria-hidden="true" />
                           </Button>
@@ -360,8 +448,8 @@ const Quotes: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDeleteQuote(quote.id)}
-                            aria-label={`Delete ${quote.number || quote.id}`}
+                            onClick={() => setDeleteQuoteId(quote.id)}
+                            aria-label={`Delete ${quote.number || generateFriendlyNumber(quote.id, 'quote')}`}
                           >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
                           </Button>
@@ -389,10 +477,6 @@ const Quotes: React.FC = () => {
         </div>
       )}
 
-      <CreateQuoteModal
-        open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
-      />
 
       {selectedQuoteId && (
         <SendQuoteDialog
@@ -402,6 +486,19 @@ const Quotes: React.FC = () => {
             setSendDialogOpen(open);
             if (!open) setSelectedQuoteId(null);
           }}
+        />
+      )}
+
+      {deleteQuoteId && (
+        <ConfirmationDialog
+          open={!!deleteQuoteId}
+          onOpenChange={(open) => !open && setDeleteQuoteId(null)}
+          title="Delete Quote"
+          description={`Are you sure you want to delete this quote? This will be moved to trash and can be restored from Settings > Trash Bin.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={() => handleDeleteQuote(deleteQuoteId)}
+          variant="destructive"
         />
       )}
     </div>

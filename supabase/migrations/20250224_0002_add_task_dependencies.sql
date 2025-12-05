@@ -11,3 +11,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_depends_on ON public.tasks(depends_on_task_
 -- Add comment
 COMMENT ON COLUMN public.tasks.depends_on_task_id IS 'Reference to another task that must be completed before this task can be completed';
 
+
+
+
+

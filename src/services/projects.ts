@@ -117,21 +117,34 @@ export const projectService = {
 
     // Get project by deal_id
     async getProjectByDealId(dealId: string): Promise<Project | null> {
-        const { data, error } = await supabase
-            .from('projects')
-            .select('*')
-            .eq('deal_id', dealId)
-            .maybeSingle();
+        try {
+            const { data, error } = await supabase
+                .from('projects')
+                .select('*')
+                .eq('deal_id', dealId)
+                .maybeSingle();
 
-        if (error) {
-            // PGRST116 = no rows returned, which is fine for maybeSingle
-            if (error.code === 'PGRST116') {
+            if (error) {
+                // PGRST116 = no rows returned, which is fine for maybeSingle
+                if (error.code === 'PGRST116') {
+                    return null;
+                }
+                // Handle 406 errors (RLS might block or project doesn't exist)
+                if (error.code === 'PGRST301' || error.status === 406) {
+                    return null;
+                }
+                throw new Error(`Failed to fetch project by deal_id: ${error.message}`);
+            }
+
+            return data || null;
+        } catch (error: any) {
+            // Catch any network or other errors and return null gracefully
+            // This prevents errors from cascading
+            if (error?.status === 406 || error?.message?.includes('406')) {
                 return null;
             }
-            throw new Error(`Failed to fetch project by deal_id: ${error.message}`);
+            throw error;
         }
-
-        return data || null;
     },
 
     // Create project
@@ -214,9 +227,23 @@ export function useProjectFromDeal(dealId: string | null | undefined) {
         queryKey: ['project', 'deal', dealId],
         queryFn: async () => {
             if (!dealId) return null;
-            return projectService.getProjectByDealId(dealId);
+            try {
+                return await projectService.getProjectByDealId(dealId);
+            } catch (error: any) {
+                // Handle 406 or other errors gracefully
+                // If project doesn't exist or can't be accessed, return null
+                if (error?.code === 'PGRST116' || error?.status === 406 || error?.message?.includes('not found')) {
+                    return null;
+                }
+                // Re-throw other errors
+                throw error;
+            }
         },
         enabled: !!dealId,
+        // Don't retry on errors - project might not exist for this deal
+        retry: false,
+        // Don't refetch on window focus to avoid unnecessary requests
+        refetchOnWindowFocus: false,
     });
 }
 
@@ -225,9 +252,23 @@ export function useCreateProject() {
 
     return useMutation({
         mutationFn: (data: CreateProjectData) => projectService.createProject(data),
-        onSuccess: () => {
+        onSuccess: (project) => {
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             queryClient.invalidateQueries({ queryKey: ['project'] });
+            queryClient.invalidateQueries({ queryKey: qk.projects.all });
+            queryClient.invalidateQueries({ queryKey: qk.projects.list() });
+            queryClient.invalidateQueries({ queryKey: qk.projects.detail(project.id) });
+            // Invalidate deal-related queries
+            if (project.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(project.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+                queryClient.invalidateQueries({ queryKey: ['project', 'deal', project.deal_id] });
+            }
+            // Invalidate company-related queries
+            if (project.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(project.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }
@@ -242,6 +283,19 @@ export function useUpdateProject() {
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             queryClient.invalidateQueries({ queryKey: ['project', data.id] });
             queryClient.invalidateQueries({ queryKey: ['project', 'deal', data.deal_id] });
+            queryClient.invalidateQueries({ queryKey: qk.projects.all });
+            queryClient.invalidateQueries({ queryKey: qk.projects.list() });
+            queryClient.invalidateQueries({ queryKey: qk.projects.detail(data.id) });
+            // Invalidate deal-related queries
+            if (data.deal_id) {
+                queryClient.invalidateQueries({ queryKey: qk.deal(data.deal_id) });
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            // Invalidate company-related queries
+            if (data.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(data.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }
@@ -250,10 +304,35 @@ export function useDeleteProject() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: string) => projectService.deleteProject(id),
-        onSuccess: () => {
+        mutationFn: async (id: string) => {
+            // Fetch project before deletion to get deal_id and company_id
+            const project = await projectService.getProject(id);
+            await projectService.deleteProject(id);
+            return project;
+        },
+        onSuccess: (project) => {
+            // Remove the project from cache immediately
+            queryClient.removeQueries({ queryKey: qk.projects.detail(project?.id) });
+            queryClient.removeQueries({ queryKey: ['project', project?.id] });
+            queryClient.removeQueries({ queryKey: ['project', 'deal', project?.deal_id] });
+            
+            // Invalidate list queries (but don't refetch deal if it might not exist)
             queryClient.invalidateQueries({ queryKey: ['projects'] });
-            queryClient.invalidateQueries({ queryKey: ['project'] });
+            queryClient.invalidateQueries({ queryKey: qk.projects.all });
+            queryClient.invalidateQueries({ queryKey: qk.projects.list() });
+            
+            // Only invalidate deal queries if we know the deal exists
+            // Don't invalidate deal detail query as it may cause errors if deal was also deleted
+            if (project?.deal_id) {
+                // Only invalidate the deals list, not the specific deal query
+                // This prevents cascading errors if the deal doesn't exist
+                queryClient.invalidateQueries({ queryKey: qk.deals() });
+            }
+            // Invalidate company-related queries
+            if (project?.company_id) {
+                queryClient.invalidateQueries({ queryKey: qk.company(project.company_id) });
+                queryClient.invalidateQueries({ queryKey: qk.companies() });
+            }
         },
     });
 }

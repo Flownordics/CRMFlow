@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConnectedAccounts } from '@/components/settings/ConnectedAccounts';
@@ -12,6 +13,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 
 export function SettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const defaultTab = tabParam || 'integrations';
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +45,20 @@ export function SettingsPage() {
   useEffect(() => {
     getWorkspaceId();
   }, [getWorkspaceId]);
+
+  // Sync activeTab with URL param when it changes
+  useEffect(() => {
+    const tabFromUrl = tabParam || 'integrations';
+    setActiveTab(tabFromUrl);
+  }, [tabParam]);
+
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('tab', value);
+    setSearchParams(newSearchParams);
+  };
 
   if (loading) {
     return (
@@ -78,7 +97,7 @@ export function SettingsPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="integrations" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>

@@ -1,12 +1,13 @@
 import { useParams, Link } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
     useOrder,
     useUpdateOrderHeader,
     useUpsertOrderLine,
     useDeleteOrderLine,
+    useDeleteOrder,
 } from "@/services/orders";
-import { formatMoneyMinor, computeLineTotals } from "@/lib/money";
+import { formatMoneyMinor } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,13 +18,15 @@ import {
     SelectContent,
     SelectItem,
 } from "@/components/ui/select";
-import { DataTable } from "@/components/tables/DataTable";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { FormRow } from "@/components/forms/FormRow";
 
 import { getOrderPdfUrl } from "@/services/pdf";
 import { logPdfGenerated } from "@/services/activity";
 import { Plus, Trash2, FileText } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { toastBus } from "@/lib/toastBus";
 import { generateFriendlyNumber } from "@/lib/friendlyNumbers";
 
 import { OpenPdfButton } from "@/components/common/OpenPdfButton";
@@ -40,14 +43,52 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useLineItems } from "@/hooks/useLineItems";
+import { LineItemsTable } from "@/components/lines/LineItemsTable";
+import { useCompanyLookup } from "@/hooks/useCompanyLookup";
 
 export default function OrderEditor() {
     const { id = "" } = useParams();
+    const navigate = useNavigate();
 
     const { data: order, isLoading, error } = useOrder(id);
     const updateHeader = useUpdateOrderHeader(id);
     const upsertLine = useUpsertOrderLine(id);
     const deleteLine = useDeleteOrderLine(id);
+    const deleteOrderMutation = useDeleteOrder();
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const { getCompanyName } = useCompanyLookup();
+
+    // Use the new line items hook
+    const lineItems = useLineItems({
+        initialLines: order?.lines || [],
+        onPatch: async (lineId, patch) => {
+            // Calculate line total if relevant fields changed
+            const existingLine = order?.lines.find((l) => l.id === lineId);
+            if (existingLine && (patch.qty !== undefined || patch.unitMinor !== undefined || 
+                patch.taxRatePct !== undefined || patch.discountPct !== undefined)) {
+                const { computeLineTotals } = await import("@/lib/money");
+                const { totalMinor } = computeLineTotals({
+                    qty: patch.qty !== undefined ? patch.qty : existingLine.qty,
+                    unitMinor: patch.unitMinor !== undefined ? patch.unitMinor : existingLine.unitMinor,
+                    discountPct: patch.discountPct !== undefined ? patch.discountPct : existingLine.discountPct,
+                    taxRatePct: patch.taxRatePct !== undefined ? patch.taxRatePct : existingLine.taxRatePct,
+                });
+                patch = { ...patch, lineTotalMinor: totalMinor };
+            }
+            await upsertLine.mutateAsync({ id: lineId, ...patch });
+        },
+        onDelete: async (lineId) => {
+            await deleteLine.mutateAsync(lineId);
+        },
+    });
+
+    // Sync lines when order changes
+    useEffect(() => {
+        if (order?.lines) {
+            lineItems.setLines(order.lines);
+        }
+    }, [order?.lines, order?.id]);
 
 
     // Local state for form fields
@@ -76,34 +117,8 @@ export default function OrderEditor() {
         }
     }, [order]);
 
-    // Compute totals from lines
-    const totals = useMemo(() => {
-        if (!order?.lines || order.lines.length === 0) return { subtotal: 0, tax: 0, total: 0 };
-
-        const subtotal = order.lines.reduce((acc, l) => {
-            const { afterDiscMinor } = computeLineTotals({
-                qty: l.qty,
-                unitMinor: l.unitMinor,
-                discountPct: l.discountPct,
-                taxRatePct: l.taxRatePct,
-            });
-            return acc + afterDiscMinor;
-        }, 0);
-
-        const tax = order.lines.reduce((acc, l) => {
-            const { taxMinor } = computeLineTotals({
-                qty: l.qty,
-                unitMinor: l.unitMinor,
-                discountPct: l.discountPct,
-                taxRatePct: l.taxRatePct,
-            });
-            return acc + taxMinor;
-        }, 0);
-
-        const total = subtotal + tax;
-
-        return { subtotal, tax, total };
-    }, [order?.lines]);
+    // Use totals from the hook
+    const totals = lineItems.totals;
 
     // Handle header field changes
     const handleHeaderChange = (field: string, value: string) => {
@@ -113,46 +128,74 @@ export default function OrderEditor() {
         updateHeader.mutate(patch);
     };
 
-    // Handle line item changes
-    const handleLineChange = (lineId: string, patch: any) => {
-        // Calculate line total if qty, unitMinor, taxRatePct, or discountPct changed
-        if (patch.qty !== undefined || patch.unitMinor !== undefined || patch.taxRatePct !== undefined || patch.discountPct !== undefined) {
-            const line = order?.lines.find(l => l.id === lineId);
-            if (line) {
-                const { totalMinor } = computeLineTotals({
-                    qty: patch.qty !== undefined ? patch.qty : line.qty,
-                    unitMinor: patch.unitMinor !== undefined ? patch.unitMinor : line.unitMinor,
-                    discountPct: patch.discountPct !== undefined ? patch.discountPct : line.discountPct,
-                    taxRatePct: patch.taxRatePct !== undefined ? patch.taxRatePct : line.taxRatePct,
-                });
-                patch.lineTotalMinor = totalMinor;
-            }
+    // Handle delete order
+    const handleDelete = async () => {
+        if (!order) return;
+        try {
+            await deleteOrderMutation.mutateAsync(order.id);
+            toastBus.emit({
+                title: "Order Deleted",
+                description: `Order ${order.number || order.id} has been moved to trash.`,
+                variant: "success",
+                action: {
+                    label: "Restore",
+                    onClick: () => {
+                        window.location.href = "/settings?tab=trash";
+                    }
+                }
+            });
+            navigate("/orders");
+        } catch (error: any) {
+            toastBus.emit({
+                title: "Error",
+                description: error.message || "Failed to delete order. Please try again.",
+                variant: "destructive",
+            });
         }
-        upsertLine.mutate({ id: lineId, ...patch });
-    };
-
-    // Handle line item deletion
-    const handleLineDelete = (lineId: string) => {
-        deleteLine.mutate(lineId);
     };
 
     // Handle add new line
-    const handleAddLine = () => {
-        const { totalMinor } = computeLineTotals({
-            qty: 1,
-            unitMinor: 0,
-            taxRatePct: 25,
-            discountPct: 0,
-        });
-
-        upsertLine.mutate({
+    const handleAddLine = async () => {
+        const tempId = lineItems.addLine({
             description: "",
             qty: 1,
             unitMinor: 0,
             taxRatePct: 25,
             discountPct: 0,
-            lineTotalMinor: totalMinor,
         });
+
+        // Save to server to get real ID and calculate lineTotalMinor
+        try {
+            const { computeLineTotals } = await import("@/lib/money");
+            const { totalMinor } = computeLineTotals({
+                qty: 1,
+                unitMinor: 0,
+                taxRatePct: 25,
+                discountPct: 0,
+            });
+
+            const result = await upsertLine.mutateAsync({
+                description: "",
+                qty: 1,
+                unitMinor: 0,
+                taxRatePct: 25,
+                discountPct: 0,
+                lineTotalMinor: totalMinor,
+            });
+
+            // Update with the real ID from the server
+            if (result) {
+                lineItems.setLines(
+                    lineItems.lines.map((line) =>
+                        line.id === tempId ? { ...line, id: result.id } : line
+                    )
+                );
+            }
+        } catch (error) {
+            // Remove the temp line if save failed
+            lineItems.deleteLine(tempId);
+            throw error;
+        }
     };
 
     // Handle PDF generation
@@ -203,7 +246,7 @@ export default function OrderEditor() {
         <div className="space-y-6 p-6">
             <PageHeader
                 title={`Order ${order.number ?? generateFriendlyNumber(order.id, 'order')}`}
-                subtitle={order.company_id ? `Company: ${order.company_id}` : ""}
+                subtitle={order.company_id ? `Company: ${getCompanyName(order.company_id)}` : ""}
                 actions={
                     <div className="flex items-center gap-2">
                         <Button
@@ -244,6 +287,15 @@ export default function OrderEditor() {
                             onGetUrl={() => getOrderPdfUrl(order.id)}
                             onLogged={handlePdfGenerated}
                         />
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsDeleteDialogOpen(true)}
+                            className="text-destructive hover:text-destructive"
+                        >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                        </Button>
                     </div>
                 }
             />
@@ -371,112 +423,41 @@ export default function OrderEditor() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <DataTable
-                        data={order.lines || []}
-                        columns={[
-                            {
-                                header: "Description",
-                                cell: (line: any) => (
-                                    <Input
-                                        value={line.description || ""}
-                                        onChange={(e) =>
-                                            handleLineChange(line.id, { description: e.target.value })
-                                        }
-                                        placeholder="Enter description"
-                                    />
-                                ),
-                            },
-                            {
-                                header: "Qty",
-                                cell: (line: any) => (
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={line.qty || 0}
-                                        onChange={(e) =>
-                                            handleLineChange(line.id, { qty: parseFloat(e.target.value) || 0 })
-                                        }
-                                    />
-                                ),
-                            },
-                            {
-                                header: "Unit Price",
-                                cell: (line: any) => (
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={line.unitMinor || 0}
-                                        onChange={(e) =>
-                                            handleLineChange(line.id, { unitMinor: parseFloat(e.target.value) || 0 })
-                                        }
-                                    />
-                                ),
-                            },
-                            {
-                                header: "Tax %",
-                                cell: (line: any) => (
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={line.taxRatePct || 0}
-                                        onChange={(e) =>
-                                            handleLineChange(line.id, { taxRatePct: parseFloat(e.target.value) || 0 })
-                                        }
-                                    />
-                                ),
-                            },
-                            {
-                                header: "Discount %",
-                                cell: (line: any) => (
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={line.discountPct || 0}
-                                        onChange={(e) =>
-                                            handleLineChange(line.id, { discountPct: parseFloat(e.target.value) || 0 })
-                                        }
-                                    />
-                                ),
-                            },
-                            {
-                                header: "Total",
-                                cell: (line: any) => (
-                                    <span className="font-medium">
-                                        {formatMoneyMinor(line.lineTotalMinor || 0, currency)}
-                                    </span>
-                                ),
-                            },
-                            {
-                                header: "Actions",
-                                cell: (line: any) => (
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="sm">
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Delete Line Item</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Are you sure you want to delete this line item? This action cannot be undone.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction
-                                                    onClick={() => handleLineDelete(line.id)}
-                                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                                >
-                                                    Delete
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                ),
-                            },
-                        ]}
-                    />
+                    {lineItems.lines.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                            No line items yet
+                        </div>
+                    ) : (
+                        <LineItemsTable
+                            currency={currency}
+                            lines={lineItems.lines.map((line) => ({
+                                id: line.id,
+                                sku: line.sku ?? null,
+                                description: line.description,
+                                qty: line.qty,
+                                unitMinor: line.unitMinor,
+                                taxRatePct: line.taxRatePct,
+                                discountPct: line.discountPct,
+                            }))}
+                            showSku={false}
+                            onPatch={(lineId, patch) => {
+                                // Use the hook's patchLine which handles validation and saving
+                                lineItems.patchLine(lineId, patch);
+                            }}
+                            onDelete={(lineId) => {
+                                // Use the hook's deleteLine which handles deletion
+                                lineItems.deleteLine(lineId);
+                            }}
+                            labels={{
+                                description: "Description",
+                                qty: "Qty",
+                                unit: "Unit",
+                                discount_pct: "Discount %",
+                                tax_pct: "Tax %",
+                                line_total: "Total",
+                            }}
+                        />
+                    )}
                 </CardContent>
             </Card>
 
@@ -509,6 +490,19 @@ export default function OrderEditor() {
                     <Link to="/orders">← Back to Orders</Link>
                 </Button>
             </div>
+
+            {order && (
+                <ConfirmationDialog
+                    open={isDeleteDialogOpen}
+                    onOpenChange={setIsDeleteDialogOpen}
+                    title="Delete Order"
+                    description={`Are you sure you want to delete order ${order.number || order.id}? This will be moved to trash and can be restored from Settings > Trash Bin.`}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    onConfirm={handleDelete}
+                    variant="destructive"
+                />
+            )}
         </div>
     );
 }

@@ -11,3 +11,7 @@ COMMENT ON COLUMN public.companies.created_by IS 'UUID of the user who created t
 -- Create index for created_by if it doesn't exist (useful for queries)
 CREATE INDEX IF NOT EXISTS idx_companies_created_by ON public.companies (created_by);
 
+
+
+
+

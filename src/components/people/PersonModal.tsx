@@ -25,6 +25,7 @@ import { useCreatePerson, useUpdatePerson } from "@/services/people";
 import { useCompanies } from "@/services/companies";
 import { toast } from "sonner";
 import { logger } from '@/lib/logger';
+import { formatPhoneNumber } from "@/lib/utils";
 
 interface PersonModalProps {
     person?: Person;
@@ -193,8 +194,14 @@ export function PersonModal({ person, companyId, open, onOpenChange, onSuccess, 
                             <Label htmlFor="phone">Phone</Label>
                             <Input
                                 id="phone"
-                                {...form.register("phone")}
-                                placeholder="+1 (555) 123-4567"
+                                type="tel"
+                                value={form.watch("phone") || ""}
+                                placeholder="+45 12 34 56 78"
+                                onChange={(e) => {
+                                    const formatted = formatPhoneNumber(e.target.value);
+                                    form.setValue("phone", formatted, { shouldValidate: true });
+                                }}
+                                onBlur={() => form.trigger("phone")}
                             />
                         </div>
                     </div>

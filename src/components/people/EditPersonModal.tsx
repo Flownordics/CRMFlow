@@ -15,6 +15,7 @@ import { useUpdatePerson } from "@/services/people";
 import { Person } from "@/lib/schemas/person";
 import { CompanySelect } from "@/components/selects/CompanySelect";
 import { toastBus } from "@/lib/toastBus";
+import { formatPhoneNumber } from "@/lib/utils";
 
 interface EditPersonModalProps {
     person: Person;
@@ -117,7 +118,11 @@ export function EditPersonModal({ person, open, onOpenChange, onSuccess }: EditP
                             id="phone"
                             type="tel"
                             value={formData.phone}
-                            onChange={(e) => handleInputChange("phone", e.target.value)}
+                            onChange={(e) => {
+                                const formatted = formatPhoneNumber(e.target.value);
+                                handleInputChange("phone", formatted);
+                            }}
+                            placeholder="+45 12 34 56 78"
                         />
                     </div>
 

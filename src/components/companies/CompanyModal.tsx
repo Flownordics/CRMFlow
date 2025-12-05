@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { Mail, Building2, Search, Loader2 } from "lucide-react";
 import { logger } from '@/lib/logger';
+import { formatPhoneNumber } from "@/lib/utils";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -339,8 +340,13 @@ export function CompanyModal({ company, open, onOpenChange, onSuccess, defaultVa
                             <Input
                                 id="phone"
                                 type="tel"
-                                {...form.register("phone")}
+                                value={form.watch("phone") || ""}
                                 placeholder="+45 12 34 56 78"
+                                onChange={(e) => {
+                                    const formatted = formatPhoneNumber(e.target.value);
+                                    form.setValue("phone", formatted, { shouldValidate: true });
+                                }}
+                                onBlur={() => form.trigger("phone")}
                             />
                         </div>
 

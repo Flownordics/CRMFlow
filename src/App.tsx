@@ -48,6 +48,7 @@ const OAuthComplete = lazy(() => import("@/pages/oauth/OAuthComplete"));
 const OAuthCallback = lazy(() => import("@/pages/oauth/OAuthCallback"));
 const CallLists = lazy(() => import("@/pages/CallLists"));
 const CallListDetail = lazy(() => import("@/pages/CallListDetail"));
+const PublicQuoteView = lazy(() => import("@/pages/public/PublicQuoteView"));
 
 const App = () => {
   // Health check effect
@@ -88,6 +89,8 @@ const App = () => {
                     <Route path="/forgot" element={<Forgot />} />
                     <Route path="/oauth/complete" element={<OAuthComplete />} />
                     <Route path="/oauth/callback" element={<OAuthCallback />} />
+                    {/* Public routes (no authentication required) */}
+                    <Route path="/quote/:token" element={<PublicQuoteView />} />
                     <Route
                       path="/"
                       element={
